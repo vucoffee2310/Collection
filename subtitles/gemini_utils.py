@@ -3,7 +3,8 @@ from google import genai
 from google.genai import types
 import sys
 import re
-from regex_patterns import prepare_regex_patterns # Assuming this file exists
+from regex_patterns import prepare_regex_patterns
+from similarity import find_longest_approx_common_string_k_mismatches_reduced # NEW: Import similarity function
 
 # --- Private Helper Functions ---
 
@@ -41,8 +42,8 @@ def _handle_no_segmentation(client, model_name, contents_list, generation_config
     try:
         with open(output_filename, "w", encoding="utf-8") as f:
             stream = client.models.generate_content_stream(
-                model=model_name, 
-                contents=contents_list, 
+                model=model_name,
+                contents=contents_list,
                 config=generation_config
             )
             chunk_count = 0
@@ -84,10 +85,10 @@ def _process_stream_and_segments(client, model_name, contents_list, generation_c
     chunk_count = 0
 
     print("Generating content (dots indicate received chunks; dashes indicate key matches):")
-    
+
     stream = client.models.generate_content_stream(
-        model=model_name, 
-        contents=contents_list, 
+        model=model_name,
+        contents=contents_list,
         config=generation_config
     )
 
@@ -103,16 +104,125 @@ def _process_stream_and_segments(client, model_name, contents_list, generation_c
             for pattern_info in patterns_to_check:
                 compiled_pattern = pattern_info["compiled_pattern"]
                 pattern_identifier = compiled_pattern.pattern
-                
+
                 if pattern_identifier not in found_patterns_reported:
                     match = compiled_pattern.search(total_generated_content)
                     if match:
                         print("-", end="") # Indicate a match
                         sys.stdout.flush()
 
-                        captured_content = match.group(0) # Entire regex match
-                        key_group_idx = pattern_info["key_group_idx"]
-                        is_final_extraction_pattern = pattern_info["is_final_extraction_pattern"]
+                        # --- Process content using similarity.py based on pattern type ---
+                        current_segment_content = ""
+                        processed_content_description = ""
+
+                        pattern_name = pattern_info["pattern_name"]
+                        content_group_idx = pattern_info["content_group_idx"] # The group holding the primary content
+
+                        if pattern_name == "first_key_pair":
+                            # Regex groups: (1=key1)(2=content_G2)(3=key2)(4=150_chars_after_key2)
+                            g2_content = match.group(content_group_idx) # This is the main content to be saved
+                            g4_content = match.group(pattern_info["comparison_groups"]["s2_to_compare"])
+
+                            # Compare first 150 characters of group 2 to entire group 4
+                            s1_compare = g2_content[:pattern_info["comparison_groups"]["s1_start_len"]]
+                            s2_compare = g4_content
+
+                            overlap_match = find_longest_approx_common_string_k_mismatches_reduced(
+                                s1_compare, s2_compare, min_matched_words=3, max_mismatches=3
+                            )
+
+                            current_segment_content = g2_content
+                            if overlap_match:
+                                # "remove from the match to the end of group 2"
+                                # This means keeping only the part *before* the overlap starts in G2.
+                                start_idx_in_g2 = g2_content.find(overlap_match)
+                                if start_idx_in_g2 != -1:
+                                    current_segment_content = g2_content[:start_idx_in_g2]
+                                    print(f"\n--- Trimmed '{pattern_name}' (before overlap) ---")
+                                    print(f"Original G{content_group_idx} preview: '{g2_content[:100]}...'")
+                                    print(f"Overlap found: '{overlap_match}'")
+                                    print(f"New G{content_group_idx} preview: '{current_segment_content[:100]}...'")
+                                    sys.stdout.flush()
+                            processed_content_description = f"Processed content from Group {content_group_idx}"
+
+                        elif pattern_name == "general_pair":
+                            # Regex groups: (1=150_chars_before_key1)(2=key1)(3=content_G3)(4=key2)(5=150_chars_after_key2)
+                            g1_content = match.group(pattern_info["comparison_groups"]["first_compare"]["s1_group"])
+                            g3_content = match.group(content_group_idx) # This is the main content to be saved
+                            g5_content = match.group(pattern_info["comparison_groups"]["second_compare"]["s1_group"])
+
+                            original_g3_content = g3_content # Keep original for comparison
+
+                            # First comparison: G1 vs G3[:150]
+                            s1_compare_1 = g1_content
+                            s2_compare_1 = g3_content[:pattern_info["comparison_groups"]["first_compare"]["s2_end_len"]]
+                            overlap1 = find_longest_approx_common_string_k_mismatches_reduced(
+                                s1_compare_1, s2_compare_1, min_matched_words=3, max_mismatches=3
+                            )
+                            if overlap1:
+                                # "remove text before the match from group 3"
+                                start_idx_in_g3 = g3_content.find(overlap1)
+                                if start_idx_in_g3 != -1:
+                                    g3_content = g3_content[start_idx_in_g3:]
+                                    print(f"\n--- Trimmed '{pattern_name}' (after overlap1) ---")
+                                    print(f"Original G{content_group_idx} preview: '{original_g3_content[:100]}...'")
+                                    print(f"Overlap1 found: '{overlap1}'")
+                                    print(f"New G{content_group_idx} preview: '{g3_content[:100]}...'")
+                                    sys.stdout.flush()
+
+                            # Second comparison: G5 vs G3[-150:] (using potentially modified g3_content)
+                            s1_compare_2 = g5_content
+                            s2_compare_2 = g3_content[pattern_info["comparison_groups"]["second_compare"]["s2_start_len"]:]
+                            overlap2 = find_longest_approx_common_string_k_mismatches_reduced(
+                                s1_compare_2, s2_compare_2, min_matched_words=3, max_mismatches=3
+                            )
+                            if overlap2:
+                                # "remove from the match to the end of group 3."
+                                # This means keep only the part *before* the overlap starts in G3.
+                                end_idx_in_g3 = g3_content.rfind(overlap2) # Use rfind for the last occurrence
+                                if end_idx_in_g3 != -1:
+                                    g3_content = g3_content[:end_idx_in_g3]
+                                    print(f"\n--- Trimmed '{pattern_name}' (before overlap2) ---")
+                                    print(f"Overlap2 found: '{overlap2}'")
+                                    print(f"New G{content_group_idx} preview: '{g3_content[:100]}...'")
+                                    sys.stdout.flush()
+
+                            current_segment_content = g3_content
+                            processed_content_description = f"Processed content from Group {content_group_idx}"
+
+                        elif pattern_info["is_final_extraction_pattern"]: # Catches 'last_key_segment_with_prefix' and 'single_last_key_segment_with_prefix'
+                            # Regex groups: (1=150_chars_before_last_key)(2=last_key)(3=content_G3)
+                            g1_content = match.group(pattern_info["comparison_groups"]["s1_group"])
+                            g3_content = match.group(content_group_idx) # This is the main content to be saved
+
+                            original_g3_content = g3_content
+
+                            # Comparison: G1 vs G3
+                            s1_compare = g1_content
+                            s2_compare = g3_content
+                            overlap_match = find_longest_approx_common_string_k_mismatches_reduced(
+                                s1_compare, s2_compare, min_matched_words=3, max_mismatches=3
+                            )
+
+                            current_segment_content = g3_content
+                            if overlap_match:
+                                # "remove the text before the match from group 3."
+                                # This means keep only the part *from* the overlap to the end of G3.
+                                start_idx_in_g3 = g3_content.find(overlap_match)
+                                if start_idx_in_g3 != -1:
+                                    current_segment_content = g3_content[start_idx_in_g3:]
+                                    print(f"\n--- Trimmed '{pattern_name}' (after overlap) ---")
+                                    print(f"Original G{content_group_idx} preview: '{original_g3_content[:100]}...'")
+                                    print(f"Overlap found: '{overlap_match}'")
+                                    print(f"New G{content_group_idx} preview: '{current_segment_content[:100]}...'")
+                                    sys.stdout.flush()
+                            processed_content_description = f"Processed content from Group {content_group_idx}"
+
+                        else:
+                            # Default if no specific processing rule applies, save the entire matched segment
+                            current_segment_content = match.group(0)
+                            processed_content_description = "Entire matched segment (full regex match, no specific processing)"
+                        # --- End similarity.py processing ---
 
                         filename_suffix = ""
                         print_message = ""
@@ -122,21 +232,23 @@ def _process_stream_and_segments(client, model_name, contents_list, generation_c
                             print_message = f"Keys '{key1_str}' and '{key2_str}' found with pattern '{pattern_info['pattern_name']}'."
                         else:
                             single_key_str = pattern_info["keys_involved"][0]
-                            filename_suffix = f"{single_key_str}_to_absolute_end.txt"
+                            # For single/last keys, the file saved here is just the processed content *after* the key, not the full slice.
+                            # The full slice is handled separately by _extract_and_save_final_slice after the stream completes.
+                            filename_suffix = f"{single_key_str}.txt"
                             print_message = f"Key '{single_key_str}' found with pattern '{pattern_info['pattern_name']}'."
-                            if is_final_extraction_pattern:
-                                last_key_overall_start_index = match.start(key_group_idx)
-                        
+                            if pattern_info["is_final_extraction_pattern"]:
+                                last_key_overall_start_index = match.start(pattern_info["key_group_idx"]) # Use the group index of the key itself for overall start index tracking
+
                         segment_filename = f"matched_segment_{filename_suffix}"
                         _save_matched_segment_to_file(
-                            captured_content, 
-                            segment_filename, 
-                            print_message, 
-                            "Entire matched segment (full regex match)",
+                            current_segment_content, # Pass the processed content
+                            segment_filename,
+                            print_message,
+                            processed_content_description, # Pass the new description
                             compiled_pattern
                         )
                         found_patterns_reported.add(pattern_identifier)
-    
+
     print(f"\nContent generation stream complete. Total chunks received: {chunk_count}")
     return total_generated_content, last_key_overall_start_index
 
@@ -182,24 +294,24 @@ def generate_and_save(input_text, output_filename, api_key, generated_keys):
         return
 
     print(f"Starting content generation for '{input_text[:50]}...' to '{output_filename}' with segmentation.")
-    
+
     total_generated_content = ""
     last_key_overall_start_index = -1
 
     try:
         with open(output_filename, "w", encoding="utf-8") as f_main:
             total_generated_content, last_key_overall_start_index = _process_stream_and_segments(
-                client, 
-                model_name, 
-                contents_list, 
-                generation_config, 
-                f_main, 
+                client,
+                model_name,
+                contents_list,
+                generation_config,
+                f_main,
                 patterns_to_check
             )
-        
+
         _extract_and_save_final_slice(
-            total_generated_content, 
-            last_key_overall_start_index, 
+            total_generated_content,
+            last_key_overall_start_index,
             final_segment_key_str
         )
 
