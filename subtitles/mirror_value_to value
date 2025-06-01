@@ -1,0 +1,60 @@
+import re
+
+text1 = """
+Hey guys, MCP has quickly become the standard for connecting tools to your AI agents. Which is why in today's video, I'm going to be giving you a crash course on connecting MCP to agent (xt) development kit so that you can supercharge your ADK agents with real world tools that actually work. And I know MCP can feel complex and overwhelming at first, which is why in (ji) today's video, we're going to break everything down step by step in three different phases. In phase one, we're going to hop over to the whiteboard and break everything down so you can (GI) understand what is MCP, how it works, and so you can see why MCP is so powerful with Agent Development Kit. In phase two, we're going to actually dive into some code where you're going to see (Aw) how we can connect an ADK agent up to a remote tool that's all done with MCP. And then in phase three, you're going to see everything end to end where we're going to actually create a local MCP (Do) server on our own computer and connect it to an ADK agent so you can understand how they work together and create your own custom MCP servers. And to make things even easier for you guys, I'm (QG) going to be giving away all the source code for all the different examples you're going to see in today's video completely for free. Just click that first link in the description below so (NJ) you can download all the source code. So, if you're serious about becoming an AI developer, you're going to want to stick through this whole video because MCP has become a core foundational (iN) technology in building real world AI agents. And this is the video that's going to catch you up to speed super fast. So, with all that out of the way, let's go ahead and hop over to the (ox) whiteboard so you guys can understand what is MCP, how it works, and why it's such an amazing tool to use with Agent Development Kit. Oh, and real quick. If you're looking to get help on your AI (Oc) projects or if you'd like to meet like-minded AI developers, I definitely recommend checking out the free school community I've created for you guys. We have over 7,000 members and free weekly (dq) coaching calls and a bunch of extra bonus materials. So, definitely recommend you joining and I cannot wait to see you guys on our weekly Tuesday coaching calls. But enough of that. (Hd) Let's get back to the video. Okay guys, so welcome to phase one where we're going to do a quick crash course on all things MCP. Now, before we dive in, I just want to mention that MCP confused (eW) the heck out of me. The first few times I heard about it, I didn't understand why we would need it. I actually just was like, "Oh, that seems pointless. It's so much extra work just to use (qZ) tools. I'm not even going to work with it." That was my thought process for the longest time. But after continually working with it over and over again, I now am a firm believer in MCP and I (ib) understand why it's such a powerful tool. So that's why in this section, I'm going to cover some of the major problems with traditional tool calling so that you can understand why MCP is so (LA) powerful and you need to use it as well. And to make things as easy to understand as possible, I've done my best to include a few different examples so you can see what tool calling looks like (nE) without MCP and all the benefits, but most importantly the cons of not using MCP so that when we hop over to looking at MCP, you go, "Oh, I now understand why MCP is so powerful and why I should (eG) use it as well." So, we're going to be covering all that in this crash course so we have a good foundation before we dive into actually start using it inside of Agent Development Kit. So, let's (zj) start at the top. And don't worry if it doesn't click instantly. It took me forever to learn it. So, I'm going to be breaking things down part by part. So, don't worry if it doesn't make sense (VQ) till the end of phase one because there's a lot of moving parts. So, long story short, what the heck is model context protocol or MCP? In a nutshell, it's just a standardized way for AI (UQ) agents to connect to external tools. More simply, what it's really doing under the hood is MCP is just a server that is a standardized way for you to access common real world AI tools that (Qu) you want to pass to your agents. This MCP server, what it does in a standardized way is it allows you to connect up tools to your agent. So, it's one server that connects to your agent (jY) and this one server goes, "Hey, I'm connected to all sorts of tools." And for each tool, I could allow you to call this tool. I could list out all the tools you have access to or if you want (qS) more information on a tool, I can describe it for you so you can see what arguments you need to pass to this tool and what this tool is going to return to. So, it's just a standardized way. (Zf)
+"""
+
+text2 = """
+Chào các bạn, MCP đã nhanh chóng trở thành tiêu chuẩn để kết nối các công cụ với tác nhân AI của bạn. Đó là lý do tại sao trong video hôm nay, tôi sẽ cung cấp cho bạn một khóa học cấp tốc về cách kết nối MCP với bộ công cụ phát triển tác nhân (xt) để bạn có thể tăng cường sức mạnh cho các tác nhân ADK của mình bằng các công cụ thực tế hoạt động hiệu quả. Và tôi biết MCP ban đầu có thể cảm thấy phức tạp và choáng ngợp, đó là lý do tại sao trong video (ji) hôm nay, chúng ta sẽ phân tích mọi thứ từng bước một theo ba giai đoạn khác nhau. Trong giai đoạn một, chúng ta sẽ chuyển sang bảng trắng và phân tích mọi thứ để bạn có thể (GI) hiểu MCP là gì, cách nó hoạt động và tại sao MCP lại mạnh mẽ đến vậy với Agent Development Kit. Trong giai đoạn hai, chúng ta sẽ thực sự đi sâu vào một số mã nơi bạn sẽ thấy (Aw) cách chúng ta có thể kết nối một tác nhân ADK với một công cụ từ xa, tất cả đều được thực hiện bằng MCP. Và sau đó trong giai đoạn ba, bạn sẽ thấy mọi thứ từ đầu đến cuối, nơi chúng ta sẽ thực sự tạo một máy chủ MCP (Do) cục bộ trên máy tính của mình và kết nối nó với một tác nhân ADK để bạn có thể hiểu cách chúng hoạt động cùng nhau và tạo các máy chủ MCP tùy chỉnh của riêng mình. Và để mọi thứ trở nên dễ dàng hơn cho các bạn, tôi (QG) sẽ cung cấp miễn phí toàn bộ mã nguồn cho tất cả các ví dụ khác nhau mà bạn sẽ thấy trong video hôm nay. Chỉ cần nhấp vào liên kết đầu tiên trong phần mô tả bên dưới để (NJ) bạn có thể tải xuống toàn bộ mã nguồn. Vì vậy, nếu bạn nghiêm túc muốn trở thành một nhà phát triển AI, bạn sẽ muốn xem hết video này vì MCP đã trở thành một công nghệ nền tảng cốt lõi (iN) trong việc xây dựng các tác nhân AI trong thế giới thực. Và đây là video sẽ giúp bạn bắt kịp tốc độ siêu nhanh. Vì vậy, sau khi đã nói hết những điều đó, hãy cùng chuyển sang bảng (ox) trắng để các bạn có thể hiểu MCP là gì, cách nó hoạt động và tại sao nó lại là một công cụ tuyệt vời để sử dụng với Agent Development Kit. Ồ, và nói nhanh thôi. Nếu bạn đang tìm kiếm sự giúp đỡ cho các dự án AI (Oc) của mình hoặc nếu bạn muốn gặp gỡ các nhà phát triển AI có cùng chí hướng, tôi chắc chắn khuyên bạn nên kiểm tra cộng đồng trường học miễn phí mà tôi đã tạo cho các bạn. Chúng tôi có hơn 7.000 thành viên và các cuộc gọi huấn luyện (dq) miễn phí hàng tuần cùng một loạt tài liệu bổ sung. Vì vậy, chắc chắn khuyên bạn nên tham gia và tôi rất nóng lòng được gặp các bạn trong các cuộc gọi huấn luyện hàng tuần vào thứ Ba của chúng tôi. Nhưng đủ rồi. (Hd) Hãy quay lại video. Được rồi các bạn, chào mừng đến với giai đoạn một, nơi chúng ta sẽ có một khóa học cấp tốc về tất cả mọi thứ liên quan đến MCP. Bây giờ, trước khi chúng ta đi sâu vào, tôi chỉ muốn đề cập rằng MCP đã làm tôi bối rối (eW) rất nhiều. Vài lần đầu tiên tôi nghe về nó, tôi không hiểu tại sao chúng ta lại cần nó. Tôi thực sự chỉ nghĩ, "Ồ, điều đó có vẻ vô nghĩa. Quá nhiều công việc bổ sung chỉ để sử dụng (qZ) các công cụ. Tôi thậm chí sẽ không làm việc với nó." Đó là quá trình suy nghĩ của tôi trong một thời gian dài nhất. Nhưng sau khi liên tục làm việc với nó hết lần này đến lần khác, bây giờ tôi là một người tin tưởng vững chắc vào MCP và tôi (ib) hiểu tại sao nó lại là một công cụ mạnh mẽ đến vậy. Đó là lý do tại sao trong phần này, tôi sẽ đề cập đến một số vấn đề lớn với việc gọi công cụ truyền thống để bạn có thể hiểu tại sao MCP lại (LA) mạnh mẽ đến vậy và bạn cũng cần sử dụng nó. Và để mọi thứ dễ hiểu nhất có thể, tôi đã cố gắng hết sức để đưa vào một vài ví dụ khác nhau để bạn có thể thấy việc gọi công cụ trông như thế nào (nE) mà không có MCP và tất cả các lợi ích, nhưng quan trọng nhất là những nhược điểm của việc không sử dụng MCP để khi chúng ta chuyển sang xem xét MCP, bạn sẽ nói, "Ồ, bây giờ tôi hiểu tại sao MCP lại mạnh mẽ đến vậy và tại sao tôi cũng nên (eG) sử dụng nó." Vì vậy, chúng ta sẽ đề cập đến tất cả những điều đó trong khóa học cấp tốc này để chúng ta có một nền tảng tốt trước khi đi sâu vào việc thực sự bắt đầu sử dụng nó bên trong Agent Development Kit. Vậy, hãy (zj) bắt đầu từ đầu. Và đừng lo lắng nếu nó không hiểu ngay lập tức. Tôi đã mất rất nhiều thời gian để học nó. Vì vậy, tôi sẽ phân tích mọi thứ từng phần. Vì vậy, đừng lo lắng nếu nó không có ý nghĩa (VQ) cho đến cuối giai đoạn một vì có rất nhiều phần chuyển động. Vậy, tóm lại, giao thức ngữ cảnh mô hình hay MCP là gì? Tóm lại, nó chỉ là một cách tiêu chuẩn hóa để các tác nhân AI (UQ) kết nối với các công cụ bên ngoài. Đơn giản hơn, điều nó thực sự đang làm bên dưới là MCP chỉ là một máy chủ là một cách tiêu chuẩn hóa để bạn truy cập các công cụ AI thực tế phổ biến mà (Qu) bạn muốn chuyển cho các tác nhân của mình. Máy chủ MCP này, điều nó làm theo một cách tiêu chuẩn hóa là nó cho phép bạn kết nối các công cụ với tác nhân của mình. Vì vậy, nó là một máy chủ kết nối với tác nhân của bạn (jY) và máy chủ này nói, "Này, tôi được kết nối với tất cả các loại công cụ." Và đối với mỗi công cụ, tôi có thể cho phép bạn gọi công cụ này. Tôi có thể liệt kê tất cả các công cụ bạn có quyền truy cập hoặc nếu bạn muốn (qS) thêm thông tin về một công cụ, tôi có thể mô tả nó cho bạn để bạn có thể thấy những đối số bạn cần truyền cho công cụ này và công cụ này sẽ trả về gì. Vì vậy, nó chỉ là một cách tiêu chuẩn hóa. (Zf)
+"""
+
+def extract_key_value_pairs(text_content):
+    """
+    Extracts key-value pairs from a text string based on (xx) delimiters.
+    Returns a dictionary where keys are (xx) and values are the preceding text.
+    """
+    text_content = text_content.strip()
+    delimiter_pattern = r'(\([a-zA-Z]{2}\))' # Keep the parentheses in the key
+
+    matches_info = []
+    for match in re.finditer(delimiter_pattern, text_content):
+        matches_info.append({
+            'key_with_paren': match.group(0),
+            'start_index': match.start(),
+            'end_index': match.end()
+        })
+
+    extracted_data = {}
+    current_value_start_index = 0
+
+    for match_data in matches_info:
+        key = match_data['key_with_paren']
+        key_start = match_data['start_index']
+
+        value = text_content[current_value_start_index:key_start].strip()
+        extracted_data[key] = value
+
+        current_value_start_index = match_data['end_index']
+    
+    return extracted_data
+
+# Extract data from both texts
+data1 = extract_key_value_pairs(text1)
+data2 = extract_key_value_pairs(text2)
+
+# Get the keys that are common to both dictionaries
+common_keys = set(data1.keys()).intersection(set(data2.keys()))
+
+# Iterate through the keys of data1 to maintain original order,
+# and process only those that are common.
+for key in data1:
+    if key in common_keys:
+        value1 = data1[key]
+        value2 = data2[key]
+
+        # Escape double quotes within the values
+        escaped_value1 = value1.replace('"', '\\"')
+        escaped_value2 = value2.replace('"', '\\"')
+        
+        # Format the output as "text1_value":"text2_value"
+        print(f'"{escaped_value1}":"{escaped_value2}"')
