@@ -1,0 +1,255 @@
+import re
+import random
+import string
+from datetime import timedelta
+import json
+import logging
+
+# --- Configuration ---
+CONFIG = {
+    "group_size": 5,
+    "combine_size": 25,
+    "random_key_length": 4,
+    "log_level": "INFO",
+    "output_indent": 2,
+    "output_file": "output.json",
+    "marker_regex": r"^\s*\[[^\]]+\]\s*$"
+}
+
+# --- Logging Setup ---
+def setup_logging(level: str):
+    numeric_level = getattr(logging, level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f"Invalid log level: {level}")
+    logging.basicConfig(level=numeric_level, format='%(levelname)s: %(message)s')
+
+# --- Functions from the first code block (parsing subtitle data) ---
+
+def parse_time_str(time_str: str) -> timedelta:
+    parts = time_str.replace('.', ',').split(',')
+    if len(parts) != 2:
+        raise ValueError(f"Time string format error: expected 'H:M:S,ms', got '{time_str}'")
+    h, m, s = map(int, parts[0].split(':'))
+    ms = int(parts[1])
+    return timedelta(hours=h, minutes=m, seconds=s, milliseconds=ms)
+
+def format_timedelta_str(td_object: timedelta) -> str:
+    total_seconds = int(td_object.total_seconds())
+    milliseconds = td_object.microseconds // 1000
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+
+def generate_delimiter() -> str:
+    char1 = random.choice(string.ascii_letters)
+    char2 = random.choice(string.ascii_letters)
+    return f"({char1}{char2})"
+
+def process_subtitle_text(text_input: str) -> list[dict]:
+    results: list[dict] = []
+    blocks = re.split(r'\n\s*\n', text_input.strip())
+    marker_pattern = re.compile(CONFIG["marker_regex"])
+
+    for block in blocks:
+        lines = block.strip().split('\n')
+        
+        # OPTIMIZED: Simplified condition and improved debug message
+        if len(lines) < 3:
+            first_line_debug = lines[0] if lines else "Empty block"
+            logging.debug(f"Skipping malformed block (too few lines or missing text): '{first_line_debug}'")
+            continue
+
+        try:
+            index = int(lines[0])
+            time_line = lines[1]
+            text_content = '\n'.join(lines[2:]).strip()
+
+            if marker_pattern.fullmatch(text_content):
+                logging.debug(f"Skipping marker entry (index {index}): '{text_content}'")
+                continue
+
+            start_time_str, end_time_str = time_line.split(' --> ')
+            start_td = parse_time_str(start_time_str)
+            end_td = parse_time_str(end_time_str)
+            duration_td = end_td - start_td
+            
+            if duration_td.total_seconds() < 0:
+                logging.warning(f"Negative duration for index {index}. Setting to 0. Start: {start_time_str}, End: {end_time_str}")
+                duration_td = timedelta(0)
+
+            results.append({
+                "index": index,
+                "start": format_timedelta_str(start_td),
+                "end": format_timedelta_str(end_td),
+                "duration": format_timedelta_str(duration_td),
+                "word length": len(text_content.split()),
+                "character length": len(text_content),
+                "text": text_content,
+                "delimiter": generate_delimiter()
+            })
+        except (ValueError, IndexError, AttributeError) as e:
+            logging.warning(f"Skipping malformed or incomplete block starting with '{lines[0] if lines else ''}'. Error: {e}")
+            continue
+    return results
+
+# --- Functions from the second code block (merging and combining) ---
+
+def merge_text_and_delimiter(data_list: list[dict], group_size: int) -> list[dict]:
+    merged_results: list[dict] = []
+    num_items = len(data_list)
+    for i in range(0, num_items, group_size):
+        current_group = data_list[i : i + group_size]
+        if not current_group:
+            continue
+        merged_text_segment = " ".join([item['text'] for item in current_group])
+        group_word_lengths = [item['word length'] for item in current_group]
+        last_item_in_group = current_group[-1]
+        merged_results.append({
+            "full_string": f"{merged_text_segment} {last_item_in_group['delimiter']}",
+            "last_original_text": last_item_in_group['text'],
+            "last_original_delimiter": last_item_in_group['delimiter'],
+            "group_word_lengths": group_word_lengths
+        })
+    logging.debug(f"Merged {num_items} items into {len(merged_results)} segments (group_size={group_size}).")
+    return merged_results
+
+def combine_merged_results(initial_merged_structured_data: list[dict], combine_size: int) -> list[dict]:
+    final_combined_results: list[dict] = []
+    num_merged_items = len(initial_merged_structured_data)
+    for i in range(0, num_merged_items, combine_size):
+        current_segment_dicts = initial_merged_structured_data[i : i + combine_size]
+        if not current_segment_dicts:
+            continue
+        combined_string = " ".join([d["full_string"] for d in current_segment_dicts])
+        
+        # OPTIMIZED: Use dictionary comprehension
+        word_length_object_for_segment = {
+            d["last_original_delimiter"]: d["group_word_lengths"]
+            for d in current_segment_dicts
+        }
+        
+        last_dict_in_segment = current_segment_dicts[-1]
+        final_combined_results.append({
+            "combined_string": combined_string,
+            "last_text_for_next_prepend": last_dict_in_segment["last_original_text"],
+            "last_delimiter_for_next_prepend": last_dict_in_segment["last_original_delimiter"],
+            "word_length_object": word_length_object_for_segment
+        })
+    logging.debug(f"Combined {num_merged_items} merged segments into {len(final_combined_results)} final segments (combine_size={combine_size}).")
+    return final_combined_results
+
+# --- New function for generating random characters for the key ---
+
+def generate_random_key(length: int) -> str:
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+
+# --- Main execution flow ---
+
+def main():
+    setup_logging(CONFIG["log_level"])
+    logging.info("Starting subtitle processing pipeline.")
+    text_input = """
+"""
+    parsed_data = process_subtitle_text(text_input)
+    logging.debug(f"Parsed {len(parsed_data)} subtitle entries (after filtering).")
+    if logging.getLogger().isEnabledFor(logging.DEBUG) and parsed_data:
+        logging.debug(f"Sample parsed_data[0]: {parsed_data[0]}")
+
+    initial_merged_structured_data = merge_text_and_delimiter(
+        parsed_data, group_size=CONFIG["group_size"]
+    )
+    logging.debug(f"Merged into {len(initial_merged_structured_data)} initial segments (group_size={CONFIG['group_size']}).")
+    if logging.getLogger().isEnabledFor(logging.DEBUG) and initial_merged_structured_data:
+        logging.debug(f"Sample initial_merged_structured_data[0]: {initial_merged_structured_data[0]}")
+
+    final_structured_output = combine_merged_results(
+        initial_merged_structured_data, combine_size=CONFIG["combine_size"]
+    )
+    logging.debug(f"Combined into {len(final_structured_output)} final segments (combine_size={CONFIG['combine_size']}).")
+    if logging.getLogger().isEnabledFor(logging.DEBUG) and final_structured_output:
+        logging.debug(f"Sample final_structured_output[0]: {final_structured_output[0]}")
+
+    # OPTIMIZED: Streamlined final processing and metadata addition
+    processed_segments_with_keys: list[dict] = []
+    all_generated_keys: list[str] = []
+    
+    total_words_sum = 0
+    total_characters_sum = 0
+    
+    previous_text_for_prepend: str | None = None
+    previous_delimiter_for_next_prepend: str | None = None
+    
+    total_segments_count = len(final_structured_output) # Known beforehand
+
+    for i, item in enumerate(final_structured_output):
+        current_s = item["combined_string"]
+        current_word_length_obj = item["word_length_object"]
+        
+        output_text = ""
+        if i > 0 and previous_text_for_prepend is not None and previous_delimiter_for_next_prepend is not None:
+            output_text += f"{previous_text_for_prepend} {previous_delimiter_for_next_prepend} "
+            logging.debug(f"Prepending segment {i} with previous context.")
+        output_text += current_s
+        
+        segment_word_count = len(output_text.split())
+        segment_char_count = len(output_text)
+        
+        total_words_sum += segment_word_count
+        total_characters_sum += segment_char_count
+        
+        random_key = generate_random_key(CONFIG["random_key_length"])
+        all_generated_keys.append(random_key)
+        
+        segment_data = {
+            "text": output_text,
+            "word_length_object": current_word_length_obj,
+            "segment_word_count": segment_word_count,
+            "segment_char_count": segment_char_count,
+            # Add global metadata known at this stage
+            "total_segments": total_segments_count,
+            "group_size_setting": CONFIG["group_size"],
+            "combine_size_setting": CONFIG["combine_size"]
+            # total_words/chars_in_final_output will be added after this loop
+        }
+        processed_segments_with_keys.append({random_key: segment_data})
+
+        previous_text_for_prepend = item["last_text_for_next_prepend"]
+        previous_delimiter_for_next_prepend = item["last_delimiter_for_next_prepend"]
+        logging.debug(f"Segment {i} processed. Key: {random_key}. Storing last text/delimiter for next prepend.")
+
+    # Now, build the final JSON list, adding the remaining global sums
+    final_json_output_list: list[dict] = []
+    
+    if all_generated_keys: # Add keys object if there are any segments
+        final_json_output_list.append({"keys": all_generated_keys})
+        logging.debug(f"Added 'keys' object with {len(all_generated_keys)} keys to the output.")
+    elif final_structured_output: # Log warning only if we expected segments but generated no keys (shouldn't happen with current logic)
+        logging.warning("Segments were processed, but no keys were generated (unexpected). 'keys' object not added.")
+    else: # No segments to process initially
+        logging.info("No segments processed, 'keys' object will not be added.")
+
+    for segment_entry in processed_segments_with_keys:
+        # segment_entry is like { "aBcD": { ... segment_data ... } }
+        # Get the inner segment_data dictionary (there's only one key)
+        # list(segment_entry.values())[0] is a more direct way to get the value if key is not needed
+        segment_data_dict = list(segment_entry.values())[0] 
+        
+        # Add the calculated global sums
+        segment_data_dict["total_words_in_final_output"] = total_words_sum
+        segment_data_dict["total_characters_in_final_output"] = total_characters_sum
+        
+        # Append the segment_entry (which contains the now-updated segment_data_dict)
+        final_json_output_list.append(segment_entry)
+
+    logging.info(f"Processing complete. Writing JSON output to {CONFIG['output_file']}.")
+    try:
+        with open(CONFIG["output_file"], 'w', encoding='utf-8') as f:
+            json.dump(final_json_output_list, f, indent=CONFIG["output_indent"], ensure_ascii=False)
+        logging.info("JSON output successfully written to file.")
+    except IOError as e:
+        logging.error(f"Error writing JSON to file {CONFIG['output_file']}: {e}")
+
+if __name__ == "__main__":
+    main()
