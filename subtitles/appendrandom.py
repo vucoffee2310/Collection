@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 def add_random_chars_after_punctuations(text: str) -> str:
     """
     Adds " {2 random characters}." after specified punctuation marks in a string.
-    The target punctuation marks are: '.', ',', '!', '?'.
+    The target punctuation marks are: '.', '!', '?'.
 
     Args:
         text: The input string.
