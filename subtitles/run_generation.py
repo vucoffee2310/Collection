@@ -2,8 +2,8 @@ import os
 import logging
 import sys
 from dotenv import load_dotenv
-from subtitles.gemini_utils import generate_and_save
-from subtitles.input_manipulation import process_input_to_structured_data, save_structured_data_to_json, DEFAULT_CONFIG as input_manip_default_config
+from gemini_utils import generate_and_save
+from input_manipulation import process_input_to_structured_data, save_structured_data_to_json, DEFAULT_CONFIG as input_manip_default_config
 
 # --- Basic Logging Setup ---
 def setup_logging(level=logging.INFO):
