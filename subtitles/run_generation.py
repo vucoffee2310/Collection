@@ -48,8 +48,8 @@ Another example to make enough segments for grouping and combining.
     """
     # Example: Override default input_manipulation config if needed
     input_processing_config = {
-        "group_size": 2, # Smaller for testing
-        "combine_size": 1, # Smaller for testing
+        "group_size": 5, # Smaller for testing
+        "combine_size": 25, # Smaller for testing
         "output_json_file": "run_generation_input_structure.json"
     }
 
