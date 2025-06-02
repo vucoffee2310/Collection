@@ -21,7 +21,7 @@ def add_random_chars_after_punctuations(text: str) -> str:
         """Generates a string containing 2 random ASCII letters."""
         return ''.join(random.choice(string.ascii_letters) for _ in range(2))
 
-    punctuations_pattern = r'[.!?,\']' 
+    punctuations_pattern = r'[.!?\']' 
 
     def replacement_function(match):
         original_punctuation = match.group(0)
