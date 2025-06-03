@@ -123,18 +123,18 @@ def generate_random_key(length: int) -> str:
 def process_input_to_structured_data(
     raw_subtitle_text: str, 
     config_overrides: dict | None = None
-) -> tuple[str, list[str], list[dict] | None]:
+) -> tuple[list[str], list[dict] | None]:
     """
-    Processes raw subtitle text into a full string for translation, a list of generated keys,
-    and optionally, the structured data that can be saved as JSON.
+    Processes raw subtitle text into a list of generated keys and
+    a list of segment data dictionaries that can be saved as JSON.
 
     Args:
         raw_subtitle_text: The raw subtitle text (e.g., SRT format).
         config_overrides: Dictionary to override default config values.
 
     Returns:
-        A tuple: (full_text_for_translation, generated_keys, structured_data_for_json).
-        structured_data_for_json will be None if no segments are processed.
+        A tuple: (generated_keys, list_of_segment_data_for_json).
+        list_of_segment_data_for_json will be None if no segments are processed.
     """
     current_config = DEFAULT_CONFIG.copy()
     if config_overrides:
@@ -153,13 +153,11 @@ def process_input_to_structured_data(
 
     if not final_structured_output:
         logger.warning("No segments produced after parsing and combining. Returning empty results.")
-        return "", [], None
+        return [], None
 
     all_generated_keys: list[str] = []
-    all_output_texts_for_gemini: list[str] = [] # These will be joined for the single Gemini input string
     
-    # For constructing the optional JSON output
-    segment_details_for_json_output: list[dict] = [] 
+    list_of_segment_data_for_json: list[dict] = [] 
     total_words_sum = 0
     total_characters_sum = 0
     previous_text_for_prepend: str | None = None
@@ -169,13 +167,11 @@ def process_input_to_structured_data(
     for i, item in enumerate(final_structured_output):
         current_s = item["combined_string"]
         
-        # This is the text for one "keyed" segment
         segment_text_parts = []
         if i > 0 and previous_text_for_prepend and previous_delimiter_for_prepend:
             segment_text_parts.extend([previous_text_for_prepend, previous_delimiter_for_prepend])
         segment_text_parts.append(current_s)
-        final_segment_text = " ".join(segment_text_parts)
-        all_output_texts_for_gemini.append(final_segment_text) # Collect parts for the full string
+        final_segment_text = " ".join(segment_text_parts) # This is the text for this segment's data
         
         segment_word_count = len(final_segment_text.split())
         segment_char_count = len(final_segment_text)
@@ -185,43 +181,38 @@ def process_input_to_structured_data(
         random_key = generate_random_key(current_config["random_key_length"])
         all_generated_keys.append(random_key)
         
-        # Data for the optional JSON structure
-        segment_data_for_json = {
-            "text": final_segment_text, # This specific segment's text
+        # Data for the JSON structure (list of these dictionaries)
+        segment_data = {
+            "key": random_key, # Key associated with this segment
+            "text": final_segment_text,
             "word_length_object": item["word_length_object"],
             "segment_word_count": segment_word_count,
             "segment_char_count": segment_char_count,
-            "total_segments": total_segments_count, # Global metadata
+            "total_segments": total_segments_count, 
             "group_size_setting": current_config["group_size"],
             "combine_size_setting": current_config["combine_size"]
         }
-        segment_details_for_json_output.append({"key": random_key, "data": segment_data_for_json})
+        list_of_segment_data_for_json.append(segment_data)
 
         previous_text_for_prepend = item["last_text_for_next_prepend"]
         previous_delimiter_for_prepend = item["last_delimiter_for_next_prepend"]
         logger.debug(f"Segment {i} processed for input_manipulation. Key: {random_key}.")
-
-    full_text_for_translation = " ".join(all_output_texts_for_gemini)
     
-    # Construct the final JSON structure (optional output)
-    final_json_list_for_file: list[dict] = []
-    if all_generated_keys:
-        final_json_list_for_file.append({"keys": all_generated_keys})
-    
-    for detail in segment_details_for_json_output:
-        # Add global sums valid for the entire collection of segments
-        detail["data"]["total_words_in_final_output"] = total_words_sum 
-        detail["data"]["total_characters_in_final_output"] = total_characters_sum
-        final_json_list_for_file.append({detail["key"]: detail["data"]})
+    # Add global sums to each segment's data if segments exist
+    if list_of_segment_data_for_json:
+        for segment_data_item in list_of_segment_data_for_json:
+            segment_data_item["total_words_in_all_segments"] = total_words_sum 
+            segment_data_item["total_characters_in_all_segments"] = total_characters_sum
     
     logger.info(f"Input manipulation complete. Generated {len(all_generated_keys)} keys.")
-    logger.debug(f"Full text for translation preview: '{full_text_for_translation[:100]}...'")
     
-    return full_text_for_translation, all_generated_keys, final_json_list_for_file
+    structured_data_output = list_of_segment_data_for_json if list_of_segment_data_for_json else None
+    
+    return all_generated_keys, structured_data_output
 
 
 def save_structured_data_to_json(structured_data: list[dict], config: dict):
-    """Saves the structured data list to a JSON file."""
+    """Saves the structured data list (list of segment data dictionaries) to a JSON file."""
     if not structured_data:
         logger.info("No structured data to save to JSON.")
         return
