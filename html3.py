@@ -15,12 +15,14 @@ INVALID_CONTENT_REGEX_STRINGS = [
             r'(\s*(&?(nbsp;|amp;))\s*){2,}',         # Multiple consecutive space entities
             r'(@[\w.-]+|[\w\.-]+@[\w\.-]+\.\w+)',    # Social handle or Email address
             r'(https?://|/)\S+',                     # Absolute or relative URL
+            r'^\w[\w-]*=[\w.-]+(,\s*\w[\w-]*=[\w.-]+)*$', # key=value pairs (e.g., "width=device-width, initial-scale=1")
             r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:[0-5]\d)?([+-]\d{2}:\d{2}|Z)?', # ISO 8601 Timestamp
             r'\d{1,2}:\d{2}\s+\d{2}/\d{2}/\d{4}',    # US-style timestamp
             r'\d{1,2}:\d{2}',                        # Simple time (e.g., "14:30")
             r'\S{16,}'                               # Long, likely random string/ID
         ]
 
+MAX_PARENT_DISTANCE = 100
 # Pre-compiled regex patterns for efficiency and clarity.
 EMPTY_TAG_PAIR_PATTERN = re.compile(r"^\s*<([a-zA-Z0-9_:-]+)([^>]*)>\s*</\1>\s*$")
 SINGLE_TAG_PATTERN = re.compile(r"^\s*<([a-zA-Z0-9_:-]+)([^>]*?)/*>\s*$")
@@ -32,49 +34,67 @@ SIMPLE_TAG_CONTENT_PATTERN = re.compile(r"^\s*<([a-zA-Z0-9_:-]+)>(.*?)</\1>\s*$"
 # Compile the invalid patterns for efficient reuse
 INVALID_CONTENT_PATTERNS = [re.compile(p) for p in INVALID_CONTENT_REGEX_STRINGS]
 
-
 # --- Processing Functions ---
 
 # --- Step 0 ---
 def prune_useless_tags(html_content: str) -> str:
     """
-    Performs an initial cleanup pass to remove superfluous tags:
-    1. Removes pairs of lines that form an empty tag (e.g., `<div>\n</div>`).
-    2. Removes single lines containing a void tag that has no attributes (e.g., `<hr>`).
+    Step 0: Remove empty tag pairs and unadorned void tags in a single pass.
+    This uses a stack-based approach to achieve O(n) complexity, avoiding the
+    inefficient iterative method.
     """
     lines = html_content.splitlines()
-    processed_lines = []
-    line_index = 0
-    num_lines = len(lines)
+    if not lines:
+        return ""
 
-    while line_index < num_lines:
-        current_line_stripped = lines[line_index].strip()
+    tag_stack = []  # Stack stores tuples: (tag_name, line_index, has_content)
+    lines_to_prune = set()
 
-        # Condition 1: Check for a multi-line empty tag pair
-        if line_index + 1 < num_lines:
-            next_line_stripped = lines[line_index + 1].strip()
-            open_match = OPEN_TAG_PATTERN.match(current_line_stripped)
-            close_match = CLOSE_TAG_PATTERN.match(next_line_stripped)
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue  # We will preserve empty lines for now and filter later.
 
-            if (open_match and close_match and
-                open_match.group(1) == close_match.group(1)):
-                line_index += 2  # Skip both lines
-                continue
+        # Rule 1: Prune unadorned void tags immediately.
+        single_match = SINGLE_TAG_PATTERN.match(stripped)
+        if single_match and single_match.group(1) in VOID_TAGS and not single_match.group(2).strip():
+            lines_to_prune.add(i)
+            continue
 
-        # Condition 2: Check for a single-line void tag with no attributes
-        single_tag_match = SINGLE_TAG_PATTERN.match(current_line_stripped)
-        if single_tag_match:
-            tag_name, attributes = single_tag_match.group(1), single_tag_match.group(2).strip()
-            if tag_name in VOID_TAGS and not attributes:
-                line_index += 1  # Skip this line
-                continue
+        # Rule 2: Handle opening tags.
+        open_match = OPEN_TAG_PATTERN.match(stripped)
+        if open_match:
+            # Push tag, its line index, and initial content status (False) to the stack.
+            tag_stack.append((open_match.group(1), i, False))
+            continue
 
-        # If neither condition is met, keep the line
-        processed_lines.append(lines[line_index])
-        line_index += 1
+        # Rule 3: Handle closing tags.
+        close_match = CLOSE_TAG_PATTERN.match(stripped)
+        if close_match and tag_stack and tag_stack[-1][0] == close_match.group(1):
+            # A matching closing tag is found. Pop its data from the stack.
+            _, start_index, has_content = tag_stack.pop()
 
-    return "\n".join(processed_lines)
+            if not has_content:
+                # If the block had no content, mark both open and close tags for pruning.
+                lines_to_prune.add(start_index)
+                lines_to_prune.add(i)
+            elif tag_stack:
+                # If the block *did* have content, it makes its parent non-empty.
+                # Propagate the `has_content = True` status to the new parent on the stack.
+                parent_tag, parent_index, _ = tag_stack[-1]
+                tag_stack[-1] = (parent_tag, parent_index, True)
+            continue
 
+        # Rule 4: Any other line is considered "real" content.
+        # This includes text nodes, tags with attributes, or non-matching/malformed tags.
+        if tag_stack:
+            # Mark the current parent tag on the stack as having content.
+            parent_tag, parent_index, _ = tag_stack[-1]
+            tag_stack[-1] = (parent_tag, parent_index, True)
+
+    # Reconstruct the HTML by keeping only the lines that were not marked for pruning.
+    final_lines = [line for i, line in enumerate(lines) if i not in lines_to_prune]
+    return "\n".join(final_lines)
 
 # --- Step 1 ---
 def normalize_simple_tags(html_content: str) -> str:
@@ -132,7 +152,7 @@ def is_text_line(stripped_line: str) -> bool:
         
     return True
 
-# --- Step 2 (NEW INTEGRATED VERSION) ---
+# --- Step 2 ---
 def wrap_text_content(html_content: str) -> str:
     """
     Wraps two types of text patterns using temporary block tags.
@@ -192,55 +212,91 @@ def wrap_text_content(html_content: str) -> str:
 # --- Step 3 ---
 def wrap_nested_content(html_content: str) -> str:
     """
-    Finds nested HTML structures that contain text (already marked as <block-2>)
-    and wraps the entire structure in a <block-3> tag.
+    Step 3: Identify and wrap complex nested structures containing text.
+    - Wraps orphaned or distant text blocks in <block-5>.
+    - Wraps complex nested blocks containing text in <block-3>.
     """
     lines = html_content.splitlines()
-    if not lines:
-        return ""
+    if not lines: return ""
+    
+    tag_stack, blocks = [], {}
+    # NEW: Set to track indices of lines that should be wrapped individually.
+    lines_to_wrap_individually = set()
 
-    tag_stack = []
-    # Maps the starting line index of a block to its content and end index
-    nested_block_locations = {}
-
-    # First pass: Identify all nested blocks containing text
-    for index, line in enumerate(lines):
-        if "<block-2>" in line and tag_stack:
-            tag, start_index, _ = tag_stack[-1]
-            tag_stack[-1] = (tag, start_index, True)  # Mark parent as containing text
+    # --- Pass 1: Analyze the structure ---
+    for i, line in enumerate(lines):
+        if "<block-2>" in line:
+            # This line contains a simple text block. Decide how to handle it.
+            if not tag_stack:
+                # Condition: No parent wrapper. Mark for individual wrapping.
+                lines_to_wrap_individually.add(i)
+            else:
+                parent_tag, start_idx, _ = tag_stack[-1]
+                distance = i - start_idx
+                
+                # Condition: Parent is too far away. Mark for individual wrapping.
+                if distance > MAX_PARENT_DISTANCE:
+                    lines_to_wrap_individually.add(i)
+                else:
+                    # Parent is close enough. Mark it as having text content.
+                    tag_stack[-1] = (parent_tag, start_idx, True)
 
         open_match = OPEN_TAG_PATTERN.match(line)
         if open_match:
-            tag_stack.append((open_match.group(1), index, False))  # (tag, start_idx, contains_text)
+            tag_stack.append((open_match.group(1), i, False))
             continue
 
         close_match = CLOSE_TAG_PATTERN.match(line)
         if close_match and tag_stack and tag_stack[-1][0] == close_match.group(1):
-            _, start_index, contains_text = tag_stack.pop()
-            if contains_text:
-                content = "".join([l.strip() for l in lines[start_index: index + 1]])
-                nested_block_locations[start_index] = (f"<block-3>{content}</block-3>", index)
+            _, start_idx, has_text = tag_stack.pop()
+            if has_text:
+                # This block has valid, nearby text content. Prepare it for <block-3> wrapping.
+                block_content_lines = lines[start_idx : i + 1]
+                
+                kept_lines = []
+                if len(block_content_lines) > 2:
+                    kept_lines.append(block_content_lines[0].strip())
+                    for inner_line in block_content_lines[1:-1]:
+                        stripped_inner = inner_line.strip()
+                        # Keep inner content blocks, but also keep individually-wrapped blocks
+                        # if they happen to be inside this larger structure.
+                        if stripped_inner.startswith(('<block-1>', '<block-2>')):
+                            line_index = start_idx + block_content_lines[1:-1].index(inner_line) + 1
+                            if line_index in lines_to_wrap_individually:
+                                # This line was marked as distant, so wrap it in block-5
+                                kept_lines.append(f"<p>{stripped_inner}</p>")
+                            else:
+                                kept_lines.append(stripped_inner)
+                    kept_lines.append(block_content_lines[-1].strip())
+                else:
+                    kept_lines = [l.strip() for l in block_content_lines]
 
-    # Second pass: Reconstruct the HTML using the identified blocks
-    processed_line_indices = set()
-    for start, (_, end) in nested_block_locations.items():
-        processed_line_indices.update(range(start, end + 1))
+                content = "".join(kept_lines)
+                blocks[start_idx] = (f"<block-3>{content}</block-3>", i)
 
-    final_lines = []
-    index = 0
-    while index < len(lines):
-        if index in nested_block_locations:
-            new_block, end_index = nested_block_locations[index]
+    # --- Pass 2: Reconstruct the HTML with the new wrappers ---
+    final_lines, i = [], 0
+    while i < len(lines):
+        if i in blocks:
+            # Case 1: This is the start of a complex nested block (<block-3>).
+            new_block, end_idx = blocks[i]
             final_lines.append(new_block)
-            index = end_index + 1
-        elif index not in processed_line_indices:
-            final_lines.append(lines[index])
-            index += 1
+            i = end_idx + 1
+        elif i in lines_to_wrap_individually:
+            # Case 2: This is an orphaned/distant text block (<block-5>).
+            # We must ensure it's not already part of a complex block we just added.
+            is_processed = any(start <= i <= end for start, (_, end) in blocks.items())
+            if not is_processed:
+                final_lines.append(f"<p>{lines[i].strip()}</p>")
+            i += 1
         else:
-            index += 1  # Skip lines consumed by a block
-
+            # Case 3: Any other line. Keep it only if it's not inside a complex block.
+            is_processed = any(start <= i <= end for start, (_, end) in blocks.items())
+            if not is_processed:
+                final_lines.append(lines[i])
+            i += 1
+            
     return "\n".join(final_lines)
-
 
 # --- Step 4 ---
 def filter_for_wrapped_content(html_content: str) -> str:
@@ -288,39 +344,63 @@ def finalize_html(html_content: str) -> str:
 # --- Step 7 ---
 def filter_and_deduplicate_lines(html_content: str) -> str:
     """
-    Cleans the final output by:
-    1. Filtering out lines where the content matches a set of invalid patterns.
-    2. Removing entire duplicate lines, keeping only the first occurrence.
+    Step 7: Filter and deduplicate lines based on a set of content rules.
+    - Rule 1: Remove empty lines or exact duplicates of lines already kept.
+    - Rule 2: Remove lines with multiple consecutive space entities.
+    - Rule 3: Remove lines that are `<code>...</code>` blocks.
+    - Rule 4: Remove lines where the inner text content is a duplicate of previously seen content.
+    - Rule 5: Remove lines where the inner text content is invalid (e.g., looks like a URL, ID).
     """
-    seen_lines = set()  # Changed from seen_content to track entire lines
-    kept_lines = []
-
+    seen_lines, seen_content, kept_lines = set(), set(), []
+    
     for line in html_content.splitlines():
-        # 1. Deduplicate entire lines first. If we've seen it, skip it.
-        if line in seen_lines:
-            continue
-
-        # 2. Filter against invalid patterns for tagged lines
         stripped_line = line.strip()
+        
+        # Rule 1: Discard empty lines or exact duplicates of lines already kept.
+        if not stripped_line or stripped_line in seen_lines:
+            continue
+        
+        # Rule 2: Discard lines with multiple non-breaking space entities.
+        if (
+            "&nbsp;&nbsp;" in stripped_line
+            or stripped_line.count("&amp;nbsp;") > 1
+            or stripped_line.count("nbsp;&amp;") > 1
+        ):
+            continue
+        
+        # Rules 3, 4, & 5 apply to lines with simple tag-content-tag structure.
         match = SIMPLE_TAG_CONTENT_PATTERN.match(stripped_line)
-
         if match:
+            tag_name = match.group(1)
             content = match.group(2).strip()
-            is_invalid = False
-            for pattern in INVALID_CONTENT_PATTERNS:
-                if pattern.fullmatch(content):
-                    is_invalid = True
-                    break
             
-            if is_invalid:
-                continue # Discard line with invalid content
+            # NEW Rule 3: Discard if the tag is `code`.
+            # We use .lower() for case-insensitivity (e.g., <CODE>).
+            if tag_name.lower() == 'code':
+                continue
 
-        # If the line is not a duplicate and not invalid, keep it.
+            # If the line has no actual text content, let it pass for now.
+            # It might be an empty tag with attributes, which is valid.
+            if not content:
+                pass
+            else:
+                # Rule 4: Discard if the inner text is a duplicate of content
+                # we have already kept from a previous line.
+                if content in seen_content:
+                    continue
+                
+                # Rule 5: Discard if the inner text content is invalid.
+                if any(p.fullmatch(content) for p in INVALID_CONTENT_PATTERNS):
+                    continue
+                
+                # If the content is valid and unique, record it for future checks.
+                seen_content.add(content)
+
+        # If all checks pass, keep the line and record its full structure.
         kept_lines.append(line)
-        seen_lines.add(line) # Add the entire line to the set of seen lines
-
+        seen_lines.add(stripped_line)
+        
     return "\n".join(kept_lines)
-
 
 # --- Full Pipeline Execution ---
 
@@ -351,1966 +431,7 @@ def run_html_pipeline(raw_html: str) -> str:
 # --- Example Usage ---
 print("\n--- FULL PIPELINE DEMONSTRATION ---")
 
-full_pipeline_input = """<html>
-<head>
-<meta content="text/html; charset=utf-8">
-<title>
-HLV Kim Sang-sik xin lỗi sau trận ĐT Việt Nam thua sốc Malaysia
-</title>
-<meta>
-<meta>
-<meta content="HLV Kim Sang-sik, tuyển Việt Nam">
-<meta>
-<meta>
-<meta content="article">
-<meta>
-<meta>
-<meta content="image/jpg">
-<meta>
-<meta>
-<meta>
-<meta>
-<link>
-<link>
-<link>
-<meta>
-<meta>
-<meta>
-<meta>
-<meta content="Hải Đăng">
-<meta content="width=device-width, initial-scale=1, maximum-scale=5, minimal-ui">
-<meta>
-<meta content="vi">
-<meta content="Global">
-<meta>
-<meta content="Document">
-<meta content="1 days">
-<meta>
-<meta content="GENERAL">
-<link>
-<meta>
-<meta content="VCCorp.vn">
-<meta>
-<meta content="Copyright (c) by Công ty cổ phần Vccorp">
-<meta content="on">
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-<link>
-</head>
-<body>
-<div>
-</div>
-<div>
-<div>
-</div>
-<div>
-<div>
-<div>
-<ul>
-<li>
-<a title="Magazine">
-eMagazine
-</a>
-</li>
-<li>
-<a>
-Genz Area
-</a>
-</li>
-<li>
-<a>
-XANH chưa - check!!!
-</a>
-</li>
-<li>
-<a title="Kenh14 showlive">
-ShowLive
-</a>
-</li>
-</ul>
-<div>
-<p>
-</p>
-<a title="tìm kiếm">
-<span>
-</span>
-</a>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<a title="Tin tức, giải trí, xã hội">
-</a>
-</div>
-<div>
-<ul>
-<div>
-<li>
-<a>
-G-Dragon biểu diễn tại SVĐ Mỹ Đình
-</a>
-</li>
-<li>
-<a>
-Diễn viên Ngân Hòa bị suy thận giai đoạn cuối
-</a>
-</li>
-</div>
-</ul>
-</div>
-<div>
-<a>
-<span>
-<span>
-</span>
-</span>
-<span>
-<span>
-<span>
-</span>
-<span>
-</span>
-<span>
-</span>
-</span>
-<span>
-<b>
-</b>
-</span>
-</span>
-</a>
-</div>
-<div>
-<ul>
-<li>
-<a>
-<span>
-GÓP Ý GIAO DIỆN MỚI
-</span>
-</a>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<ul>
-<li>
-<a>
-TRANG CHỦ
-</a>
-</li>
-<li>
-<a>
-Star
-</a>
-</li>
-<li>
-<a>
-Ciné
-</a>
-</li>
-<li>
-<a>
-Musik
-</a>
-</li>
-<li>
-<a title="Beauty &amp;amp; Fashion">
-Beauty &amp;amp; Fashion
-</a>
-</li>
-<li>
-<a>
-Đời sống
-</a>
-</li>
-<li>
-<a>
-Money-Z
-</a>
-</li>
-<li>
-<a>
-Ăn - Quẩy - Đi
-</a>
-</li>
-<li>
-<a>
-Xã hội
-</a>
-</li>
-<li>
-<a>
-Sức khỏe
-</a>
-</li>
-<li>
-<a>
-Tek-life
-</a>
-</li>
-<li>
-<a>
-Học đường
-</a>
-</li>
-<li>
-<a>
-Xem Mua Luôn
-</a>
-</li>
-<li>
-<a>
-Video
-</a>
-</li>
-<li>
-<a title="mở rộng">
-<span>
-</span>
-<span>
-</span>
-<span>
-</span>
-</a>
-<div>
-<div>
-<ul>
-<li>
-<h4>
-<a>
-Đời sống
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Nhân vật
-</a>
-</li>
-<li>
-<a>
-Xem-Ăn-Chơi
-</a>
-</li>
-<li>
-<a>
-House n Home
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Xem mua luôn
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Thời trang
-</a>
-</li>
-<li>
-<a>
-Đẹp
-</a>
-</li>
-<li>
-<a>
-Mommy mua di
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Sport
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Bóng đá
-</a>
-</li>
-<li>
-<a>
-Hậu trường
-</a>
-</li>
-<li>
-<a>
-Esports
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Musik
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Âu-Mỹ
-</a>
-</li>
-<li>
-<a>
-Châu Á
-</a>
-</li>
-<li>
-<a>
-Việt Nam
-</a>
-</li>
-<li>
-<a>
-Hip-hop neva die
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Ciné
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Phim chiếu rạp
-</a>
-</li>
-<li>
-<a>
-Phim Việt Nam
-</a>
-</li>
-<li>
-<a>
-Series truyền hình
-</a>
-</li>
-<li>
-<a>
-Hoa ngữ - Hàn Quốc
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Tek-Life
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Metaverse
-</a>
-</li>
-<li>
-<a>
-How-To
-</a>
-</li>
-<li>
-<a>
-Wow
-</a>
-</li>
-<li>
-<a>
-2-Mall
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Star
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Sao Việt
-</a>
-</li>
-<li>
-<a>
-Hội bạn thân showbiz
-</a>
-</li>
-<li>
-<a>
-TV Show
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Xã hội
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Pháp luật
-</a>
-</li>
-<li>
-<a>
-Nóng trên mạng
-</a>
-</li>
-<li>
-<a>
-Sống xanh
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Học đường
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Nhân vật
-</a>
-</li>
-<li>
-<a>
-Du học
-</a>
-</li>
-<li>
-<a>
-Bản tin 46'
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Thế giới đó đây
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Chùm ảnh
-</a>
-</li>
-<li>
-<a>
-Khám phá
-</a>
-</li>
-<li>
-<a>
-Dị
-</a>
-</li>
-</ul>
-</li>
-<li>
-<h4>
-<a>
-Sức khỏe
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Tin tức
-</a>
-</li>
-<li>
-<a>
-Dinh dưỡng
-</a>
-</li>
-<li>
-<a>
-Khỏe đẹp
-</a>
-</li>
-<li>
-<a>
-Giới tính
-</a>
-</li>
-<li>
-<a>
-Các bệnh
-</a>
-</li>
-</ul>
-</li>
-</ul>
-<div>
-<div>
-Nhóm chủ đề
-</div>
-<ul>
-</ul>
-</div>
-<div>
-<div>
-<h4>
-Tải app
-</h4>
-<ul>
-<li>
-<a title="Tải về từ App Store">
-iOS
-</a>
-</li>
-<li>
-<a title="Tải về từ Google Play">
-Android
-</a>
-</li>
-</ul>
-</div>
-<div>
-<h4>
-<a>
-Fanpage
-</a>
-</h4>
-</div>
-<div>
-<h4>
-<a>
-Liên hệ
-</a>
-</h4>
-<ul>
-<li>
-<a>
-Quảng cáo
-</a>
-</li>
-</ul>
-</div>
-</div>
-</div>
-</div>
-</li>
-</ul>
-<div>
-<a>
-<span>
-</span>
-<span>
-live
-</span>
-<span>
-</span>
-</a>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-</div>
-</div>
-</div>
-</div>
-<div>
-<input>
-<div>
-<div>
-<div>
-</div>
-<div>
-</div>
-</div>
-<div>
-<div>
-<div>
-</div>
-<div>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<ul>
-<li>
-<a>
-Sport
-</a>
-</li>
-<li>
-<a>
-Bóng đá
-</a>
-</li>
-<li>
-<a>
-Hậu Trường
-</a>
-</li>
-<li>
-<a>
-eSports
-</a>
-</li>
-<li>
-<a>
-Khám phá
-</a>
-</li>
-<li>
-<a>
-Dị
-</a>
-</li>
-</ul>
-</div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<div>
-</div>
-<div>
-<div>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-<div>
-<div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<div>
-</div>
-<h1>
-HLV Kim Sang-sik xin lỗi sau trận ĐT Việt Nam thua sốc Malaysia
-</h1>
-<div>
-<span>
-Hải Đăng,
-</span>
-<span>
-Theo Thanh Niên Việt
-</span>
-<span>
-09:36 11/06/2025
-</span>
-<div>
-</div>
-</div>
-</div>
-<div>
-<div>
-</div>
-<a>
-Chia sẻ
-<span>
-</span>
-</a>
-<div>
-</div>
-<div>
-<a title="Gửi email">
-<div>
-</div>
-</a>
-</div>
-<div>
-<div>
-</div>
-</div>
-<div>
-<a title="Theo dõi Kenh14.vn trên googlenews">
-<span>
-Theo dõi Kenh14.vn trên
-</span>
-<img alt="logo">
-</a>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<a>
-</a>
-</div>
-<div>
-<a>
-</a>
-</div>
-</div>
-</div>
-</div>
-<h2>
-<span>
-</span>
-Sau thất bại nặng nề 0-4 trước Malaysia tại lượt trận thứ hai bảng F – vòng loại cuối cùng Asian Cup 2027, HLV trưởng đội tuyển Việt Nam Kim Sang-sik đã chính thức lên tiếng xin lỗi
-</h2>
-<div>
-</div>
-<div>
-<ul>
-<li>
-<a>
-Thua Malaysia đậm nhất lịch sử, tuyển Việt Nam gần cạn hy vọng dự Asian Cup
-<i>
-</i>
-</a>
-</li>
-</ul>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-<div>
-</div>
-<p>
-Tối 10/6, tại sân vận động Bukit Jalil (Kuala Lumpur), đội tuyển Việt Nam đã trải qua một trong những trận thua nặng nề nhất trong những năm gần đây khi để chủ nhà Malaysia ghi tới bốn bàn thắng chỉ trong hiệp hai. Dù nhập cuộc thận trọng và tổ chức phòng ngự tương đối tốt trong hiệp đầu, các học trò của HLV Kim Sang-sik đã hoàn toàn vỡ trận sau giờ nghỉ.
-</p>
-<p>
-Phát biểu trong buổi họp báo sau trận, HLV người Hàn Quốc bày tỏ:
-</p>
-<p>
-“Trước tiên, tôi muốn gửi lời xin lỗi chân thành đến tất cả người hâm mộ Việt Nam – những người đã đến sân cổ vũ, cũng như theo dõi qua màn ảnh nhỏ. Các cầu thủ đã cố gắng, nhưng kết quả này là hoàn toàn không thể chấp nhận, và tôi xin nhận trách nhiệm”.
-</p>
-<figure>
-<div>
-<a>
-<img alt="HLV Kim Sang-sik xin lỗi sau trận ĐT Việt Nam thua sốc Malaysia- Ảnh 1.">
-</a>
-</div>
-<figcaption>
-<p>
-<i>
-Đội tuyển Việt Nam để thua choáng váng 0-4 trước đội tuyển Malaysia, sau 10 năm đội tuyển Việt Nam mới lại thua đậm trước một đội bóng Đông Nam Á như vậy
-</i>
-</p>
-</figcaption>
-</figure>
-<p>
-Theo HLV Kim, Việt Nam đã có hiệp một thi đấu đúng với kế hoạch đề ra, giữ cự ly đội hình tốt và hạn chế được các tình huống nguy hiểm. Tuy nhiên, bước ngoặt xảy ra khi hai trung vệ chủ chốt là Nguyễn Thành Chung và Bùi Tiến Dũng lần lượt rời sân vì chấn thương. Việc mất hai chốt chặn quan trọng khiến hàng thủ rơi vào rối loạn, tạo điều kiện để Malaysia liên tiếp ghi bàn ở các phút 49, 59, 67 và 88.
-</p>
-<p>
-“Ở nửa đầu trận đấu, chúng tôi vẫn có thể triển khai đội hình như kế hoạch, nhưng ở nửa sau trận đấu, với chấn thương của 2 cầu thủ phòng ngự, chúng tôi đã gặp khó khăn trong việc triển khai đội hình và có lẽ đó cũng là một trong những lý do khiến chúng tôi thất bại”, HLV Kim Sang Sik nói.
-</p>
-<p>
-Nhà cầm quân người Hàn Quốc thừa nhận ĐT Việt Nam gặp khó trước 5 cầu thủ nhập tịch mới toanh của đối thủ. “Mặc dù chúng tôi đã cố gắng phân tích nhiều nhất có thể, nhưng cả 5 cầu thủ nhập tịch của đối thủ hôm nay thể hiện tốt hơn chúng tôi dự đoán. Và đúng là chúng tôi đã vất vả khi phải đối đầu với Malaysia. Nhưng chúng tôi sẽ vận dụng những kinh nghiệm của trận đấu ngày hôm nay để chuẩn bị thật tốt cho lần sau”, HLV Kim chia sẻ.
-</p>
-<p>
-Thất bại này khiến đội tuyển Việt Nam rơi xuống vị trí thứ hai bảng F với 3 điểm sau 2 trận, trong khi Malaysia vươn lên dẫn đầu với 6 điểm tuyệt đối. Dù cánh cửa vào VCK Asian Cup 2027 vẫn còn, nhưng đội tuyển sẽ phải đối mặt với áp lực lớn trong các trận lượt về, đặc biệt là khi tiếp chính Malaysia tại Mỹ Đình vào tháng 3/2026.
-</p>
-<p>
-Dù vậy, HLV Kim Sang-sik khẳng định ông và các học trò sẽ không bỏ cuộc. “Về cách chuẩn bị cho trận lượt về ở Hà Nội, đầu tiên tôi nghĩ chúng tôi cần chấp nhận sự thật rằng đội tuyển Malaysia đã mạnh lên nhờ vào những cầu thủ nhập tịch mới. Nhưng bóng đá thì vẫn luôn có chỗ cho những kỳ tích xảy ra. Nếu chúng tôi chuẩn bị tốt cho trận lượt về, tôi nghĩ chúng tôi vẫn có cơ hội để bù đắp được 4 bàn thua hôm nay”, HLV Kim khẳng định.
-</p>
-<p>
-Sau trận đấu này, đội tuyển Việt Nam sẽ về nước, các cầu thủ trở lại CLB để tiếp tục thi đấu các trận còn lại của V.League 2024/25. Tuyển Việt Nam sẽ hội quân trở lại vào dịp FIFA Days tháng 9.
-</p>
-<div>
-</div>
-</div>
-<zone>
-</zone>
-<zone>
-</zone>
-<div>
-<div>
-</div>
-</div>
-<div>
-<div>
-<a title="Theo  Thanh Niên Việt">
-Theo
-<span>
-Thanh Niên Việt
-</span>
-<span>
-<i>
-Copy link
-</i>
-</span>
-</a>
-<div>
-<div>
-<span>
-Link bài gốc
-</span>
-<span>
-<i>
-Lấy link
-</i>
-</span>
-</div>
-<a>
-https://thanhnienviet.vn/hlv-kim-sang-sik-xin-loi-sau-tran-dt-viet-nam-thua-soc-malaysia-209250611080238159.htm
-</a>
-<div>
-</div>
-</div>
-</div>
-</div>
-<div>
-</div>
-<div>
-<a>
-Hlv Kim Sang-sik dùng bài lạ, tuyển Việt Nam sụp đổ đầy thất vọng, nguy cơ lớn lỡ vé Asian Cup
-</a>
-</div>
-</div>
-<div>
-<div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<div>
-</div>
-<div>
-</div>
-</div>
-<div>
-<span>
-</span>
-<div>
-</div>
-</div>
-<div>
-<div>
-<div>
-</div>
-<div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-<ul>
-<li>
-<a>
-HLV Kim Sang-sik
-</a>
-</li>
-<li>
-<a>
-tuyển Việt Nam
-</a>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div>
-<div>
-</div>
-</div>
-<div>
-<div>
-</div>
-</div>
-<div>
-<div>
-</div>
-</div>
-<div>
-<div>
-</div>
-</div>
-<div>
-<div>
-</div>
-<div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<span>
-TIN CÙNG CHUYÊN MỤC
-</span>
-<div>
-<span>
-Xem theo ngày
-</span>
-<ul>
-<li>
-<div>
-<div>
-11
-</div>
-<ul>
-<li>
-Ngày
-</li>
-<li>
-1
-</li>
-<li>
-2
-</li>
-<li>
-3
-</li>
-<li>
-4
-</li>
-<li>
-5
-</li>
-<li>
-6
-</li>
-<li>
-7
-</li>
-<li>
-8
-</li>
-<li>
-9
-</li>
-<li>
-10
-</li>
-<li>
-11
-</li>
-<li>
-12
-</li>
-<li>
-13
-</li>
-<li>
-14
-</li>
-<li>
-15
-</li>
-<li>
-16
-</li>
-<li>
-17
-</li>
-<li>
-18
-</li>
-<li>
-19
-</li>
-<li>
-20
-</li>
-<li>
-21
-</li>
-<li>
-22
-</li>
-<li>
-23
-</li>
-<li>
-24
-</li>
-<li>
-25
-</li>
-<li>
-26
-</li>
-<li>
-27
-</li>
-<li>
-28
-</li>
-<li>
-29
-</li>
-<li>
-30
-</li>
-<li>
-31
-</li>
-</ul>
-</div>
-<select>
-<option>
-Ngày
-</option>
-<option>
-1
-</option>
-<option>
-2
-</option>
-<option>
-3
-</option>
-<option>
-4
-</option>
-<option>
-5
-</option>
-<option>
-6
-</option>
-<option>
-7
-</option>
-<option>
-8
-</option>
-<option>
-9
-</option>
-<option>
-10
-</option>
-<option>
-11
-</option>
-<option>
-12
-</option>
-<option>
-13
-</option>
-<option>
-14
-</option>
-<option>
-15
-</option>
-<option>
-16
-</option>
-<option>
-17
-</option>
-<option>
-18
-</option>
-<option>
-19
-</option>
-<option>
-20
-</option>
-<option>
-21
-</option>
-<option>
-22
-</option>
-<option>
-23
-</option>
-<option>
-24
-</option>
-<option>
-25
-</option>
-<option>
-26
-</option>
-<option>
-27
-</option>
-<option>
-28
-</option>
-<option>
-29
-</option>
-<option>
-30
-</option>
-<option>
-31
-</option>
-</select>
-</li>
-<li>
-<div>
-<div>
-Tháng 6
-</div>
-<ul>
-<li>
-Tháng
-</li>
-<li>
-Tháng 1
-</li>
-<li>
-Tháng 2
-</li>
-<li>
-Tháng 3
-</li>
-<li>
-Tháng 4
-</li>
-<li>
-Tháng 5
-</li>
-<li>
-Tháng 6
-</li>
-<li>
-Tháng 7
-</li>
-<li>
-Tháng 8
-</li>
-<li>
-Tháng 9
-</li>
-<li>
-Tháng 10
-</li>
-<li>
-Tháng 11
-</li>
-<li>
-Tháng 12
-</li>
-</ul>
-</div>
-<select>
-<option>
-Tháng
-</option>
-<option>
-Tháng 1
-</option>
-<option>
-Tháng 2
-</option>
-<option>
-Tháng 3
-</option>
-<option>
-Tháng 4
-</option>
-<option>
-Tháng 5
-</option>
-<option>
-Tháng 6
-</option>
-<option>
-Tháng 7
-</option>
-<option>
-Tháng 8
-</option>
-<option>
-Tháng 9
-</option>
-<option>
-Tháng 10
-</option>
-<option>
-Tháng 11
-</option>
-<option>
-Tháng 12
-</option>
-</select>
-</li>
-<li>
-<div>
-<div>
-2025
-</div>
-<ul>
-<li>
-2020
-</li>
-<li>
-2021
-</li>
-<li>
-2022
-</li>
-<li>
-2023
-</li>
-<li>
-2024
-</li>
-<li>
-2025
-</li>
-</ul>
-</div>
-<select>
-<option>
-2020
-</option>
-<option>
-2021
-</option>
-<option>
-2022
-</option>
-<option>
-2023
-</option>
-<option>
-2024
-</option>
-<option>
-2025
-</option>
-</select>
-</li>
-<li>
-<button>
-Xem
-</button>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<span>
-TIN CÙNG CHUYÊN MỤC
-</span>
-<div>
-<span>
-Xem theo ngày
-</span>
-<ul>
-<li>
-<select>
-<option>
-Ngày
-</option>
-<option>
-1
-</option>
-<option>
-2
-</option>
-<option>
-3
-</option>
-<option>
-4
-</option>
-<option>
-5
-</option>
-<option>
-6
-</option>
-<option>
-7
-</option>
-<option>
-8
-</option>
-<option>
-9
-</option>
-<option>
-10
-</option>
-<option>
-11
-</option>
-<option>
-12
-</option>
-<option>
-13
-</option>
-<option>
-14
-</option>
-<option>
-15
-</option>
-<option>
-16
-</option>
-<option>
-17
-</option>
-<option>
-18
-</option>
-<option>
-19
-</option>
-<option>
-20
-</option>
-<option>
-21
-</option>
-<option>
-22
-</option>
-<option>
-23
-</option>
-<option>
-24
-</option>
-<option>
-25
-</option>
-<option>
-26
-</option>
-<option>
-27
-</option>
-<option>
-28
-</option>
-<option>
-29
-</option>
-<option>
-30
-</option>
-<option>
-31
-</option>
-</select>
-</li>
-<li>
-<select>
-<option>
-Tháng
-</option>
-<option>
-Tháng 1
-</option>
-<option>
-Tháng 2
-</option>
-<option>
-Tháng 3
-</option>
-<option>
-Tháng 4
-</option>
-<option>
-Tháng 5
-</option>
-<option>
-Tháng 6
-</option>
-<option>
-Tháng 7
-</option>
-<option>
-Tháng 8
-</option>
-<option>
-Tháng 9
-</option>
-<option>
-Tháng 10
-</option>
-<option>
-Tháng 11
-</option>
-<option>
-Tháng 12
-</option>
-</select>
-</li>
-<li>
-<select>
-<option>
-2020
-</option>
-<option>
-2021
-</option>
-<option>
-2022
-</option>
-<option>
-2023
-</option>
-<option>
-2024
-</option>
-<option>
-2025
-</option>
-</select>
-</li>
-<li>
-<button>
-Xem
-</button>
-</li>
-</ul>
-</div>
-</div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<a>
-<video>
-</video>
-</a>
-<div>
-<h4>
-<a>
-Ngọc Trinh chơi pickleball &quot;cợt nhả vô cùng&quot;, thứ cuốn nhất là vòng eo siêu thực
-</a>
-<span>
-Nổi bật
-</span>
-</h4>
-</div>
-</div>
-<div>
-<a>
-<img>
-</a>
-<div>
-<h4>
-<a>
-Căng rồi: Thua thảm 0-4 Malaysia, đội tuyển Việt Nam tụt dốc không phanh trên bảng xếp hạng FIFA
-</a>
-<span>
-Nổi bật
-</span>
-</h4>
-</div>
-</div>
-<div>
-<a>
-<img>
-</a>
-<div>
-<h4>
-<a>
-HLV Kim Sang-sik xin lỗi sau trận ĐT Việt Nam thua sốc Malaysia
-</a>
-<span>
--
-</span>
-<span>
-5 giờ trước
-</span>
-</h4>
-</div>
-</div>
-</div>
-<div>
-<div>
-<a>
-<img>
-</a>
-<div>
-<h4>
-<a>
-Nhìn lại trận thua của đội tuyển Việt Nam trước Malaysia: Ông Kim Sang-sik không thể tạo nên phép màu
-</a>
-<span>
--
-</span>
-<span>
-5 giờ trước
-</span>
-</h4>
-</div>
-</div>
-<div>
-<a>
-<video>
-</video>
-</a>
-<div>
-<h4>
-<a>
-Nàng WAG nổi tiếng phấn khích khi đón các thành viên BTS xuất ngũ, cảm thán: Đợi anh về em lấy chồng luôn rồi!
-</a>
-<span>
--
-</span>
-<span>
-6 giờ trước
-</span>
-</h4>
-</div>
-</div>
-<div>
-<a>
-<img>
-</a>
-<div>
-<h4>
-<a>
-Lộ khoảnh khắc Chu Thanh Huyền về quê Quang Hải ăn cỗ nhưng lấy phần đem về, dân tình liền có phản ứng này
-</a>
-<span>
--
-</span>
-<span>
-6 giờ trước
-</span>
-</h4>
-</div>
-</div>
-<div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-</div>
-</div>
-</div>
-</div>
-<div>
-</div>
-<input>
-<div>
-<div>
-</div>
-</div>
-<div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<input>
-<input>
-<input>
-<div>
-<div>
-<div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<button>
-</button>
-<div>
-<div>
-<span>
-</span>
-<span>
-</span>
-<span>
-</span>
-</div>
-<span>
-Đóng
-</span>
-<div>
-<span>
-</span>
-<span>
-</span>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-</div>
-<div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-<input>
-</div>
-</div>
-<div>
-</div>
-<div>
-</div>
-<div>
-<div>
-<div>
-<ul>
-<li>
-<a>
-Star
-</a>
-</li>
-<li>
-<a>
-Ciné
-</a>
-</li>
-<li>
-<a>
-Musik
-</a>
-</li>
-<li>
-<a>
-Beauty &amp;amp; Fashion
-</a>
-</li>
-<li>
-<a>
-Sport
-</a>
-</li>
-<li>
-<a>
-Đời sống
-</a>
-</li>
-<li>
-<a>
-Xã hội
-</a>
-</li>
-<li>
-<a>
-Ăn - Quẩy - Đi
-</a>
-</li>
-<li>
-<a>
-Xem Mua Luôn
-</a>
-</li>
-<li>
-<a>
-Thế giới đó đây
-</a>
-</li>
-<li>
-<a>
-Sức khỏe
-</a>
-</li>
-<li>
-<a>
-Tek-Life
-</a>
-</li>
-<li>
-<a>
-Học đường
-</a>
-</li>
-<li>
-<a>
-Money-Z
-</a>
-</li>
-<li>
-<a>
-Video
-</a>
-</li>
-</ul>
-</div>
-</div>
-<div>
-<footer>
-<div>
-<div>
-<a title="Kênh 14">
-</a>
-<div>
-<span>
-ĐÓNG GÓP NỘI DUNG
-</span>
-<div>
-<a>
-câu hỏi thường gặp
-</a>
-<a>
-bandoc@kenh14.vn
-</a>
-</div>
-<p>
-Kenh14.vn rất hoan nghênh độc giả gửi thông tin và góp ý cho chúng tôi.
-</p>
-</div>
-</div>
-<div>
-<div>
-<blockquote>
-<a title="facebook">
-</a>
-</blockquote>
-</div>
-</div>
-</div>
-<div>
-<div>
-<div>
-<p>
-trụ sở hà nội
-</p>
-<p>
-Tầng 21, Tòa nhà Center Building, Hapulico Complex, số 1 Nguyễn Huy Tưởng, phường Thanh Xuân Trung, quận Thanh Xuân, Hà Nội.
-<br>
-Điện thoại: 024 7309 5555, máy lẻ 62.370
-</p>
-<a>
-xem bản đồ
-</a>
-</div>
-<div>
-<p>
-trụ sở tp.hồ chí minh
-</p>
-<p>
-Tầng 4, Tòa nhà 123, số 127 Võ Văn Tần, phường 6, quận 3, TP. Hồ Chí Minh.
-<br>
-Điện thoại: 028 7307 7979
-</p>
-<a>
-xem bản đồ
-</a>
-</div>
-</div>
-<div>
-<div>
-<p>
-chịu trách nhiệm quản lý nội dung
-</p>
-<p>
-Bà Nguyễn Bích Minh
-</p>
-</div>
-<div>
-<p>
-hợp tác truyền thông
-</p>
-<p>
-024.73095555  (máy lẻ 62.370)
-</p>
-<a>
-marketing@kenh14.vn
-</a>
-</div>
-<div>
-<p>
-liên hệ quảng cáo
-</p>
-<p>
-02473007108
-</p>
-<a>
-giaitrixahoi@admicro.vn
-</a>
-<div>
-<a>
-<span>
-</span>
-Chat với tư vấn viên
-</a>
-<a>
-xem chi tiết
-</a>
-</div>
-</div>
-<div>
-<p>
-<a>
-Chính sách bảo mật
-</a>
-</p>
-</div>
-</div>
-<div>
-<a>
-<img alt="Vccorp">
-</a>
-<p>
-<span>
-© Copyright 2007 - 2025 –
-</span>
-Công ty Cổ phần VCCorp
-</p>
-<p>
-Tầng 17, 19, 20, 21 Tòa nhà Center Building - Hapulico Complex, Số 1 Nguyễn Huy Tưởng, Thanh Xuân, Hà Nội.
-</p>
-<p>
-Giấy phép thiết lập trang thông tin điện tử tổng hợp trên mạng số 2215/GP-TTĐT do Sở Thông tin và Truyền thông Hà Nội cấp ngày 10 tháng 4 năm 2019
-</p>
-</div>
-</div>
-</footer>
-</div>
-</div>
-<div>
-</div>
-<div>
-<input>
-</div>
-</body>
-</html>"""
+full_pipeline_input = """"""
 
 # print("\n1. Raw Input:")
 # print(full_pipeline_input)
