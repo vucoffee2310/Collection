@@ -441,7 +441,7 @@ class ContentExtractor:
                                 line_index = start_idx + block_content_lines[1:-1].index(inner_line) + 1
                                 if line_index in lines_to_wrap_individually:
                                     # This line was marked as distant, so wrap it in block-5
-                                    kept_lines.append(f"<block-5>{stripped_inner}</block-5>")
+                                    kept_lines.append(f"<p>{stripped_inner}</p>")
                                 else:
                                     kept_lines.append(stripped_inner)
                         kept_lines.append(block_content_lines[-1].strip())
