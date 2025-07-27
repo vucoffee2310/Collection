@@ -1,0 +1,43 @@
+{
+    "manifest_version": 3,
+    "name": "Youtube Subtitle Downloader",
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "youtube-subtitle-downloader@mozilla.org"
+        }
+    },
+    "version": "3.6.0",
+    "description": "Download subtitle (Closed Caption) from YouTube",
+    "icons": {
+        "48": "images/download-64.png"
+    },
+    "action": {
+        "default_icon": "images/download-64.png",
+        "default_title": "Download YouTube Subtitles",
+        "default_popup": "popup.html"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.youtube.com/watch?v=*"
+            ],
+            "js": [
+                "js/content.js"
+            ]
+        }
+    ],
+    "permissions": [
+        "storage",
+        "webRequest",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "https://www.youtube.com/api/timedtext?*"
+    ],
+    "background": {
+        "service_worker": "js/background.js"
+    },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self';"
+    }
+}

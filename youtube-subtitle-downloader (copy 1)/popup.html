@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>YT Subtitle Downloader</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h3>Youtube Subtitle Downloader</h3>
+        </div>
+        <div id="status" class="status-message">Loading...</div>
+        <div id="subtitle-list" class="list-container"></div>
+        <hr id="divider" class="hidden">
+        <div id="processed-files" class="list-container"></div>
+        <div id="options-container" class="options hidden">
+            <label>
+                <input type="checkbox" id="copy-toggle"> Also copy to clipboard
+            </label>
+        </div>
+    </div>
+
+    <!-- Load scripts in order of dependency -->
+    <script src="js/modules/config.js"></script>
+    <script src="js/modules/utils.js"></script>
+    <script src="js/modules/srt-processor.js"></script>
+    <script src="js/modules/youtube.js"></script>
+    <script src="js/popup.js"></script>
+</body>
+</html>
