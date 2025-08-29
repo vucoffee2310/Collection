@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>yt-dlp Command Helper</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="wrapper">
+        <div class="settings-panel">
+            <div class="settings-content">
+                <h3>Settings</h3>
+                <form id="settings-form" class="settings-form">
+                    <div class="form-group">
+                        <label for="http-chunk-size">Chunk (M)</label>
+                        <input type="number" id="http-chunk-size" name="httpChunkSize" placeholder="8">
+                    </div>
+                    <div class="form-group">
+                        <label for="limit-rate">Rate (M)</label>
+                        <input type="number" id="limit-rate" name="limitRate" placeholder="4">
+                    </div>
+                    <div class="form-group">
+                        <label for="player-client">Client</label>
+                        <select id="player-client" name="playerClient">
+                            <option value="tv">TV</option>
+                            <option value="ios">iOS</option>
+                            <option value="web">Web</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="playback-wait">Wait (s)</label>
+                        <input type="number" id="playback-wait" name="playbackWait" placeholder="2">
+                    </div>
+                </form>
+            </div>
+
+            <!-- Buttons are now at the bottom of the settings panel -->
+            <div class="button-group">
+                <button id="copy-command-btn" disabled>Copy</button>
+                <button id="send-api-btn" disabled>Send</button>
+            </div>
+        </div>
+        <div class="main-panel">
+            <pre id="api-response">log response here</pre>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

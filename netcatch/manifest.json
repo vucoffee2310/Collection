@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "yt-dlp Command Helper",
+  "version": "3.0",
+  "description": "Generates yt-dlp commands with cookies and poToken for YouTube.",
+  "permissions": [
+    "webRequest",
+    "storage",
+    "tabs",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "https://ytdlpy.vercel.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}
