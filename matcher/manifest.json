@@ -3,8 +3,10 @@
   "name": "Audio Match Finder",
   "version": "1.0",
   "description": "Finds occurrences of a short audio pattern within a longer audio file using WASM for FFT.",
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
-    "default_popup": "viewer.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -21,5 +23,8 @@
       "resources": ["wasm/fft.wasm"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  }
 }

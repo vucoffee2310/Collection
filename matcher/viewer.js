@@ -20,8 +20,24 @@ document.addEventListener('DOMContentLoaded', () => {
         wasmApi = {
             Module,
             fft: wasm_fft,
-            ifft: wasm_ifft
+            ifft: wasm_ifft,
+            // These will be initialized below and updated if memory grows
+            HEAPF32: null, 
+            HEAPU8: null
         };
+
+        // --- START FIX for missing/detached HEAP views ---
+        if (Module.memory && Module.memory.buffer) {
+            // Create the initial heap views
+            wasmApi.HEAPF32 = new Float32Array(Module.memory.buffer);
+            wasmApi.HEAPU8 = new Uint8Array(Module.memory.buffer);
+        } else {
+            const errorMsg = "Fatal Error: Could not find WASM memory buffer. The loader script (fft.js) may not have been updated correctly.";
+            console.error(errorMsg, "Module object:", Module);
+            statusDiv.textContent = errorMsg;
+            return; // Prevent further execution
+        }
+        // --- END FIX ---
 
         statusDiv.textContent = 'Ready. Select files and click "Find Matches".';
         runButton.disabled = false;
@@ -33,6 +49,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     runButton.disabled = true; // Disabled until WASM is loaded
     runButton.addEventListener('click', runMatch);
+
+    /**
+     * Checks if the WebAssembly memory has been resized. If so, it updates
+     * the HEAPF32 and HEAPU8 views to point to the new ArrayBuffer.
+     * This is crucial to prevent "detached ArrayBuffer" errors.
+     */
+    function updateWasmMemoryViews() {
+        if (wasmApi.HEAPF32.buffer.byteLength === 0) { // A more robust check for detached
+            console.log("WASM memory has grown. Re-creating heap views.");
+            wasmApi.HEAPF32 = new Float32Array(wasmApi.Module.memory.buffer);
+            wasmApi.HEAPU8 = new Uint8Array(wasmApi.Module.memory.buffer);
+        }
+    }
+
 
     // ===================================================================
     //  HELPER FUNCTIONS (JavaScript replacements for Python/NumPy/SciPy)
@@ -103,6 +133,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {Float32Array} - The 'valid' part of the convolution result.
      */
     function fftConvolve(in1, in2) {
+        // !! CRITICAL FIX !!
+        // Before interacting with memory, ensure our views are not stale.
+        updateWasmMemoryViews();
+
         const n1 = in1.length;
         const n2 = in2.length;
         const n_fft = n1 + n2 - 1;
@@ -124,10 +158,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const ptr2_imag = wasmApi.Module._malloc(n_fft * BYTES_PER_ELEMENT);
         
         // --- Copy data to WASM ---
-        wasmApi.Module.HEAPF32.set(in1_padded_real, ptr1_real / BYTES_PER_ELEMENT);
-        wasmApi.Module.HEAPF32.set(in1_padded_imag, ptr1_imag / BYTES_PER_ELEMENT);
-        wasmApi.Module.HEAPF32.set(in2_padded_real, ptr2_real / BYTES_PER_ELEMENT);
-        wasmApi.Module.HEAPF32.set(in2_padded_imag, ptr2_imag / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(in1_padded_real, ptr1_real / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(in1_padded_imag, ptr1_imag / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(in2_padded_real, ptr2_real / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(in2_padded_imag, ptr2_imag / BYTES_PER_ELEMENT);
 
         // --- Perform FFT on both signals ---
         // Pointers for output are the same as input, FFT is done in-place.
@@ -135,10 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
         wasmApi.fft(n_fft, ptr2_real, ptr2_imag, ptr2_real, ptr2_imag);
         
         // --- Get frequency domain data back from WASM ---
-        const fft1_real = new Float32Array(wasmApi.Module.HEAPF32.buffer, ptr1_real, n_fft);
-        const fft1_imag = new Float32Array(wasmApi.Module.HEAPF32.buffer, ptr1_imag, n_fft);
-        const fft2_real = new Float32Array(wasmApi.Module.HEAPF32.buffer, ptr2_real, n_fft);
-        const fft2_imag = new Float32Array(wasmApi.Module.HEAPF32.buffer, ptr2_imag, n_fft);
+        const fft1_real = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_real, n_fft);
+        const fft1_imag = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_imag, n_fft);
+        const fft2_real = new Float32Array(wasmApi.HEAPF32.buffer, ptr2_real, n_fft);
+        const fft2_imag = new Float32Array(wasmApi.HEAPF32.buffer, ptr2_imag, n_fft);
 
         // --- Perform complex multiplication in frequency domain ---
         const conv_freq_real = new Float32Array(n_fft);
@@ -150,15 +184,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Copy multiplied data back to WASM for IFFT ---
         // We can reuse ptr1 for the output of the convolution.
-        wasmApi.Module.HEAPF32.set(conv_freq_real, ptr1_real / BYTES_PER_ELEMENT);
-        wasmApi.Module.HEAPF32.set(conv_freq_imag, ptr1_imag / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(conv_freq_real, ptr1_real / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(conv_freq_imag, ptr1_imag / BYTES_PER_ELEMENT);
 
         // --- Perform Inverse FFT ---
         wasmApi.ifft(n_fft, ptr1_real, ptr1_imag, ptr1_real, ptr1_imag);
         
         // --- Get the final time-domain result ---
         // The result is the real part after IFFT. We need to create a copy.
-        const full_conv = new Float32Array(wasmApi.Module.HEAPF32.buffer, ptr1_real, n_fft).slice();
+        const full_conv = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_real, n_fft).slice();
 
         // --- IMPORTANT: Free all allocated WASM memory ---
         wasmApi.Module._free(ptr1_real);
