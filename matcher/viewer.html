@@ -11,6 +11,15 @@
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         button { width: 100%; padding: 8px; font-size: 1em; }
         #status { margin-top: 15px; font-style: italic; color: #555; }
+        #monitoring {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #eefafc;
+            border: 1px solid #cce;
+            white-space: pre-wrap;
+            font-family: monospace;
+            color: #335;
+        }
         #results { 
             margin-top: 10px; 
             padding: 10px; 
@@ -35,6 +44,7 @@
     </div>
     <button id="run-button">Find Matches</button>
     <div id="status"></div>
+    <pre id="monitoring"></pre>
     <pre id="results"></pre>
 
     <!-- Load WASM module first, then our script -->

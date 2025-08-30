@@ -8,12 +8,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('search-file');
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
+    const monitoringDiv = document.getElementById('monitoring'); // New monitoring display
 
     let wasmApi = null;
+    let perfMetrics = {}; // Object to store performance metrics
+
+    // --- Performance Monitoring Helper ---
+    function displayMetrics() {
+        let text = "--- Performance Monitoring ---\n";
+        for (const [key, value] of Object.entries(perfMetrics)) {
+            const paddedKey = key.padEnd(25, ' ');
+            text += `${paddedKey}: ${value} ms\n`;
+        }
+        monitoringDiv.textContent = text;
+    }
+
 
     // --- Start: Load the WASM Module ---
+    const wasmLoadStart = performance.now();
     statusDiv.textContent = 'Loading WASM FFT module...';
     createFFTModule().then(Module => {
+        const wasmLoadEnd = performance.now();
+        perfMetrics['WASM Load Time'] = (wasmLoadEnd - wasmLoadStart).toFixed(2);
+        displayMetrics();
+
         // Wrap the C++ functions for easier use
         const wasm_fft = Module.cwrap('wasm_fft', null, ['number', 'number', 'number', 'number', 'number']);
         const wasm_ifft = Module.cwrap('wasm_ifft', null, ['number', 'number', 'number', 'number', 'number']);
@@ -212,7 +230,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===================================================================
 
     async function runMatch() {
+        // Reset metrics for this run, keeping WASM load time
+        perfMetrics = { 'WASM Load Time': perfMetrics['WASM Load Time'] };
+        monitoringDiv.textContent = ''; // Clear monitoring panel
         resultsDiv.textContent = '';
+        const totalStartTime = performance.now();
+
         const patternFile = patternInput.files[0];
         const searchFile = searchInput.files[0];
 
@@ -224,15 +247,20 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const target_sr = 4000;
             
+            // --- Audio Loading ---
             statusDiv.textContent = 'Loading and resampling audio...';
+            const audioLoadStart = performance.now();
             let pattern = await loadAudio(patternFile, target_sr);
             let search = await loadAudio(searchFile, target_sr);
+            const audioLoadEnd = performance.now();
 
             if (pattern.length > search.length) {
                 throw new Error("Pattern length cannot exceed search signal length.");
             }
             
+            // --- Normalization ---
             statusDiv.textContent = 'Normalizing audio signals...';
+            const normStart = performance.now();
             let max_abs = 0;
             for (const val of pattern) max_abs = Math.max(max_abs, Math.abs(val));
             if (max_abs > 1e-10) {
@@ -244,9 +272,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (max_abs > 1e-10) {
                 for (let i = 0; i < search.length; i++) search[i] /= max_abs;
             }
+            const normEnd = performance.now();
             
+            // --- Cross-Correlation ---
             statusDiv.textContent = 'Calculating cross-correlation... (this may take a moment)';
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI to update
+            const correlationStart = performance.now();
 
             const M = pattern.length;
             const pattern_mean = pattern.reduce((a, b) => a + b) / M;
@@ -277,9 +308,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     ncc[i] = conv[i] / denominator;
                 }
             }
+            const correlationEnd = performance.now();
             
+            // --- Peak Finding ---
             statusDiv.textContent = 'Finding peaks...';
+            const peakStart = performance.now();
             const peaks = findPeaks(ncc, 0.7, 0.25 * M);
+            const peakEnd = performance.now();
             
             if (peaks.length === 0) {
                 resultsDiv.textContent = 'No matches found with similarity > 0.7';
@@ -304,6 +339,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsDiv.textContent = resultText;
             }
             statusDiv.textContent = `Done. Found ${peaks.length} match(es).`;
+
+            // --- Finalize and display all metrics ---
+            const totalEndTime = performance.now();
+            perfMetrics['Audio Load & Resample'] = (audioLoadEnd - audioLoadStart).toFixed(2);
+            perfMetrics['Normalization'] = (normEnd - normStart).toFixed(2);
+            perfMetrics['Correlation Calculate'] = (correlationEnd - correlationStart).toFixed(2);
+            perfMetrics['Peak Finding'] = (peakEnd - peakStart).toFixed(2);
+            perfMetrics['Total Processing Time'] = (totalEndTime - totalStartTime).toFixed(2);
+            displayMetrics();
 
         } catch (error) {
             statusDiv.textContent = `Error: ${error.message}`;
