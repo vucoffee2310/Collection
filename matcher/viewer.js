@@ -1,3 +1,4 @@
+// FILE: matcher/viewer.js
 // This script will execute when the popup (viewer.html) is opened.
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -56,8 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * This is crucial to prevent "detached ArrayBuffer" errors.
      */
     function updateWasmMemoryViews() {
-        if (wasmApi.HEAPF32.buffer.byteLength === 0) { // A more robust check for detached
-            console.log("WASM memory has grown. Re-creating heap views.");
+        // A robust check for a detached buffer is to see if its byteLength is 0.
+        // Or, more simply, we can just check if our view's buffer is different from the module's current buffer.
+        if (wasmApi.HEAPF32.buffer !== wasmApi.Module.memory.buffer) {
+            console.log("WASM memory has been resized. Re-creating heap views.");
             wasmApi.HEAPF32 = new Float32Array(wasmApi.Module.memory.buffer);
             wasmApi.HEAPU8 = new Uint8Array(wasmApi.Module.memory.buffer);
         }
@@ -133,15 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {Float32Array} - The 'valid' part of the convolution result.
      */
     function fftConvolve(in1, in2) {
-        // !! CRITICAL FIX !!
-        // Before interacting with memory, ensure our views are not stale.
-        updateWasmMemoryViews();
-
         const n1 = in1.length;
         const n2 = in2.length;
         const n_fft = n1 + n2 - 1;
         
-        // Pad signals to the required FFT size
         const in1_padded_real = new Float32Array(n_fft);
         in1_padded_real.set(in1);
         const in1_padded_imag = new Float32Array(n_fft);
@@ -157,6 +155,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const ptr2_real = wasmApi.Module._malloc(n_fft * BYTES_PER_ELEMENT);
         const ptr2_imag = wasmApi.Module._malloc(n_fft * BYTES_PER_ELEMENT);
         
+        // Malloc can resize memory. Update our heap views before writing.
+        updateWasmMemoryViews();
+
         // --- Copy data to WASM ---
         wasmApi.HEAPF32.set(in1_padded_real, ptr1_real / BYTES_PER_ELEMENT);
         wasmApi.HEAPF32.set(in1_padded_imag, ptr1_imag / BYTES_PER_ELEMENT);
@@ -164,10 +165,12 @@ document.addEventListener('DOMContentLoaded', () => {
         wasmApi.HEAPF32.set(in2_padded_imag, ptr2_imag / BYTES_PER_ELEMENT);
 
         // --- Perform FFT on both signals ---
-        // Pointers for output are the same as input, FFT is done in-place.
         wasmApi.fft(n_fft, ptr1_real, ptr1_imag, ptr1_real, ptr1_imag);
         wasmApi.fft(n_fft, ptr2_real, ptr2_imag, ptr2_real, ptr2_imag);
         
+        // ** FIX 2 **: The wasm fft function itself might grow memory. Update views before reading.
+        updateWasmMemoryViews();
+
         // --- Get frequency domain data back from WASM ---
         const fft1_real = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_real, n_fft);
         const fft1_imag = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_imag, n_fft);
@@ -183,15 +186,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // --- Copy multiplied data back to WASM for IFFT ---
-        // We can reuse ptr1 for the output of the convolution.
         wasmApi.HEAPF32.set(conv_freq_real, ptr1_real / BYTES_PER_ELEMENT);
         wasmApi.HEAPF32.set(conv_freq_imag, ptr1_imag / BYTES_PER_ELEMENT);
 
         // --- Perform Inverse FFT ---
         wasmApi.ifft(n_fft, ptr1_real, ptr1_imag, ptr1_real, ptr1_imag);
         
+        // ** FIX 3 **: The ifft function could also grow memory. Update before the final read.
+        updateWasmMemoryViews();
+
         // --- Get the final time-domain result ---
-        // The result is the real part after IFFT. We need to create a copy.
         const full_conv = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_real, n_fft).slice();
 
         // --- IMPORTANT: Free all allocated WASM memory ---
@@ -200,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         wasmApi.Module._free(ptr2_real);
         wasmApi.Module._free(ptr2_imag);
 
-        // Extract the 'valid' part of the convolution and return
         return full_conv.subarray(n2 - 1, n1);
     }
     
@@ -221,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const target_sr = 4000;
             
-            // --- 1. Load and prepare audio ---
             statusDiv.textContent = 'Loading and resampling audio...';
             let pattern = await loadAudio(patternFile, target_sr);
             let search = await loadAudio(searchFile, target_sr);
@@ -230,20 +232,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error("Pattern length cannot exceed search signal length.");
             }
             
-            // --- 2. Normalize audio ---
             statusDiv.textContent = 'Normalizing audio signals...';
             let max_abs = 0;
             for (const val of pattern) max_abs = Math.max(max_abs, Math.abs(val));
-            for (let i = 0; i < pattern.length; i++) pattern[i] /= (max_abs + 1e-10);
+            if (max_abs > 1e-10) {
+                for (let i = 0; i < pattern.length; i++) pattern[i] /= max_abs;
+            }
             
             max_abs = 0;
             for (const val of search) max_abs = Math.max(max_abs, Math.abs(val));
-            for (let i = 0; i < search.length; i++) search[i] /= (max_abs + 1e-10);
+            if (max_abs > 1e-10) {
+                for (let i = 0; i < search.length; i++) search[i] /= max_abs;
+            }
             
-            // --- 3. Compute normalized cross-correlation (NCC) ---
             statusDiv.textContent = 'Calculating cross-correlation... (this may take a moment)';
-            
-            // Allow the UI to update before this heavy computation
             await new Promise(resolve => setTimeout(resolve, 10));
 
             const M = pattern.length;
@@ -256,7 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const pattern_reversed = pattern_centered.slice().reverse();
             const conv = fftConvolve(search, pattern_reversed);
             
-            // --- 4. Compute sliding statistics for normalization ---
             const window = new Float32Array(M).fill(1.0);
             const sliding_sum = fftConvolve(search, window);
             
@@ -269,15 +270,17 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = 0; i < ncc.length; i++) {
                 const local_mean = sliding_sum[i] / M;
                 const local_variance = (sliding_sum_squares[i] / M) - (local_mean * local_mean);
-                const denominator = Math.sqrt(local_variance * M) * sqrt_pattern_energy + 1e-10;
-                ncc[i] = conv[i] / denominator;
+                const denominator = Math.sqrt(Math.max(0, local_variance) * M) * sqrt_pattern_energy;
+                if (denominator < 1e-10) {
+                    ncc[i] = 0;
+                } else {
+                    ncc[i] = conv[i] / denominator;
+                }
             }
             
-            // --- 5. Find peaks in the NCC result ---
             statusDiv.textContent = 'Finding peaks...';
             const peaks = findPeaks(ncc, 0.7, 0.25 * M);
             
-            // --- 6. Format and display results ---
             if (peaks.length === 0) {
                 resultsDiv.textContent = 'No matches found with similarity > 0.7';
             } else {
