@@ -40,23 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
             Module,
             fft: wasm_fft,
             ifft: wasm_ifft,
-            // These will be initialized below and updated if memory grows
-            HEAPF32: null, 
-            HEAPU8: null
+            HEAPF32: new Float32Array(Module.memory.buffer),
+            HEAPU8: new Uint8Array(Module.memory.buffer),
         };
-
-        // --- START FIX for missing/detached HEAP views ---
-        if (Module.memory && Module.memory.buffer) {
-            // Create the initial heap views
-            wasmApi.HEAPF32 = new Float32Array(Module.memory.buffer);
-            wasmApi.HEAPU8 = new Uint8Array(Module.memory.buffer);
-        } else {
-            const errorMsg = "Fatal Error: Could not find WASM memory buffer. The loader script (fft.js) may not have been updated correctly.";
-            console.error(errorMsg, "Module object:", Module);
-            statusDiv.textContent = errorMsg;
-            return; // Prevent further execution
-        }
-        // --- END FIX ---
 
         statusDiv.textContent = 'Ready. Select files and click "Find Matches".';
         runButton.disabled = false;
@@ -75,8 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * This is crucial to prevent "detached ArrayBuffer" errors.
      */
     function updateWasmMemoryViews() {
-        // A robust check for a detached buffer is to see if its byteLength is 0.
-        // Or, more simply, we can just check if our view's buffer is different from the module's current buffer.
         if (wasmApi.HEAPF32.buffer !== wasmApi.Module.memory.buffer) {
             console.log("WASM memory has been resized. Re-creating heap views.");
             wasmApi.HEAPF32 = new Float32Array(wasmApi.Module.memory.buffer);
@@ -86,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ===================================================================
-    //  HELPER FUNCTIONS (JavaScript replacements for Python/NumPy/SciPy)
+    //  HELPER FUNCTIONS
     // ===================================================================
     
     /**
@@ -148,83 +132,104 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Performs FFT-based convolution, mimicking scipy.signal.fftconvolve.
-     * @param {Float32Array} in1 - The first signal (longer).
-     * @param {Float32Array} in2 - The second signal (shorter).
-     * @returns {Float32Array} - The 'valid' part of the convolution result.
+     * OPTIMIZED: Calculates normalized cross-correlation using batched FFT operations.
+     * This function replaces three separate, inefficient calls to a generic convolution function.
+     * It computes all necessary FFTs and IFFTs in a more coordinated way, reducing
+     * WASM overhead and eliminating redundant calculations.
      */
-    function fftConvolve(in1, in2) {
-        const n1 = in1.length;
-        const n2 = in2.length;
-        const n_fft = n1 + n2 - 1;
-        
-        const in1_padded_real = new Float32Array(n_fft);
-        in1_padded_real.set(in1);
-        const in1_padded_imag = new Float32Array(n_fft);
+    function calculateNormalizedCrossCorrelation(search, pattern) {
+        const n1 = search.length;
+        const M = pattern.length;
+        const n_fft = n1 + M - 1;
 
-        const in2_padded_real = new Float32Array(n_fft);
-        in2_padded_real.set(in2);
-        const in2_padded_imag = new Float32Array(n_fft);
+        // --- Step 1: Prepare JS-side data ---
+        const pattern_mean = pattern.reduce((a, b) => a + b) / M;
+        const pattern_centered = pattern.map(x => x - pattern_mean);
+        const pattern_reversed = pattern_centered.slice().reverse();
+        const search_squared = search.map(x => x * x);
+        const window = new Float32Array(M).fill(1.0);
+        let pattern_energy = 0;
+        for (const val of pattern_centered) pattern_energy += val * val;
+        const sqrt_pattern_energy = Math.sqrt(pattern_energy);
 
-        // --- Allocate memory in WASM heap ---
+        // --- Step 2: Allocate all required WASM memory at once ---
         const BYTES_PER_ELEMENT = Float32Array.BYTES_PER_ELEMENT;
-        const ptr1_real = wasmApi.Module._malloc(n_fft * BYTES_PER_ELEMENT);
-        const ptr1_imag = wasmApi.Module._malloc(n_fft * BYTES_PER_ELEMENT);
-        const ptr2_real = wasmApi.Module._malloc(n_fft * BYTES_PER_ELEMENT);
-        const ptr2_imag = wasmApi.Module._malloc(n_fft * BYTES_PER_ELEMENT);
+        const bufferSize = n_fft * BYTES_PER_ELEMENT;
+        const pointers = Array.from({ length: 8 }, () => wasmApi.Module._malloc(bufferSize));
+        const [ptr_s_r, ptr_s_i, ptr_p_r, ptr_p_i, ptr_w_r, ptr_w_i, ptr_sq_r, ptr_sq_i] = pointers;
         
-        // Malloc can resize memory. Update our heap views before writing.
         updateWasmMemoryViews();
 
-        // --- Copy data to WASM ---
-        wasmApi.HEAPF32.set(in1_padded_real, ptr1_real / BYTES_PER_ELEMENT);
-        wasmApi.HEAPF32.set(in1_padded_imag, ptr1_imag / BYTES_PER_ELEMENT);
-        wasmApi.HEAPF32.set(in2_padded_real, ptr2_real / BYTES_PER_ELEMENT);
-        wasmApi.HEAPF32.set(in2_padded_imag, ptr2_imag / BYTES_PER_ELEMENT);
+        // --- Step 3: Copy padded data to WASM heap ---
+        const js_padded_buffers = [
+            search, pattern_reversed, window, search_squared
+        ].map(arr => {
+            const padded = new Float32Array(n_fft);
+            padded.set(arr);
+            return padded;
+        });
 
-        // --- Perform FFT on both signals ---
-        wasmApi.fft(n_fft, ptr1_real, ptr1_imag, ptr1_real, ptr1_imag);
-        wasmApi.fft(n_fft, ptr2_real, ptr2_imag, ptr2_real, ptr2_imag);
+        wasmApi.HEAPF32.set(js_padded_buffers[0], ptr_s_r / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(js_padded_buffers[1], ptr_p_r / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(js_padded_buffers[2], ptr_w_r / BYTES_PER_ELEMENT);
+        wasmApi.HEAPF32.set(js_padded_buffers[3], ptr_sq_r / BYTES_PER_ELEMENT);
         
-        // ** FIX 2 **: The wasm fft function itself might grow memory. Update views before reading.
+        // --- Step 4: Perform all forward FFTs ---
+        wasmApi.fft(n_fft, ptr_s_r, ptr_s_i, ptr_s_r, ptr_s_i);
+        wasmApi.fft(n_fft, ptr_p_r, ptr_p_i, ptr_p_r, ptr_p_i);
+        wasmApi.fft(n_fft, ptr_w_r, ptr_w_i, ptr_w_r, ptr_w_i);
+        wasmApi.fft(n_fft, ptr_sq_r, ptr_sq_i, ptr_sq_r, ptr_sq_i);
         updateWasmMemoryViews();
 
-        // --- Get frequency domain data back from WASM ---
-        const fft1_real = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_real, n_fft);
-        const fft1_imag = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_imag, n_fft);
-        const fft2_real = new Float32Array(wasmApi.HEAPF32.buffer, ptr2_real, n_fft);
-        const fft2_imag = new Float32Array(wasmApi.HEAPF32.buffer, ptr2_imag, n_fft);
+        // --- Step 5: Perform complex multiplications in frequency domain ---
+        const views = pointers.map(p => new Float32Array(wasmApi.HEAPF32.buffer, p, n_fft));
+        const [s_r, s_i, p_r, p_i, w_r, w_i, sq_r, sq_i] = views;
 
-        // --- Perform complex multiplication in frequency domain ---
-        const conv_freq_real = new Float32Array(n_fft);
-        const conv_freq_imag = new Float32Array(n_fft);
+        // Reuse views for IFFT inputs by writing multiplication results back to them
         for (let i = 0; i < n_fft; i++) {
-            conv_freq_real[i] = fft1_real[i] * fft2_real[i] - fft1_imag[i] * fft2_imag[i];
-            conv_freq_imag[i] = fft1_real[i] * fft2_imag[i] + fft1_imag[i] * fft2_real[i];
+            const sr = s_r[i], si = s_i[i], pr = p_r[i], pi = p_i[i];
+            const wr = w_r[i], wi = w_i[i], sqr = sq_r[i], sqi = sq_i[i];
+            
+            // Result 1 (conv) -> stored in pattern buffer
+            p_r[i] = sr * pr - si * pi;
+            p_i[i] = sr * pi + si * pr;
+            // Result 2 (sliding_sum) -> stored in search buffer
+            s_r[i] = sr * wr - si * wi;
+            s_i[i] = sr * wi + si * wr;
+            // Result 3 (sliding_sum_sq) -> stored in window buffer
+            w_r[i] = sqr * wr - sqi * wi;
+            w_i[i] = sqr * wi + sqi * wr;
         }
-
-        // --- Copy multiplied data back to WASM for IFFT ---
-        wasmApi.HEAPF32.set(conv_freq_real, ptr1_real / BYTES_PER_ELEMENT);
-        wasmApi.HEAPF32.set(conv_freq_imag, ptr1_imag / BYTES_PER_ELEMENT);
-
-        // --- Perform Inverse FFT ---
-        wasmApi.ifft(n_fft, ptr1_real, ptr1_imag, ptr1_real, ptr1_imag);
         
-        // ** FIX 3 **: The ifft function could also grow memory. Update before the final read.
+        // --- Step 6: Perform inverse FFTs ---
+        wasmApi.ifft(n_fft, ptr_p_r, ptr_p_i, ptr_p_r, ptr_p_i); // conv
+        wasmApi.ifft(n_fft, ptr_s_r, ptr_s_i, ptr_s_r, ptr_s_i); // sliding_sum
+        wasmApi.ifft(n_fft, ptr_w_r, ptr_w_i, ptr_w_r, ptr_w_i); // sliding_sum_sq
         updateWasmMemoryViews();
 
-        // --- Get the final time-domain result ---
-        const full_conv = new Float32Array(wasmApi.HEAPF32.buffer, ptr1_real, n_fft).slice();
+        // --- Step 7: Extract final convolution results from WASM ---
+        const conv = views[2].slice(M - 1, n1);
+        const sliding_sum = views[0].slice(M - 1, n1);
+        const sliding_sum_squares = views[4].slice(M - 1, n1);
+        
+        // --- Step 8: Free all WASM memory ---
+        pointers.forEach(p => wasmApi.Module._free(p));
 
-        // --- IMPORTANT: Free all allocated WASM memory ---
-        wasmApi.Module._free(ptr1_real);
-        wasmApi.Module._free(ptr1_imag);
-        wasmApi.Module._free(ptr2_real);
-        wasmApi.Module._free(ptr2_imag);
+        // --- Step 9: Final NCC calculation loop (with micro-optimization) ---
+        const ncc = new Float32Array(conv.length);
+        const M_inv = 1.0 / M;
 
-        return full_conv.subarray(n2 - 1, n1);
+        for (let i = 0; i < ncc.length; i++) {
+            const local_mean = sliding_sum[i] * M_inv;
+            const local_variance = (sliding_sum_squares[i] * M_inv) - (local_mean * local_mean);
+            const denominator = Math.sqrt(Math.max(0, local_variance) * M) * sqrt_pattern_energy;
+            
+            ncc[i] = (denominator > 1e-10) ? (conv[i] / denominator) : 0;
+        }
+        
+        return ncc;
     }
-    
+
     // ===================================================================
     //  MAIN MATCHING LOGIC
     // ===================================================================
@@ -247,11 +252,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const target_sr = 4000;
             
-            // --- Audio Loading ---
+            // --- OPTIMIZATION: Audio Loading in Parallel ---
             statusDiv.textContent = 'Loading and resampling audio...';
             const audioLoadStart = performance.now();
-            let pattern = await loadAudio(patternFile, target_sr);
-            let search = await loadAudio(searchFile, target_sr);
+            const [pattern, search] = await Promise.all([
+                loadAudio(patternFile, target_sr),
+                loadAudio(searchFile, target_sr)
+            ]);
             const audioLoadEnd = performance.now();
 
             if (pattern.length > search.length) {
@@ -274,45 +281,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const normEnd = performance.now();
             
-            // --- Cross-Correlation ---
+            // --- OPTIMIZATION: Batched Cross-Correlation ---
             statusDiv.textContent = 'Calculating cross-correlation... (this may take a moment)';
             await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI to update
             const correlationStart = performance.now();
+            
+            const ncc = calculateNormalizedCrossCorrelation(search, pattern);
 
-            const M = pattern.length;
-            const pattern_mean = pattern.reduce((a, b) => a + b) / M;
-            const pattern_centered = pattern.map(x => x - pattern_mean);
-            
-            let pattern_energy = 0;
-            for (const val of pattern_centered) pattern_energy += val * val;
-            
-            const pattern_reversed = pattern_centered.slice().reverse();
-            const conv = fftConvolve(search, pattern_reversed);
-            
-            const window = new Float32Array(M).fill(1.0);
-            const sliding_sum = fftConvolve(search, window);
-            
-            const search_squared = search.map(x => x * x);
-            const sliding_sum_squares = fftConvolve(search_squared, window);
-            
-            const ncc = new Float32Array(conv.length);
-            const sqrt_pattern_energy = Math.sqrt(pattern_energy);
-
-            for (let i = 0; i < ncc.length; i++) {
-                const local_mean = sliding_sum[i] / M;
-                const local_variance = (sliding_sum_squares[i] / M) - (local_mean * local_mean);
-                const denominator = Math.sqrt(Math.max(0, local_variance) * M) * sqrt_pattern_energy;
-                if (denominator < 1e-10) {
-                    ncc[i] = 0;
-                } else {
-                    ncc[i] = conv[i] / denominator;
-                }
-            }
             const correlationEnd = performance.now();
             
             // --- Peak Finding ---
             statusDiv.textContent = 'Finding peaks...';
             const peakStart = performance.now();
+            const M = pattern.length;
             const peaks = findPeaks(ncc, 0.7, 0.25 * M);
             const peakEnd = performance.now();
             
