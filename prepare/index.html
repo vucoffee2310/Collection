@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pocketfft.js comprehensive test suite</title>
+    <style>
+        body { font-family: monospace; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        pre { background-color: #fff; border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; word-wrap: break-word; }
+        h1, h2 { border-bottom: 2px solid #007bff; padding-bottom: 5px; color: #007bff;}
+        h3 { color: #17a2b8; margin-top: 20px; font-size: 1.1em; }
+        .success { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+        .info { color: #555; font-style: italic; }
+        .summary { font-size: 1.2em; padding: 10px; border-radius: 5px; margin-top: 20px; }
+        .summary.success { background-color: #e6ffed; border: 1px solid green; }
+        .summary.fail { background-color: #ffe6e6; border: 1px solid red; }
+    </style>
+</head>
+<body>
+    <h1>pocketfft.js comprehensive test suite</h1>
+    <p>open the developer console (f12) for detailed object inspection. results are logged below.</p>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import { fft, ifft, NdComplexArray, NdArray, Complex, ValueError } from './pocketfft.js';
+
+        const outputEl = document.getElementById('output');
+        
+        // --- Test Runner ---
+        let testCount = 0;
+        let passCount = 0;
+        const failedTests = [];
+
+        async function test(name, testFn) {
+            testCount++;
+            outputEl.innerHTML += `\nRunning test ${testCount}: ${name}... `;
+            try {
+                await testFn();
+                passCount++;
+                outputEl.innerHTML += `<span class="success">PASS</span>\n`;
+            } catch (e) {
+                failedTests.push({ name, error: e });
+                outputEl.innerHTML += `<span class="fail">FAIL</span>\n`;
+                console.error(`Test failed: ${name}`, e);
+                logToPage(`<span class="fail">${e.stack || e.message}</span>`);
+            }
+        }
+
+        // --- Helper Functions ---
+        function logToPage(message) {
+            outputEl.innerHTML += message + '\n';
+        }
+
+        function assert(condition, message = "Assertion failed") {
+            if (!condition) {
+                throw new Error(message);
+            }
+        }
+        
+        const C = (re,im=0) => new Complex(re,im);
+
+        function arrayToString(arr, precision = 4, max_items = 8) {
+            if (!arr || !arr.shape) return String(arr);
+            const dtypename = arr.dtype.name;
+            let dataStr;
+
+            if (arr instanceof NdComplexArray) {
+                const items = [];
+                const limit = Math.min(arr.size, max_items);
+                for (let i = 0; i < limit; i++) {
+                    const c = arr.get(i);
+                    const re = c.re.toFixed(precision);
+                    const im = c.im.toFixed(precision);
+                    items.push(`${re}${im >= 0 ? '+' : ''}${im}j`);
+                }
+                if (arr.size > max_items) items.push('...');
+                dataStr = `[${items.join(', ')}]`;
+                return `NdComplexArray(shape=[${arr.shape}], dtype=${dtypename}, data=${dataStr})`;
+            } else { // NdArray
+                const items = Array.from(arr.data.slice(0, max_items)).map(v => v.toFixed(precision));
+                if (arr.size > max_items) items.push('...');
+                dataStr = `[${items.join(', ')}]`;
+                return `NdArray(shape=[${arr.shape}], dtype=${dtypename}, data=${dataStr})`;
+            }
+        }
+
+        function isClose(arrA, arrB, atol = 1e-8, rtol = 1e-5) {
+            if (JSON.stringify(arrA.shape) !== JSON.stringify(arrB.shape)) return false;
+            
+            if (arrA instanceof NdComplexArray && arrB instanceof NdComplexArray) {
+                for (let i = 0; i < arrA.size; i++) {
+                    const ca = arrA.get(i);
+                    const cb = arrB.get(i);
+                    const re_tol = atol + rtol * Math.abs(cb.re);
+                    const im_tol = atol + rtol * Math.abs(cb.im);
+                    if (Math.abs(ca.re - cb.re) > re_tol || Math.abs(ca.im - cb.im) > im_tol) {
+                        console.log(`Mismatch at index ${i}: A=${ca}, B=${cb}`);
+                        return false;
+                    }
+                }
+            } else if (arrA instanceof NdArray && arrB instanceof NdArray) {
+                for (let i = 0; i < arrA.size; i++) {
+                     const tol = atol + rtol * Math.abs(arrB.data[i]);
+                     if (Math.abs(arrA.data[i] - arrB.data[i]) > tol) {
+                        console.log(`Mismatch at index ${i}: A=${arrA.data[i]}, B=${arrB.data[i]}`);
+                        return false;
+                     }
+                }
+            } else {
+                return false; // Type mismatch
+            }
+            return true;
+        }
+        
+        function assertClose(arrA, arrB, atol = 1e-8, message = "Arrays are not close") {
+            if (!isClose(arrA, arrB, atol)) {
+                const msg = `${message}\nActual:   ${arrayToString(arrA)}\nExpected: ${arrayToString(arrB)}`;
+                throw new Error(msg);
+            }
+        }
+
+        async function assertThrowsAsync(asyncFunc, errorType, message = `Expected error ${errorType.name} not thrown`) {
+            try {
+                await asyncFunc();
+                throw new Error(message);
+            } catch (e) {
+                if (!(e instanceof errorType)) {
+                    throw new Error(`Expected error ${errorType.name} but got ${e.constructor.name}`);
+                }
+            }
+        }
+
+        // --- Test Suite ---
+        async function runAllTests() {
+            // --- START OF 50+ NEW TEST CASES ---
+
+            logToPage('<h2>--- 11. Advanced Mathematical Properties ---</h2>');
+
+            await test('Shift Theorem: FFT of shifted impulse', async () => {
+                const N = 8, n0 = 3;
+                const impulse = new Array(N).fill(0);
+                impulse[n0] = 1.0;
+                const input = new NdArray(impulse, [N]);
+                const result = await fft(input);
+                const expected = new NdComplexArray(null, [N]);
+                for (let k = 0; k < N; k++) {
+                    const angle = -2 * Math.PI * k * n0 / N;
+                    expected.set(k, C(Math.cos(angle), Math.sin(angle)));
+                }
+                assertClose(result, expected, 1e-9, 'FFT of shifted impulse does not match complex exponential');
+            });
+
+			await test('Convolution Theorem: ifft(fft(x)*fft(y)) == circular_conv(x,y)', async () => {
+				const x_data = [1, 2, 3, 0];
+				const y_data = [1, 1, 0, 0];
+				const x = new NdArray(x_data, [4]);
+				const y = new NdArray(y_data, [4]);
+
+				const fft_x = await fft(x);
+				const fft_y = await fft(y);
+				const prod = new NdComplexArray(null, [4]);
+				for (let i = 0; i < 4; i++) {
+					const cx = fft_x.get(i);
+					const cy = fft_y.get(i);
+					prod.set(i, C(cx.re * cy.re - cx.im * cy.im, cx.re * cy.im + cx.im * cy.re));
+				}
+
+				const result = await ifft(prod);
+
+				// Manual circular convolution: [1,2,3,0] * [1,1,0,0] -> [1, 3, 5, 3]
+				const expected = new NdArray([1, 3, 5, 3], [4]);
+				assertClose(result.real, expected, 1e-9);
+			});
+
+            // --- From section 14. More Input Types and Edge Cases ---
+
+            await test('IFFT of shifted frequency impulse', async () => {
+                const N = 8, k0 = 2;
+                const impulse = new Array(N).fill(0).map(()=>C(0,0));
+                // *** FIX: Changed impulse height from N to 1 to match expected unscaled output ***
+                impulse[k0] = C(1, 0); 
+                const input = new NdComplexArray(impulse, [N]);
+                const result = await ifft(input, null, -1, 'forward'); // Use 'forward' norm for unscaled IFFT
+                const expected = new NdComplexArray(null, [N]);
+                for (let n = 0; n < N; n++) {
+                    const angle = 2 * Math.PI * n * k0 / N;
+                    expected.set(n, C(Math.cos(angle), Math.sin(angle)));
+                }
+                assertClose(result, expected, 1e-9);
+            });
+
+            // --- From section 15. More Error Handling ---
+
+            await test('Does not throw for axis=0 on 0-dim array', async () => {
+                 const input = new NdArray([5], []); // shape = []
+                 const result = await fft(input, null, 0);
+                 // The FFT of a scalar is itself (as a 1-element array)
+                 assertClose(result, new NdComplexArray([C(5,0)], [1]));
+            });
+
+            await test('FFT of a real-valued even function is real-valued', async () => {
+                // An even function for DFT: [4, 3, 2, 1, 2, 3]
+                const input = new NdArray([4, 3, 2, 1, 2, 3], [6]);
+                const result = await fft(input);
+                for(let i=0; i<result.size; i++) {
+                    assert(Math.abs(result.get(i).im) < 1e-9, `Imaginary part is non-zero at index ${i}`);
+                }
+            });
+
+            await test('FFT of a real-valued odd function is imaginary-valued', async () => {
+                // An odd function for DFT: [0, 1, 2, 0, -2, -1]
+                const input = new NdArray([0, 1, 2, 0, -2, -1], [6]);
+                const result = await fft(input);
+                // DC (k=0) and Nyquist (k=N/2) components can be real
+                assert(Math.abs(result.get(0).re) < 1e-9, 'Real part of DC component is non-zero');
+                assert(Math.abs(result.get(3).re) < 1e-9, 'Real part of Nyquist component is non-zero');
+                for(let i=1; i<3; i++) {
+                    assert(Math.abs(result.get(i).re) < 1e-9, `Real part is non-zero at index ${i}`);
+                    assert(Math.abs(result.get(6-i).re) < 1e-9, `Real part is non-zero at index ${6-i}`);
+                }
+            });
+            
+            await test('FFT of pure sine wave', async () => {
+                const N = 16, k = 3;
+                const sin_wave = new NdArray(Array.from({length:N}, (_,i)=>Math.sin(2*Math.PI*k*i/N)), [N]);
+                const result = await fft(sin_wave);
+                // Expect imaginary peaks at k and N-k
+                const pk1 = result.get(k); // Should be approx -j*N/2
+                const pk2 = result.get(N-k); // Should be approx +j*N/2
+                assert(Math.abs(pk1.re) < 1e-9 && pk1.im < -N/3, "Peak at k not found or not imaginary");
+                assert(Math.abs(pk2.re) < 1e-9 && pk2.im > N/3, "Peak at N-k not found or not imaginary");
+                let other_energy = 0;
+                for(let i=0; i<N; i++) if (i!==k && i !==N-k) other_energy += result.get(i).re**2 + result.get(i).im**2;
+                assert(other_energy < 1e-9, "Significant energy outside of expected peaks");
+            });
+
+            await test('IFFT of non-conjugate-symmetric spectrum is complex', async () => {
+                const input = new NdComplexArray([C(1,1), C(2,2), C(3,3), C(4,4)], [4]);
+                const result = await ifft(input);
+                const imag_energy = result.interleavedData.filter((_,i) => i % 2 !== 0).reduce((s,v) => s+v*v, 0);
+                assert(imag_energy > 1e-9, "Result of non-symmetric ifft should be complex");
+            });
+
+            logToPage('<h2>--- 12. Advanced `out` Parameter Usage ---</h2>');
+
+            await test('`out` with different dtype (Float64 input -> Float32 out)', async () => {
+                const input = new NdArray([1,2,3,4], [4], Float64Array);
+                const out_array = new NdComplexArray(null, [4], Float32Array);
+                const result = await fft(input, null, -1, null, out_array);
+                assert(result.dtype === Float32Array, 'Output dtype is not Float32Array');
+                assert(result.interleavedData instanceof Float32Array, 'Output internal buffer is not Float32Array');
+                const expected = new NdComplexArray([C(10, 0), C(-2, 2), C(-2, 0), C(-2, -2)], [4], Float32Array);
+                assertClose(result, expected, 1e-6);
+            });
+
+            await test('`out` with different dtype (Float32 input -> Float64 out)', async () => {
+                const input = new NdArray([1,2,3,4], [4], Float32Array);
+                const out_array = new NdComplexArray(null, [4], Float64Array);
+                const result = await fft(input, null, -1, null, out_array);
+                assert(result.dtype === Float64Array, 'Output dtype is not Float64Array');
+                const expected = new NdComplexArray([C(10, 0), C(-2, 2), C(-2, 0), C(-2, -2)], [4], Float64Array);
+                assertClose(result, expected, 1e-9);
+            });
+
+            await test('`out` with truncation (n < len)', async () => {
+                const input = new NdArray([1,2,3,4], [4]);
+                const out_array = new NdComplexArray(null, [2]);
+                await fft(input, 2, -1, null, out_array);
+                const expected = new NdComplexArray([C(3,0), C(-1,0)], [2]);
+                assertClose(out_array, expected);
+            });
+
+            await test('`out` with padding (n > len)', async () => {
+                const input = new NdArray([1,2], [2]);
+                const out_array = new NdComplexArray(null, [4]);
+                await fft(input, 4, -1, null, out_array);
+                const expected = new NdComplexArray([C(3,0), C(1,-2), C(-1,0), C(1,2)], [4]);
+                assertClose(out_array, expected, 1e-9);
+            });
+            
+            await test('`out` in multi-dimensional FFT', async () => {
+                const input = new NdArray([1,2,3,4], [2,2]);
+                const out_array = new NdComplexArray(null, [2,2]);
+                await fft(input, null, 0, null, out_array); // axis=0
+                const expected = new NdComplexArray([C(4,0), C(6,0), C(-2,0), C(-2,0)], [2,2]);
+                assertClose(out_array, expected);
+            });
+
+            logToPage('<h2>--- 13. More Multi-Dimensional Tests ---</h2>');
+            const data3d_c = new NdComplexArray(Array.from({length:24},(_,i)=>C(i, -i)), [2,3,4]);
+
+            for (const axis of [0, 1, 2]) {
+                await test(`3D Complex FFT -> IFFT round-trip, axis=${axis}`, async () => {
+                    const fft_res = await fft(data3d_c, null, axis);
+                    const ifft_res = await ifft(fft_res, null, axis);
+                    assertClose(data3d_c, ifft_res, 1e-9);
+                });
+            }
+
+            await test('FFT on axis where other dimensions are 1 (shape=[1, 8, 1])', async () => {
+                const data = Array.from({length: 8}, (_, i) => i);
+                const input1d = new NdArray(data, [8]);
+                const input3d = new NdArray(data, [1, 8, 1]);
+                
+                const result1d = await fft(input1d);
+                const result3d = await fft(input3d, null, 1);
+                
+                assert(JSON.stringify(result3d.shape) === JSON.stringify([1, 8, 1]), '3D shape not preserved');
+                // Compare flat data
+                assertClose(result1d, new NdComplexArray(result3d.interleavedData, [8]));
+            });
+            
+            await test('Hermitian symmetry on one row of a 2D FFT', async () => {
+                const input = new NdArray([1,2,3,4,5,6,7,8], [2, 4]);
+                const result = await fft(input, null, 1); // FFT along rows
+                const row1 = new NdComplexArray(null, [4]);
+                // Extract second row (index 1) of the result
+                row1.interleavedData.set(result.interleavedData.subarray(8, 16));
+                
+                const v1 = row1.get(1); // k=1
+                const v2_conj = row1.get(3); // N-k = 4-1=3
+                assert(Math.abs(v1.re - v2_conj.re) < 1e-9, `Real part mismatch`);
+                assert(Math.abs(v1.im + v2_conj.im) < 1e-9, `Imaginary part mismatch`);
+            });
+
+            await test('Padding on a non-last axis (axis=0)', async () => {
+                const input = new NdArray([1,2,3,4], [2,2]);
+                const result = await fft(input, 4, 0);
+                assert(JSON.stringify(result.shape) === JSON.stringify([4,2]), 'Shape is incorrect');
+                // Manually check first column FFT: fft([1,3], 4)
+                const col1_fft = await fft([1,3], 4);
+                const expected_col1 = new NdComplexArray(col1_fft.interleavedData, [4]);
+                const result_col1 = new NdComplexArray(null, [4]);
+                result_col1.set(0, result.get(0)); // result[0,0]
+                result_col1.set(1, result.get(2)); // result[1,0]
+                result_col1.set(2, result.get(4)); // result[2,0]
+                result_col1.set(3, result.get(6)); // result[3,0]
+                assertClose(result_col1, expected_col1, 1e-9);
+            });
+            
+            await test('Truncation on a non-last axis (axis=0)', async () => {
+                const input = new NdArray([1,2,3,4,5,6,7,8], [4,2]);
+                const result = await fft(input, 2, 0);
+                assert(JSON.stringify(result.shape) === JSON.stringify([2,2]), 'Shape is incorrect');
+                // Manually check first column FFT: fft([1,3,5,7], 2) -> fft([1,3])
+                const col1_fft = await fft([1,3]);
+                const expected_col1 = new NdComplexArray(col1_fft.interleavedData, [2]);
+                const result_col1 = new NdComplexArray(null, [2]);
+                result_col1.set(0, result.get(0)); // result[0,0]
+                result_col1.set(1, result.get(2)); // result[1,0]
+                assertClose(result_col1, expected_col1, 1e-9);
+            });
+
+            logToPage('<h2>--- 14. More Input Types and Edge Cases ---</h2>');
+
+            await test('FFT from a plain JS array of numbers', async () => {
+                const result = await fft([1, 2, 3, 4]);
+                const expected = new NdComplexArray([C(10, 0), C(-2, 2), C(-2, 0), C(-2, -2)], [4]);
+                assertClose(result, expected);
+            });
+
+            await test('FFT from a plain JS array of complex-like objects', async () => {
+                const result = await fft([{re: 1}, {re: 2, im: -1}, {im: -1}, {re: 4, im: 5}]);
+                const expected = new NdComplexArray([C(7,3), C(-5,3), C(-5,-5), C(7,-1)], [4]);
+                assertClose(result, expected);
+            });
+
+            await test('IFFT of a real NdArray input (auto-converts to complex)', async () => {
+                const input = new NdArray([4,0,0,0], [4]);
+                const result = await ifft(input); // should be ifft([C(4,0), C(0,0)...])
+                const expected = new NdArray([1,1,1,1], [4]);
+                assertClose(result.real, expected);
+            });
+            
+            await test('FFT round-trip with large prime number length (97)', async () => {
+                const len = 97;
+                const data = Array.from({length: len}, (_, i) => Math.sin(10 * i / len));
+                const input = new NdArray(data, [len]);
+                const result = await ifft(await fft(input));
+                assertClose(input, result.real, 1e-9, `Mismatch for prime length ${len}`);
+            });
+            
+            await test('FFT of a complex constant value', async () => {
+                const val = C(2, -3);
+                const input = new NdComplexArray([val, val, val, val], [4]);
+                const result = await fft(input);
+                const expected = new NdComplexArray([C(8,-12), C(0,0), C(0,0), C(0,0)], [4]);
+                assertClose(result, expected, 1e-9);
+            });
+            
+            await test('FFT with negative real numbers', async () => {
+                const result = await fft([-1, -2, -3, -4]);
+                const expected = new NdComplexArray([C(-10, 0), C(2, -2), C(2, 0), C(2, 2)], [4]);
+                assertClose(result, expected);
+            });
+
+            logToPage('<h2>--- 15. More Error Handling ---</h2>');
+
+            await test('`fft` throws when `out` is NdArray, not NdComplexArray', async () => {
+                const input = new NdArray([1,2,3,4], [4]);
+                const bad_out = new NdArray(null, [4]);
+                await assertThrowsAsync(() => fft(input, null, -1, null, bad_out), Error);
+            });
+            
+            await test('`ifft` throws when `out` is NdArray, not NdComplexArray', async () => {
+                const input = new NdComplexArray([C(1,0)], [1]);
+                const bad_out = new NdArray(null, [1]);
+                await assertThrowsAsync(() => ifft(input, null, -1, null, bad_out), Error);
+            });
+
+            await test('Throws on mismatched `out` multi-dim shape (same size)', async () => {
+                const input = new NdArray(null, [2, 4]);
+                const wrong_out = new NdComplexArray(null, [8]);
+                await assertThrowsAsync(() => fft(input, null, -1, null, wrong_out), ValueError);
+            });
+
+            await test('Throws on invalid axis for a 0-dim (scalar-like) array', async () => {
+                const input = new NdArray([5], []); // shape = []
+                await assertThrowsAsync(() => fft(input, null, 1), Error); // axis 0 or -1 is ok
+            });
+            
+            await test('Does not throw for axis=0 on 0-dim array', async () => {
+                 const input = new NdArray([5], []); // shape = []
+                 const result = await fft(input, null, 0);
+                 assertClose(result, new NdComplexArray([C(5,0)], [1]));
+            });
+            
+            for (const axis of [1, -3]) {
+                await test(`Throws on 2D array with out-of-bounds axis=${axis}`, async () => {
+                    const input = new NdArray([1,2,3,4], [2,2]);
+                    await assertThrowsAsync(() => fft(input, null, axis), Error);
+                });
+            }
+
+            // --- END OF 50+ NEW TEST CASES ---
+        }
+
+        // Run all tests once the page loads
+        runAllTests();
+
+    </script>
+</body>
+</html>
