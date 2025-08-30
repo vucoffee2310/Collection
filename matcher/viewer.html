@@ -10,9 +10,10 @@
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         button { width: 100%; padding: 8px; font-size: 1em; }
         #status { margin-top: 15px; font-style: italic; color: #555; }
-        #results { margin-top: 10px; padding: 10px; background: #f4f4f4; border: 1px solid #ddd; white-space: pre-wrap; font-family: monospace; max-height: 350px; overflow-y: auto; }
+        #results, #metrics { margin-top: 10px; padding: 10px; background: #f4f4f4; border: 1px solid #ddd; white-space: pre-wrap; font-family: monospace; max-height: 350px; overflow-y: auto; }
         .row { display: flex; gap: 10px; align-items: center; }
         .row > div { flex: 1; }
+        .section-title { margin-top: 18px; font-size: 1.05em; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -28,14 +29,17 @@
     <div class="file-input">
         <label for="sample-rate">Processing sample rate</label>
         <select id="sample-rate">
-            <option value="3000">3000 Hz (fast + good)</option>
-            <option value="4000" selected>4000 Hz (default)</option>
-            <option value="8000">6000 Hz (higher detail)</option>
+            <option value="3000" selected>3000 Hz (fast)</option>
+            <option value="4000">4000 Hz (default)</option>
+            <option value="6000">6000 Hz (higher detail)</option>
         </select>
     </div>
     <button id="run-button">Find Matches</button>
     <div id="status"></div>
+
+    <div class="section-title">Results</div>
     <pre id="results"></pre>
+
     <script src="wasm/fft.js"></script>
     <script src="viewer.js"></script>
 </body>
