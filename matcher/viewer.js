@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('search-file');
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
+    const srSelect = document.getElementById('sample-rate');
 
     statusDiv.textContent = 'Loading WASM FFT module...';
     runButton.disabled = true;
@@ -62,12 +63,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return buf;
         }
 
-        async function loadAudio(file, targetSr) {
-            const arrayBuffer = await file.arrayBuffer();
+        // ------- Performance helpers -------
+
+        const offlineCtxCache = new Map();
+        function getDecoderCtx(targetSr) {
             const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-            const ctx = new Ctx(1, 1, targetSr);
-            const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-            return audioBuffer.getChannelData(0);
+            if (!offlineCtxCache.has(targetSr)) {
+                offlineCtxCache.set(targetSr, new Ctx(1, 1, targetSr));
+            }
+            return offlineCtxCache.get(targetSr);
+        }
+
+        function nextPow2(n) {
+            let p = 1;
+            while (p < n) p <<= 1;
+            return p;
         }
 
         function normalizeSignal(signal) {
@@ -81,6 +91,148 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (let i = 0; i < signal.length; i++) signal[i] *= s;
             }
         }
+
+        // ------- Faster decoding/resampling -------
+
+        function looksLikeWav(dv) {
+            if (dv.byteLength < 12) return false;
+            // 'RIFF' .... 'WAVE'
+            return dv.getUint32(0, false) === 0x52494646 && dv.getUint32(8, false) === 0x57415645;
+        }
+
+        function parsePcmWavMono(ab) {
+            // Returns {samples: Float32Array, sampleRate} or null if unsupported
+            const dv = new DataView(ab);
+            if (!looksLikeWav(dv)) return null;
+
+            let offset = 12;
+            let fmt = null;
+            let data = null;
+
+            while (offset + 8 <= dv.byteLength) {
+                const id = dv.getUint32(offset, false);
+                const size = dv.getUint32(offset + 4, true);
+                const chunkStart = offset + 8;
+                if (id === 0x666d7420) { // 'fmt '
+                    const audioFormat = dv.getUint16(chunkStart + 0, true);
+                    const numChannels = dv.getUint16(chunkStart + 2, true);
+                    const sampleRate = dv.getUint32(chunkStart + 4, true);
+                    const blockAlign = dv.getUint16(chunkStart + 12, true);
+                    const bitsPerSample = dv.getUint16(chunkStart + 14, true);
+                    fmt = { audioFormat, numChannels, sampleRate, blockAlign, bitsPerSample };
+                } else if (id === 0x64617461) { // 'data'
+                    data = { offset: chunkStart, size };
+                }
+                // Chunks are word-aligned
+                offset = chunkStart + size + (size & 1);
+            }
+
+            if (!fmt || !data) return null;
+            // Support PCM int16 (1) and float32 (3). Common, fast.
+            if (fmt.audioFormat !== 1 && fmt.audioFormat !== 3) return null;
+            if (fmt.numChannels < 1) return null;
+
+            const bytesPerSample = fmt.bitsPerSample >>> 3;
+            const frameCount = Math.floor(data.size / fmt.blockAlign);
+            const out = new Float32Array(frameCount);
+
+            const chStride = bytesPerSample;
+            const frameStride = fmt.blockAlign;
+            const chIndex = 0; // take first channel
+
+            let readFn;
+            if (fmt.audioFormat === 1) {
+                // PCM int
+                if (fmt.bitsPerSample === 16) {
+                    readFn = (pos) => dv.getInt16(pos, true) / 32768;
+                } else if (fmt.bitsPerSample === 24) {
+                    // 24-bit PCM: sign-extend manually
+                    readFn = (pos) => {
+                        const b0 = dv.getUint8(pos);
+                        const b1 = dv.getUint8(pos + 1);
+                        const b2 = dv.getUint8(pos + 2);
+                        let val = (b2 << 16) | (b1 << 8) | b0;
+                        if (val & 0x800000) val |= ~0xFFFFFF; // sign extend
+                        return val / 8388608; // 2^23
+                    };
+                } else if (fmt.bitsPerSample === 32) {
+                    readFn = (pos) => dv.getInt32(pos, true) / 2147483648;
+                } else {
+                    return null; // unsupported PCM bit depth; fall back
+                }
+            } else if (fmt.audioFormat === 3) {
+                if (fmt.bitsPerSample !== 32) return null;
+                readFn = (pos) => dv.getFloat32(pos, true);
+            }
+
+            let p = data.offset;
+            for (let i = 0; i < frameCount; i++) {
+                const samplePos = p + chIndex * chStride;
+                out[i] = readFn(samplePos);
+                p += frameStride;
+            }
+            return { samples: out, sampleRate: fmt.sampleRate };
+        }
+
+        function lowpassSinglePole(x, srIn, cutoffHz) {
+            if (x.length === 0) return x;
+            const out = new Float32Array(x.length);
+            const dt = 1 / srIn;
+            const RC = 1 / (2 * Math.PI * cutoffHz);
+            const alpha = dt / (RC + dt);
+            let y = x[0];
+            out[0] = y;
+            for (let i = 1; i < x.length; i++) {
+                y += alpha * (x[i] - y);
+                out[i] = y;
+            }
+            return out;
+        }
+
+        function resampleLinear(x, srIn, srOut, lowpass = true) {
+            if (x.length === 0 || srIn === srOut) return x.slice();
+            const ratio = srOut / srIn;
+            const outLen = Math.max(1, Math.floor(x.length * ratio));
+            let src = x;
+            if (lowpass && srOut < srIn) {
+                // Keep most energy under ~0.45*Nyq of new rate to avoid aliasing.
+                const cutoff = 0.45 * srOut;
+                src = lowpassSinglePole(x, srIn, cutoff);
+            }
+            const out = new Float32Array(outLen);
+            const step = srIn / srOut;
+            let pos = 0;
+            for (let i = 0; i < outLen; i++) {
+                const i0 = pos | 0;
+                const frac = pos - i0;
+                const i1 = i0 + 1;
+                const a = src[i0] || 0;
+                const b = src[i1] || a;
+                out[i] = a + frac * (b - a);
+                pos += step;
+            }
+            return out;
+        }
+
+        async function decodeViaWebAudio(ab, targetSr) {
+            const ctx = getDecoderCtx(targetSr);
+            const audioBuffer = await ctx.decodeAudioData(ab.slice(0)); // slice to avoid detachment side-effects
+            return audioBuffer.getChannelData(0).slice();
+        }
+
+        async function loadAudioFast(file, targetSr) {
+            const ab = await file.arrayBuffer();
+            // Fast path for PCM WAV
+            const parsed = parsePcmWavMono(ab);
+            if (parsed) {
+                const resampled = resampleLinear(parsed.samples, parsed.sampleRate, targetSr, true);
+                return resampled;
+            }
+            // Fallback for compressed formats (mp3, m4a, flac, etc.)
+            return await decodeViaWebAudio(ab, targetSr);
+        }
+
+        // ------- Peak finding and NCC -------
 
         function findPeaks(x, height, distance) {
             const n = x.length;
@@ -117,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const n1 = search.length;
             const M = pattern.length;
             const N = n1 + M - 1;
+            const Nfft = nextPow2(N); // pad to speed up FFT
 
             // Pattern stats
             let ps = 0, psq = 0;
@@ -126,36 +279,36 @@ document.addEventListener('DOMContentLoaded', () => {
             const pEnergy = Math.sqrt(pVar * M) || 0;
 
             // Reverse and center pattern
-            const pRev = new Float32Array(M);
+            const pRev = new Float32Array(Nfft);
             for (let i = 0; i < M; i++) pRev[M - 1 - i] = pattern[i] - pMean;
 
-            const b = ensureBuffers(N);
+            const b = ensureBuffers(Nfft);
             // Zero only needed slice
-            b.view.s_r.fill(0, 0, N);
-            b.view.s_i.fill(0, 0, N);
-            b.view.p_r.fill(0, 0, N);
-            b.view.p_i.fill(0, 0, N);
+            b.view.s_r.fill(0, 0, Nfft);
+            b.view.s_i.fill(0, 0, Nfft);
+            b.view.p_r.fill(0, 0, Nfft);
+            b.view.p_i.fill(0, 0, Nfft);
 
             // Copy input
             b.view.s_r.set(search, 0);
             b.view.p_r.set(pRev, 0);
 
             // FFTs
-            wasm.fft(N, b.ptr.s_r, b.ptr.s_i, b.ptr.s_r, b.ptr.s_i);
+            wasm.fft(Nfft, b.ptr.s_r, b.ptr.s_i, b.ptr.s_r, b.ptr.s_i);
             syncViews();
-            wasm.fft(N, b.ptr.p_r, b.ptr.p_i, b.ptr.p_r, b.ptr.p_i);
+            wasm.fft(Nfft, b.ptr.p_r, b.ptr.p_i, b.ptr.p_r, b.ptr.p_i);
             syncViews();
 
             // Complex multiply: S * P
             const sr = b.view.s_r, si = b.view.s_i, pr = b.view.p_r, pi = b.view.p_i;
-            for (let i = 0; i < N; i++) {
+            for (let i = 0; i < Nfft; i++) {
                 const a = sr[i], b1 = si[i], c = pr[i], d = pi[i];
                 pr[i] = a * c - b1 * d;
                 pi[i] = a * d + b1 * c;
             }
 
             // IFFT
-            wasm.ifft(N, b.ptr.p_r, b.ptr.p_i, b.ptr.p_r, b.ptr.p_i);
+            wasm.ifft(Nfft, b.ptr.p_r, b.ptr.p_i, b.ptr.p_r, b.ptr.p_i);
             syncViews();
 
             const conv = b.view.p_r;
@@ -194,11 +347,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const target_sr = 4000; // decode both to the same SR for correct timing
-                statusDiv.textContent = 'Loading audio...';
+                const target_sr = parseInt(srSelect.value, 10) || 2000;
+                statusDiv.textContent = `Loading and downsampling audio @ ${target_sr} Hz...`;
                 const [pattern, search] = await Promise.all([
-                    loadAudio(patternFile, target_sr),
-                    loadAudio(searchFile, target_sr)
+                    loadAudioFast(patternFile, target_sr),
+                    loadAudioFast(searchFile, target_sr)
                 ]);
 
                 if (pattern.length > search.length) throw new Error('Pattern cannot be longer than search signal.');
@@ -208,6 +361,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 statusDiv.textContent = 'Computing correlation...';
                 const ncc = calculateNCC(search, pattern);
+
+                // Keep the spacing conservative at 25% of pattern length (in samples)
                 const peaks = findPeaks(ncc, 0.7, Math.floor(0.25 * pattern.length));
 
                 if (!peaks.length) {
