@@ -20,11 +20,11 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["wasm/fft.wasm"],
+      "resources": ["wasm/fft.wasm", "audioWorker.js"],
       "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self';"
   }
 }

@@ -4,22 +4,12 @@
     <meta charset="UTF-8">
     <title>Audio Matcher</title>
     <style>
-        /* Removed fixed width from body to allow it to fill the created window */
         body { font-family: sans-serif; padding: 10px; margin: 0; }
         h3 { margin-top: 0; }
         .file-input { margin-bottom: 10px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         button { width: 100%; padding: 8px; font-size: 1em; }
         #status { margin-top: 15px; font-style: italic; color: #555; }
-        #monitoring {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #eefafc;
-            border: 1px solid #cce;
-            white-space: pre-wrap;
-            font-family: monospace;
-            color: #335;
-        }
         #results { 
             margin-top: 10px; 
             padding: 10px; 
@@ -27,7 +17,7 @@
             border: 1px solid #ddd; 
             white-space: pre-wrap;
             font-family: monospace;
-            max-height: 350px; /* Adjusted height for a taller window */
+            max-height: 350px;
             overflow-y: auto;
         }
     </style>
@@ -44,10 +34,7 @@
     </div>
     <button id="run-button">Find Matches</button>
     <div id="status"></div>
-    <pre id="monitoring"></pre>
     <pre id="results"></pre>
-
-    <!-- Load WASM module first, then our script -->
     <script src="wasm/fft.js"></script>
     <script src="viewer.js"></script>
 </body>
