@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!fmt || !data) return null;
-            if (fmt.audioFormat !== 1 && fmt.audioFormat !== 3) return null;
+            if (fmt.audioFormat !== 1 && fmt.audioFormat !== 3) return null; // PCM or IEEE float
             if (fmt.numChannels < 1) return null;
 
             const dv2 = new DataView(ab);
@@ -315,7 +315,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const t0 = performance.now();
             const audioBuffer = await ctx.decodeAudioData(ab.slice(0));
             const decodeMs = performance.now() - t0;
-            return { samples: audioBuffer.getChannelData(0).slice(), decodeMs, inSr: audioBuffer.sampleRate };
+            // Zero-copy view of channel data
+            const ch0 = audioBuffer.getChannelData(0);
+            return { samples: ch0, decodeMs, inSr: audioBuffer.sampleRate };
         }
 
         async function loadAudioFastWithMetrics(file, targetSr) {
@@ -343,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 method = 'webaudio';
                 const dec = await decodeViaWebAudio(ab, targetSr);
-                out = dec.samples;
+                out = dec.samples; // zero-copy
                 decodeMs = dec.decodeMs;
                 inSampleRate = dec.inSr;
             }
@@ -398,6 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return out;
         }
 
+        // Single-FFT NCC via dual-real packing
         function calculateNCCWithMetrics(search, pattern) {
             const tStart = performance.now();
             const n1 = search.length;
@@ -405,50 +408,62 @@ document.addEventListener('DOMContentLoaded', () => {
             const N = n1 + M - 1;
             const Nfft = nextPow2(N);
 
-            // Pattern stats
+            // Pattern stats (mean/energy)
             let t0 = performance.now();
             let ps = 0, psq = 0;
             for (let i = 0; i < M; i++) { const v = pattern[i]; ps += v; psq += v * v; }
             const pMean = ps / M;
             const pVar = Math.max(0, psq / M - pMean * pMean);
-            const pEnergy = Math.sqrt(pVar * M) || 0;
-            let patternStatsMs = performance.now() - t0;
+            const pEnergy = Math.sqrt(pVar * M) || 0; // L2 norm of zero-mean pattern
+            const patternStatsMs = performance.now() - t0;
 
-            // Reverse and center
-            t0 = performance.now();
-            const pRev = new Float32Array(Nfft);
-            for (let i = 0; i < M; i++) pRev[M - 1 - i] = pattern[i] - pMean;
-            const reverseMs = performance.now() - t0;
-
-            // Buffers + prepare (zero + copy)
+            // Buffers + prepare (minimal zeroing)
             t0 = performance.now();
             const b = ensureBuffers(Nfft);
-            b.view.s_r.fill(0, 0, Nfft);
-            b.view.s_i.fill(0, 0, Nfft);
-            b.view.p_r.fill(0, 0, Nfft);
-            b.view.p_i.fill(0, 0, Nfft);
-            b.view.s_r.set(search, 0);
-            b.view.p_r.set(pRev, 0);
+            let sr = b.view.s_r, si = b.view.s_i, pr = b.view.p_r, pi = b.view.p_i;
+
+            // Real part: search
+            sr.set(search, 0);
+            if (n1 < Nfft) sr.fill(0, n1); // zero tail only
+
+            // Imag part: reversed, zero-mean pattern
+            for (let i = 0, j = M - 1; i < M; i++, j--) si[i] = pattern[j] - pMean;
+            if (M < Nfft) si.fill(0, M);   // zero tail only
+            // pr/pi will be fully overwritten; no need to clear
             const prepareMs = performance.now() - t0;
 
-            // FFTs
+            // Single FFT for both real signals packed in real/imag
             t0 = performance.now();
             wasm.fft(Nfft, b.ptr.s_r, b.ptr.s_i, b.ptr.s_r, b.ptr.s_i);
-            syncViews();
-            const fftSearchMs = performance.now() - t0;
+            syncViews(); // memory could have grown; refresh views
+            sr = b.view.s_r; si = b.view.s_i; pr = b.view.p_r; pi = b.view.p_i;
+            const fftPairMs = performance.now() - t0;
 
+            // Recover spectra and compute product in one pass, enforce Hermitian symmetry
             t0 = performance.now();
-            wasm.fft(Nfft, b.ptr.p_r, b.ptr.p_i, b.ptr.p_r, b.ptr.p_i);
-            syncViews();
-            const fftPatternMs = performance.now() - t0;
+            const half = Nfft >>> 1;
+            for (let k = 0; k <= half; k++) {
+                const km = (k === 0) ? 0 : Nfft - k;
 
-            // Complex multiply: S * P
-            t0 = performance.now();
-            const sr = b.view.s_r, si = b.view.s_i, pr = b.view.p_r, pi = b.view.p_i;
-            for (let i = 0; i < Nfft; i++) {
-                const a = sr[i], b1 = si[i], c = pr[i], d = pi[i];
-                pr[i] = a * c - b1 * d;
-                pi[i] = a * d + b1 * c;
+                const xr = sr[k], xi = si[k];
+                const yr = sr[km], yi = si[km]; // C[N-k]
+
+                // X_k = 0.5*(C[k] + conj(C[N-k]))
+                const Ar = 0.5 * (xr + yr);
+                const Ai = 0.5 * (xi - yi);
+
+                // Y_k = (C[k] - conj(C[N-k])) / (2i)
+                const Br = 0.5 * (xi + yi);
+                const Bi = 0.5 * (yr - xr);
+
+                // Product: X_k * Y_k
+                const prk = Ar * Br - Ai * Bi;
+                const pik = Ar * Bi + Ai * Br;
+
+                pr[k] = prk;  pi[k] = pik;
+                if (k !== 0 && k !== half) {
+                    pr[km] = prk;  pi[km] = -pik;
+                }
             }
             const multiplyMs = performance.now() - t0;
 
@@ -458,13 +473,13 @@ document.addEventListener('DOMContentLoaded', () => {
             syncViews();
             const ifftMs = performance.now() - t0;
 
-            // NCC (sliding stats)
+            // NCC (sliding stats) over valid region
             t0 = performance.now();
             const conv = b.view.p_r;
             const ncc = new Float32Array(n1 - M + 1);
             let ss = 0, ssq = 0;
             for (let i = 0; i < M; i++) { const v = search[i]; ss += v; ssq += v * v; }
-            const Minv = 1 / M, eps = 1e-10;
+            const Minv = 1 / M, eps = 1e-10, off = M - 1;
             for (let i = 0; i <= n1 - M; i++) {
                 if (i) {
                     const add = search[i + M - 1], rem = search[i - 1];
@@ -474,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mean = ss * Minv;
                 const v = Math.max(0, ssq * Minv - mean * mean);
                 const denom = Math.sqrt(v * M) * pEnergy;
-                ncc[i] = denom > eps ? conv[M - 1 + i] / denom : 0;
+                ncc[i] = denom > eps ? conv[off + i] / denom : 0;
             }
             const slidingStatsMs = performance.now() - t0;
 
@@ -484,10 +499,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 metrics: {
                     Nfft,
                     patternStatsMs,
-                    reverseMs,
                     prepareMs,
-                    fftSearchMs,
-                    fftPatternMs,
+                    fftPairMs,
                     multiplyMs,
                     ifftMs,
                     slidingStatsMs,
@@ -540,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 statusDiv.textContent = 'Computing correlation...';
 
-                // Correlation with detailed metrics
+                // Correlation with detailed metrics (single FFT)
                 const { ncc, metrics: comp } = calculateNCCWithMetrics(search, pattern);
 
                 // Peak finding (timed)
@@ -586,12 +599,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
 
-                // Compute metrics
+                // Compute metrics (map single FFT to 'FFT(search)', leave pattern FFT as 0)
                 perf.compute = {
                     Nfft: comp.Nfft,
                     prepareMs: comp.prepareMs,
-                    fftSearchMs: comp.fftSearchMs,
-                    fftPatternMs: comp.fftPatternMs,
+                    fftSearchMs: comp.fftPairMs,
+                    fftPatternMs: 0,
                     multiplyMs: comp.multiplyMs,
                     ifftMs: comp.ifftMs,
                     slidingStatsMs: comp.slidingStatsMs,
