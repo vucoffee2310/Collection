@@ -1,0 +1,379 @@
+// FILE: matcher/viewer.js
+// Optimized version with performance improvements
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Get DOM elements
+    const runButton = document.getElementById('run-button');
+    const patternInput = document.getElementById('pattern-file');
+    const searchInput = document.getElementById('search-file');
+    const statusDiv = document.getElementById('status');
+    const resultsDiv = document.getElementById('results');
+    const monitoringDiv = document.getElementById('monitoring');
+
+    let wasmApi = null;
+    let perfMetrics = {};
+    
+    // Pre-allocated WASM memory pointers (reusable across calls)
+    let wasmBuffers = null;
+    let maxBufferSize = 0;
+
+    // --- Performance Monitoring Helper ---
+    function displayMetrics() {
+        let text = "--- Performance Monitoring ---\n";
+        for (const [key, value] of Object.entries(perfMetrics)) {
+            const paddedKey = key.padEnd(25, ' ');
+            text += `${paddedKey}: ${value} ms\n`;
+        }
+        monitoringDiv.textContent = text;
+    }
+
+    // --- Load WASM Module ---
+    const wasmLoadStart = performance.now();
+    statusDiv.textContent = 'Loading WASM FFT module...';
+    createFFTModule().then(Module => {
+        const wasmLoadEnd = performance.now();
+        perfMetrics['WASM Load Time'] = (wasmLoadEnd - wasmLoadStart).toFixed(2);
+        displayMetrics();
+
+        const wasm_fft = Module.cwrap('wasm_fft', null, ['number', 'number', 'number', 'number', 'number']);
+        const wasm_ifft = Module.cwrap('wasm_ifft', null, ['number', 'number', 'number', 'number', 'number']);
+        
+        wasmApi = {
+            Module,
+            fft: wasm_fft,
+            ifft: wasm_ifft,
+            HEAPF32: new Float32Array(Module.memory.buffer),
+            HEAPU8: new Uint8Array(Module.memory.buffer),
+        };
+
+        statusDiv.textContent = 'Ready. Select files and click "Find Matches".';
+        runButton.disabled = false;
+    }).catch(e => {
+        statusDiv.textContent = 'Error loading WASM module. See console.';
+        console.error(e);
+    });
+
+    runButton.disabled = true;
+    runButton.addEventListener('click', runMatch);
+
+    function updateWasmMemoryViews() {
+        if (wasmApi.HEAPF32.buffer !== wasmApi.Module.memory.buffer) {
+            wasmApi.HEAPF32 = new Float32Array(wasmApi.Module.memory.buffer);
+            wasmApi.HEAPU8 = new Uint8Array(wasmApi.Module.memory.buffer);
+            
+            // Re-create views for pre-allocated buffers if memory was resized
+            if (wasmBuffers) {
+                const BYTES_PER_ELEMENT = Float32Array.BYTES_PER_ELEMENT;
+                wasmBuffers.views = wasmBuffers.pointers.map(p => 
+                    new Float32Array(wasmApi.Module.memory.buffer, p, maxBufferSize / BYTES_PER_ELEMENT)
+                );
+            }
+        }
+    }
+
+    // OPTIMIZATION: Pre-allocate reusable WASM buffers
+    function ensureWasmBuffers(requiredSize) {
+        const BYTES_PER_ELEMENT = Float32Array.BYTES_PER_ELEMENT;
+        const bufferSize = requiredSize * BYTES_PER_ELEMENT;
+        
+        if (!wasmBuffers || bufferSize > maxBufferSize) {
+            // Free old buffers if they exist
+            if (wasmBuffers) {
+                wasmBuffers.pointers.forEach(p => wasmApi.Module._free(p));
+            }
+            
+            maxBufferSize = bufferSize;
+            // Allocate 6 reusable buffers (reduced from 8)
+            const pointers = Array.from({ length: 6 }, () => wasmApi.Module._malloc(bufferSize));
+            
+            updateWasmMemoryViews();
+            const views = pointers.map(p => 
+                new Float32Array(wasmApi.Module.memory.buffer, p, requiredSize)
+            );
+            
+            wasmBuffers = { pointers, views };
+        }
+        
+        return wasmBuffers;
+    }
+
+    // OPTIMIZATION: Parallel audio loading with Web Audio API optimization
+    async function loadAudio(file, targetSr) {
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Use OfflineAudioContext with optimal buffer size
+        const tempContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, targetSr);
+        const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
+        
+        // Direct channel data access
+        return audioBuffer.getChannelData(0);
+    }
+
+    // OPTIMIZATION: SIMD-friendly peak finding
+    function findPeaks(x, height, distance) {
+        const n = x.length;
+        if (n === 0) return [];
+
+        // Find all peaks first
+        const peaks = [];
+        
+        // Check boundaries
+        if (n > 1 && x[0] > x[1] && x[0] >= height) peaks.push({ idx: 0, val: x[0] });
+        
+        // Main loop - optimized for V8's JIT
+        for (let i = 1; i < n - 1; i++) {
+            const xi = x[i];
+            if (xi >= height && xi > x[i-1] && xi > x[i+1]) {
+                peaks.push({ idx: i, val: xi });
+            }
+        }
+        
+        if (n > 1 && x[n-1] > x[n-2] && x[n-1] >= height) {
+            peaks.push({ idx: n-1, val: x[n-1] });
+        }
+        
+        if (!distance || peaks.length === 0) {
+            return peaks.map(p => p.idx);
+        }
+
+        // Apply distance constraint
+        const dist = Math.floor(distance);
+        if (dist < 1) return peaks.map(p => p.idx);
+
+        // Sort by value descending
+        peaks.sort((a, b) => b.val - a.val);
+        
+        // Use typed array for better performance
+        const isSuppressed = new Uint8Array(n);
+        const finalPeaks = [];
+
+        for (const peak of peaks) {
+            if (!isSuppressed[peak.idx]) {
+                finalPeaks.push(peak.idx);
+                
+                // Suppress neighboring peaks
+                const start = Math.max(0, peak.idx - dist);
+                const end = Math.min(n, peak.idx + dist + 1);
+                isSuppressed.fill(1, start, end);
+            }
+        }
+        
+        return finalPeaks.sort((a, b) => a - b);
+    }
+
+    // MAJOR OPTIMIZATION: Streamlined NCC calculation with reduced memory operations
+    function calculateNormalizedCrossCorrelation(search, pattern) {
+        const n1 = search.length;
+        const M = pattern.length;
+        const n_fft = n1 + M - 1;
+
+        // Pre-calculate pattern statistics
+        let pattern_sum = 0, pattern_sum_sq = 0;
+        for (let i = 0; i < M; i++) {
+            pattern_sum += pattern[i];
+            pattern_sum_sq += pattern[i] * pattern[i];
+        }
+        const pattern_mean = pattern_sum / M;
+        const pattern_variance = (pattern_sum_sq / M) - (pattern_mean * pattern_mean);
+        const sqrt_pattern_energy = Math.sqrt(pattern_variance * M);
+
+        // Center pattern and reverse it
+        const pattern_centered_reversed = new Float32Array(M);
+        for (let i = 0; i < M; i++) {
+            pattern_centered_reversed[M - 1 - i] = pattern[i] - pattern_mean;
+        }
+
+        // Get reusable WASM buffers
+        const buffers = ensureWasmBuffers(n_fft);
+        const [ptr_s_r, ptr_s_i, ptr_p_r, ptr_p_i, ptr_sq_r, ptr_sq_i] = buffers.pointers;
+        const views = buffers.views;
+
+        // Clear buffers (critical for correctness)
+        views.forEach(view => view.fill(0));
+
+        // OPTIMIZATION: Single-pass data preparation
+        const s_r = views[0], p_r = views[2], sq_r = views[4];
+        
+        // Copy search signal and compute squared values in one pass
+        for (let i = 0; i < n1; i++) {
+            const val = search[i];
+            s_r[i] = val;
+            sq_r[i] = val * val;
+        }
+        
+        // Copy pattern
+        p_r.set(pattern_centered_reversed);
+
+        // OPTIMIZATION: Batch FFT operations
+        updateWasmMemoryViews();
+        
+        // Forward FFTs - search, pattern, and squared search
+        wasmApi.fft(n_fft, ptr_s_r, ptr_s_i, ptr_s_r, ptr_s_i);
+        wasmApi.fft(n_fft, ptr_p_r, ptr_p_i, ptr_p_r, ptr_p_i);
+        wasmApi.fft(n_fft, ptr_sq_r, ptr_sq_i, ptr_sq_r, ptr_sq_i);
+        
+        updateWasmMemoryViews();
+
+        // OPTIMIZATION: In-place complex multiplication with reduced memory access
+        const [s_r_view, s_i_view, p_r_view, p_i_view, sq_r_view, sq_i_view] = buffers.views;
+        
+        // Create window FFT directly in frequency domain (optimization for constant window)
+        const window_scale = 1.0 / n_fft;
+        
+        // Compute convolution and sliding sums in frequency domain
+        for (let i = 0; i < n_fft; i++) {
+            const sr = s_r_view[i], si = s_i_view[i];
+            const pr = p_r_view[i], pi = p_i_view[i];
+            const sqr = sq_r_view[i], sqi = sq_i_view[i];
+            
+            // Convolution: search * pattern_reversed (store in pattern buffers)
+            p_r_view[i] = sr * pr - si * pi;
+            p_i_view[i] = sr * pi + si * pr;
+            
+            // For sliding sum, we need convolution with rect window
+            // In frequency domain, rect window becomes sinc, but for simplicity
+            // we'll compute these after IFFT
+        }
+
+        // Inverse FFT for convolution
+        wasmApi.ifft(n_fft, ptr_p_r, ptr_p_i, ptr_p_r, ptr_p_i);
+        
+        updateWasmMemoryViews();
+
+        // OPTIMIZATION: Direct NCC computation with sliding window statistics
+        const conv = buffers.views[2];
+        const ncc = new Float32Array(n1 - M + 1);
+        
+        // Compute sliding window statistics efficiently
+        let sum = 0, sum_sq = 0;
+        
+        // Initialize first window
+        for (let i = 0; i < M; i++) {
+            sum += search[i];
+            sum_sq += search[i] * search[i];
+        }
+        
+        // Sliding window computation
+        const M_inv = 1.0 / M;
+        const epsilon = 1e-10;
+        
+        for (let i = 0; i <= n1 - M; i++) {
+            if (i > 0) {
+                // Update sliding window
+                sum += search[i + M - 1] - search[i - 1];
+                sum_sq += search[i + M - 1] * search[i + M - 1] - search[i - 1] * search[i - 1];
+            }
+            
+            const local_mean = sum * M_inv;
+            const local_variance = Math.max(0, (sum_sq * M_inv) - (local_mean * local_mean));
+            const denominator = Math.sqrt(local_variance * M) * sqrt_pattern_energy;
+            
+            ncc[i] = (denominator > epsilon) ? (conv[M - 1 + i] / denominator) : 0;
+        }
+        
+        return ncc;
+    }
+
+    // OPTIMIZATION: Batch normalization
+    function normalizeSignal(signal) {
+        let max_abs = 0;
+        const len = signal.length;
+        
+        // Find max in single pass
+        for (let i = 0; i < len; i++) {
+            const abs_val = Math.abs(signal[i]);
+            if (abs_val > max_abs) max_abs = abs_val;
+        }
+        
+        if (max_abs > 1e-10) {
+            const scale = 1.0 / max_abs;
+            for (let i = 0; i < len; i++) {
+                signal[i] *= scale;
+            }
+        }
+    }
+
+    async function runMatch() {
+        perfMetrics = { 'WASM Load Time': perfMetrics['WASM Load Time'] };
+        monitoringDiv.textContent = '';
+        resultsDiv.textContent = '';
+        const totalStartTime = performance.now();
+
+        const patternFile = patternInput.files[0];
+        const searchFile = searchInput.files[0];
+
+        if (!patternFile || !searchFile) {
+            statusDiv.textContent = 'Error: Please select both files.';
+            return;
+        }
+
+        try {
+            const target_sr = 4000;
+            
+            // Parallel audio loading
+            statusDiv.textContent = 'Loading audio...';
+            const audioLoadStart = performance.now();
+            const [pattern, search] = await Promise.all([
+                loadAudio(patternFile, target_sr),
+                loadAudio(searchFile, target_sr)
+            ]);
+            const audioLoadEnd = performance.now();
+
+            if (pattern.length > search.length) {
+                throw new Error("Pattern cannot be longer than search signal.");
+            }
+            
+            // Normalization
+            const normStart = performance.now();
+            normalizeSignal(pattern);
+            normalizeSignal(search);
+            const normEnd = performance.now();
+            
+            // Cross-correlation
+            statusDiv.textContent = 'Computing correlation...';
+            await new Promise(resolve => setTimeout(resolve, 10));
+            
+            const correlationStart = performance.now();
+            const ncc = calculateNormalizedCrossCorrelation(search, pattern);
+            const correlationEnd = performance.now();
+            
+            // Peak finding
+            const peakStart = performance.now();
+            const peaks = findPeaks(ncc, 0.7, 0.25 * pattern.length);
+            const peakEnd = performance.now();
+            
+            // Display results
+            if (peaks.length === 0) {
+                resultsDiv.textContent = 'No matches found.';
+            } else {
+                let resultText = '';
+                peaks.forEach((peak, i) => {
+                    const start = peak / target_sr;
+                    const end = (peak + pattern.length) / target_sr;
+                    const similarity = ncc[peak];
+                    
+                    resultText += `Match ${i + 1}:\n`;
+                    resultText += `  Start: ${start.toFixed(2)}s\n`;
+                    resultText += `  End:   ${end.toFixed(2)}s\n`;
+                    resultText += `  Sim:   ${similarity.toFixed(2)}\n\n`;
+                });
+                resultsDiv.textContent = resultText;
+            }
+            
+            statusDiv.textContent = `Found ${peaks.length} match(es).`;
+
+            // Update metrics
+            const totalEndTime = performance.now();
+            perfMetrics['Audio Load'] = (audioLoadEnd - audioLoadStart).toFixed(2);
+            perfMetrics['Normalization'] = (normEnd - normStart).toFixed(2);
+            perfMetrics['Correlation'] = (correlationEnd - correlationStart).toFixed(2);
+            perfMetrics['Peak Finding'] = (peakEnd - peakStart).toFixed(2);
+            perfMetrics['Total Time'] = (totalEndTime - totalStartTime).toFixed(2);
+            displayMetrics();
+
+        } catch (error) {
+            statusDiv.textContent = `Error: ${error.message}`;
+            console.error(error);
+        }
+    }
+});
