@@ -20,7 +20,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["wasm/fft.wasm", "audioWorker.js"],
+      "resources": ["wasm/fft.wasm"],
       "matches": ["<all_urls>"]
     }
   ],
