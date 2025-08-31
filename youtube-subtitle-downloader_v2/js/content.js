@@ -232,9 +232,10 @@ const createUI = tracks => {
             div.append(Object.assign(document.createElement('a'), {
                 textContent: `[Process & Send ${getLabel(track)} to AI]`,
                 title: 'Send formatted text to the AI for processing',
-                href: 'javascript:void(0)',
+                href: '#',
                 style: 'margin-left:10px;cursor:pointer;color:mediumpurple;font-weight:bold;text-decoration:underline',
-                onclick: async () => {
+                onclick: async (event) => { 
+                    event.preventDefault();
                     const content = await getAndProcessSubs(track);
                     if(content) sendToAI(content);
                 }
