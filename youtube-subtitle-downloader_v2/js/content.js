@@ -5,6 +5,80 @@ const getVideoId = () => new URL(location.href).searchParams.get('v');
 // SECTION 1: CORE TEXT PROCESSING PIPELINE
 // ====================================================================
 
+function breakIntoParagraphsRandomly(text, minLength = 250, maxLength = 550) {
+  if (!text || typeof text !== 'string') return "";
+
+  // Define an expanded set of punctuation characters for multiple languages.
+  const punctuation = 
+      // Standard English
+      '.?!;' + 
+      // CJK (Chinese, Japanese, Korean) Full-width
+      '。？！；' + // Period, Question Mark, Exclamation Mark
+      // Other
+      '…' +      // Ellipsis
+      // Southeast Asian Scripts
+      '။॥' +     // Burmese Danda and Double Danda (sentence breaks)
+      '។';       // Khmer Khan (sentence terminator)
+  
+  let remainingText = text.replace(/\s\s+/g, ' ').trim();
+  const finalParagraphs = [];
+
+  while (remainingText.length > 0) {
+    if (remainingText.length <= maxLength) {
+      finalParagraphs.push(remainingText);
+      break;
+    }
+
+    const randomTargetLength = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
+    
+    let breakIndex = -1;
+    let fallbackSpaceIndex = -1;
+    let fallbackPunctuationIndex = -1;
+
+    for (let i = Math.min(randomTargetLength, remainingText.length -1) ; i >= minLength; i--) {
+        // Priority 1: Whitespace preceded by punctuation.
+        if (remainingText[i] === ' ' && punctuation.includes(remainingText[i - 1])) {
+            if (isBreakPointValid(remainingText, i)) {
+                breakIndex = i;
+                break; 
+            }
+        }
+        
+        // Priority 2: Any whitespace.
+        if (fallbackSpaceIndex === -1 && remainingText[i] === ' ') {
+            if (isBreakPointValid(remainingText, i)) {
+                fallbackSpaceIndex = i;
+            }
+        }
+
+        // Priority 3: Any punctuation mark. Break happens *after* the punctuation.
+        if (fallbackPunctuationIndex === -1 && punctuation.includes(remainingText[i])) {
+            if (isBreakPointValid(remainingText, i + 1)) {
+                fallbackPunctuationIndex = i + 1; 
+            }
+        }
+    }
+
+    if (breakIndex !== -1) {
+        // Use highest priority.
+    } else if (fallbackSpaceIndex !== -1) {
+        breakIndex = fallbackSpaceIndex;
+    } else if (fallbackPunctuationIndex !== -1) {
+        breakIndex = fallbackPunctuationIndex;
+    } else {
+        // Last Resort: Force a break.
+        breakIndex = randomTargetLength;
+    }
+
+    const newPara = remainingText.substring(0, breakIndex).trim();
+    finalParagraphs.push(newPara);
+    remainingText = remainingText.substring(breakIndex).trim();
+  }
+
+  return finalParagraphs.join('\n\n');
+}
+
+// Full script for context
 function xmlToSingleParagraph(xml) {
     const characters = ['Q', 'Z', 'P', 'H', 'W', 'D', 'N', 'K', 'T', 'G', 'B', 'Y', 'V', 'S', 'U', 'R', 'J', 'E', 'O', 'M', 'C', 'L', 'X', 'A', 'F', 'I'];
     const utterances = new DOMParser().parseFromString(xml, 'text/xml').getElementsByTagName('text');
@@ -13,12 +87,15 @@ function xmlToSingleParagraph(xml) {
     Array.from(utterances).forEach((el, index) => {
         const text = (el.textContent || '').replace(/[\r\n]+/g, ' ').trim();
         if (!text) return;
-        result += text + " ";
-        if ((index + 1) % 5 === 0) {
+
+        // Check if it's the start of a new group of 5 (i.e., the 0th, 5th, 10th element)
+        if (index % 5 === 0) {
             const charToInsert = characters[markerCount % characters.length];
-            result += `(${charToInsert}) `;
+            result += `(${charToInsert}) `; // Prepend the marker
             markerCount++;
         }
+
+        result += text + " ";
     });
     return result.trim();
 };
@@ -29,34 +106,6 @@ function isBreakPointValid(text, index) {
   const isPrecededByMarker = textBefore.match(/\([A-Z]\)$/);
   const isSucceededByMarker = textAfter.match(/^\([A-Z]\)/);
   return !isPrecededByMarker && !isSucceededByMarker;
-}
-
-function breakIntoParagraphsRandomly(text, minLength = 150, maxLength = 500) {
-  if (!text || typeof text !== 'string') return "";
-  let remainingText = text.replace(/\s\s+/g, ' ').trim();
-  const finalParagraphs = [];
-  while (remainingText.length > 0) {
-    if (remainingText.length <= maxLength) {
-      finalParagraphs.push(remainingText);
-      break;
-    }
-    let breakIndex = -1;
-    const randomTargetLength = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
-    let searchStart = randomTargetLength;
-    while (breakIndex === -1 && searchStart >= minLength) {
-        let potentialIndex = remainingText.lastIndexOf(' ', searchStart);
-        if (potentialIndex < minLength) break; 
-        if (isBreakPointValid(remainingText, potentialIndex)) {
-            breakIndex = potentialIndex;
-        }
-        searchStart = potentialIndex - 1; 
-    }
-    if (breakIndex === -1) breakIndex = randomTargetLength;
-    const newPara = remainingText.substring(0, breakIndex).trim();
-    finalParagraphs.push(newPara);
-    remainingText = remainingText.substring(breakIndex).trim();
-  }
-  return finalParagraphs.join('\n\n');
 }
 
 function processSubtitles(xml) {
@@ -79,7 +128,7 @@ tags: ["astro", "learning in public", "setbacks", "community"]
 
     const footer = `\n---
 Let's keep in touch to stay up to date with the latest updates from Astro. https://github.com/withastro/astro\n\`\`\``;
-    return `${frontmatter}\n(Z) ${bodyContent}\n${footer}`;
+    return `${frontmatter}\n${bodyContent}\n${footer}`;
 }
 
 // ====================================================================
@@ -88,7 +137,7 @@ Let's keep in touch to stay up to date with the latest updates from Astro. https
 
 const sendToAI = (content) => {
     const API_KEY = "AIzaSyAzddIKNOyH3qWYcdkAWNoKKobVzRa2RXQ"; // WARNING: Hardcoding keys is insecure.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${API_KEY}`;
 
     const payload = { // <--- Define the payload object here
         contents: [{
@@ -96,8 +145,11 @@ const sendToAI = (content) => {
             parts: [{ text: content }]
         }],
         generationConfig: {
-            temperature: 0.8,
-            topP: 0.9,
+            temperature: 1.4,
+            "thinkingConfig": {
+                "thinkingBudget": 600,
+            },
+            topP: 0.6,
         }
     };
 
