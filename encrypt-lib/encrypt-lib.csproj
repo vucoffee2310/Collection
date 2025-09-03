@@ -1,0 +1,121 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>{690FBE44-D5C6-489C-8D88-9677F43E51C4}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>com.edc.classbook</RootNamespace>
+    <AssemblyName>encrypt-lib</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net35</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <EnableDefaultItems>False</EnableDefaultItems>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup>
+    <Compile Include="model\BookConfigModel.cs" />
+    <Compile Include="model\BookConfigModelEnc.cs" />
+    <Compile Include="model\ClickModel.cs" />
+    <Compile Include="model\ClickModelEnc.cs" />
+    <Compile Include="model\DataModel.cs" />
+    <Compile Include="model\DataModelEnc.cs" />
+    <Compile Include="model\MetadataModel.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="util\codec\BinaryDecoder.cs" />
+    <Compile Include="util\codec\BinaryEncoder.cs" />
+    <Compile Include="util\codec\binary\Base32.cs" />
+    <Compile Include="util\codec\binary\Base32InputStream.cs" />
+    <Compile Include="util\codec\binary\Base32OutputStream.cs" />
+    <Compile Include="util\codec\binary\Base64.cs" />
+    <Compile Include="util\codec\binary\Base64InputStream.cs" />
+    <Compile Include="util\codec\binary\Base64OutputStream.cs" />
+    <Compile Include="util\codec\binary\BaseNCodec.cs" />
+    <Compile Include="util\codec\binary\BaseNCodecInputStream.cs" />
+    <Compile Include="util\codec\binary\BaseNCodecOutputStream.cs" />
+    <Compile Include="util\codec\binary\BinaryCodec.cs" />
+    <Compile Include="util\codec\binary\Hex.cs" />
+    <Compile Include="util\codec\binary\StringUtils.cs" />
+    <Compile Include="util\codec\CharEncoding.cs" />
+    <Compile Include="util\codec\Charsets.cs" />
+    <Compile Include="util\codec\Decoder.cs" />
+    <Compile Include="util\codec\DecoderException.cs" />
+    <Compile Include="util\codec\digest\B64.cs" />
+    <Compile Include="util\codec\digest\Crypt.cs" />
+    <Compile Include="util\codec\digest\DigestUtils.cs" />
+    <Compile Include="util\codec\digest\Md5Crypt.cs" />
+    <Compile Include="util\codec\digest\MessageDigestAlgorithms.cs" />
+    <Compile Include="util\codec\digest\Sha2Crypt.cs" />
+    <Compile Include="util\codec\digest\UnixCrypt.cs" />
+    <Compile Include="util\codec\Encoder.cs" />
+    <Compile Include="util\codec\EncoderException.cs" />
+    <Compile Include="util\codec\language\AbstractCaverphone.cs" />
+    <Compile Include="util\codec\language\bm\BeiderMorseEncoder.cs" />
+    <Compile Include="util\codec\language\bm\Lang.cs" />
+    <Compile Include="util\codec\language\bm\Languages$1.cs" />
+    <Compile Include="util\codec\language\bm\Languages$2.cs" />
+    <Compile Include="util\codec\language\bm\Languages.cs" />
+    <Compile Include="util\codec\language\bm\NameType.cs" />
+    <Compile Include="util\codec\language\bm\PhoneticEngine$1.cs" />
+    <Compile Include="util\codec\language\bm\PhoneticEngine.cs" />
+    <Compile Include="util\codec\language\bm\ResourceConstants.cs" />
+    <Compile Include="util\codec\language\bm\Rule$1.cs" />
+    <Compile Include="util\codec\language\bm\Rule$10.cs" />
+    <Compile Include="util\codec\language\bm\Rule$2.cs" />
+    <Compile Include="util\codec\language\bm\Rule$3.cs" />
+    <Compile Include="util\codec\language\bm\Rule$4.cs" />
+    <Compile Include="util\codec\language\bm\Rule$5.cs" />
+    <Compile Include="util\codec\language\bm\Rule$6.cs" />
+    <Compile Include="util\codec\language\bm\Rule$7.cs" />
+    <Compile Include="util\codec\language\bm\Rule$8.cs" />
+    <Compile Include="util\codec\language\bm\Rule$9.cs" />
+    <Compile Include="util\codec\language\bm\Rule$Phoneme$1.cs" />
+    <Compile Include="util\codec\language\bm\Rule.cs" />
+    <Compile Include="util\codec\language\bm\RuleType.cs" />
+    <Compile Include="util\codec\language\Caverphone.cs" />
+    <Compile Include="util\codec\language\Caverphone1.cs" />
+    <Compile Include="util\codec\language\Caverphone2.cs" />
+    <Compile Include="util\codec\language\ColognePhonetic.cs" />
+    <Compile Include="util\codec\language\DoubleMetaphone.cs" />
+    <Compile Include="util\codec\language\Metaphone.cs" />
+    <Compile Include="util\codec\language\Nysiis.cs" />
+    <Compile Include="util\codec\language\RefinedSoundex.cs" />
+    <Compile Include="util\codec\language\Soundex.cs" />
+    <Compile Include="util\codec\language\SoundexUtils.cs" />
+    <Compile Include="util\codec\net\BCodec.cs" />
+    <Compile Include="util\codec\net\QCodec.cs" />
+    <Compile Include="util\codec\net\QuotedPrintableCodec.cs" />
+    <Compile Include="util\codec\net\RFC1522Codec.cs" />
+    <Compile Include="util\codec\net\URLCodec.cs" />
+    <Compile Include="util\codec\net\Utils.cs" />
+    <Compile Include="util\codec\StringDecoder.cs" />
+    <Compile Include="util\codec\StringEncoder.cs" />
+    <Compile Include="util\codec\StringEncoderComparator.cs" />
+    <Compile Include="util\encryption\BaseEncrypt.cs" />
+    <Compile Include="util\encryption\ClassBookEncryption.cs" />
+    <Compile Include="util\encryption\RC4.cs" />
+    <Compile Include="util\serializabledb\BookConfigDeSerial.cs" />
+    <Compile Include="util\serializabledb\BookDataDeSerial.cs" />
+    <Compile Include="util\serializabledb\ClickableDataDeSerial.cs" />
+    <Compile Include="util\serializabledb\DataModelDeSerial.cs" />
+    <Compile Include="util\serializabledb\MetadataDeSerial.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="encrypt-lib.jar" />
+    <EmbeddedResource Include="ikvm.exports" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="IKVM.OpenJDK.Core">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\IKVM.OpenJDK.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="IKVM.OpenJDK.Security">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\IKVM.OpenJDK.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="IKVM.OpenJDK.Util">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\IKVM.OpenJDK.Util.dll</HintPath>
+    </Reference>
+    <Reference Include="IKVM.Runtime">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\IKVM.Runtime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
