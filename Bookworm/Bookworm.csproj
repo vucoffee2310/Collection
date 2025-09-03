@@ -1,0 +1,567 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProjectGuid>{711EAF11-5FEA-4A36-B389-B56CCB8A0654}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Bookworm</RootNamespace>
+    <AssemblyName>Bookworm</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{60DC8134-EBA5-43B8-BCC9-BB4BC16C2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Bookworm.2.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <PlatformTarget>x86</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <PlatformTarget>x86</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="AxInterop.WMPLib">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\AxInterop.WMPLib.dll</HintPath>
+    </Reference>
+    <Reference Include="CefSharp">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\CefSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="CefSharp.Wpf">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\CefSharp.Wpf.dll</HintPath>
+    </Reference>
+    <Reference Include="CustomEntity">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\CustomEntity.dll</HintPath>
+    </Reference>
+    <Reference Include="Dapper">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\Dapper.dll</HintPath>
+    </Reference>
+    <Reference Include="Dapper.Contrib">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\Dapper.Contrib.dll</HintPath>
+    </Reference>
+    <Reference Include="encrypt-lib">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\encrypt-lib.dll</HintPath>
+    </Reference>
+    <Reference Include="Ionic.Zip">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\Ionic.Zip.dll</HintPath>
+    </Reference>
+    <Reference Include="MaterialDesignThemes.Wpf">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\MaterialDesignThemes.Wpf.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="MupdfSharp">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\MupdfSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="QuizApp">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\QuizApp.exe</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.SQLite">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\System.Data.SQLite.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Net.Http">
+      <HintPath>..\..\..\..\Program Files (x86)\TinhVan\VNU Lic\System.Net.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security" />
+    <Reference Include="System.Speech" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="WindowsFormsIntegration" />
+    <Reference Include="FontAwesome.WPF" />
+  </ItemGroup>
+  <ItemGroup>
+    <AppDesigner Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="AppCode\AppUtils.cs" />
+    <Compile Include="AppCode\ControlMover.cs" />
+    <Compile Include="AppCode\Encrypto.cs" />
+    <Compile Include="AppCode\NoteDrawable.cs" />
+    <Compile Include="AppCode\QuizManager.cs" />
+    <Compile Include="AppCode\ThumbPrint.cs" />
+    <Compile Include="AutoCompleteBook\AutoCompleteBook.cs" />
+    <Compile Include="AutoCompleteBook\DeliFacet.cs" />
+    <Compile Include="CommonFunction.cs" />
+    <Compile Include="Constant.cs" />
+    <Compile Include="CustomEntity\APIResponse.cs" />
+    <Compile Include="CustomEntity\BookSql.cs" />
+    <Compile Include="CustomEntity\MessageInput.cs" />
+    <Compile Include="CustomEntity\MessagesDto.cs" />
+    <Compile Include="CustomEntity\MessagesView.cs" />
+    <Compile Include="CustomEntity\Model\BienChung.cs" />
+    <Compile Include="CustomEntity\Model\listObject.cs" />
+    <Compile Include="CustomEntity\Number.cs" />
+    <Compile Include="CustomEntity\Rate.cs" />
+    <Compile Include="CustomEntity\ThoiGianDoc.cs" />
+    <Compile Include="CustomEntity\ThoiGianThietLap.cs" />
+    <Compile Include="MainApp.xaml.cs">
+      <DependentUpon>MainApp.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Player.xaml.cs">
+      <DependentUpon>Player.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\Resources.cs" />
+    <Compile Include="Properties\Settings.cs" />
+    <Compile Include="Properties\Settings.Designer.cs">
+      <DependentUpon>Settings.settings</DependentUpon>
+      <AutoGen>True</AutoGen>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <Compile Include="Sqlite\DBSqlite.cs" />
+    <Compile Include="StarRatingsControl\RatingsControl.cs" />
+    <Compile Include="StarRatingsControl\StarControl.cs" />
+    <Compile Include="SubClass.cs" />
+    <Compile Include="UserControls\Book\Controls\UCComment.xaml.cs">
+      <DependentUpon>UCComment.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Book\ucBookDetail.xaml.cs">
+      <DependentUpon>ucBookDetail.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Book\ucBorrowBook.xaml.cs">
+      <DependentUpon>ucBorrowBook.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Ereader\Popup\AdditionalContentViewer.xaml.cs">
+      <DependentUpon>AdditionalContentViewer.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Ereader\Popup\BrowserForm.xaml.cs">
+      <DependentUpon>BrowserForm.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Ereader\Popup\ClickContentViewer.cs" />
+    <Compile Include="UserControls\Ereader\Popup\ucAddNote.xaml.cs">
+      <DependentUpon>ucAddNote.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Ereader\Popup\ucBookMark.xaml.cs">
+      <DependentUpon>ucBookMark.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Ereader\Popup\ucGotoPage.xaml.cs">
+      <DependentUpon>ucGotoPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Library\Controls\ucAddLibrary.xaml.cs">
+      <DependentUpon>ucAddLibrary.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Library\ucBookShelf.xaml.cs">
+      <DependentUpon>ucBookShelf.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\Library\ucChoseLib.xaml.cs">
+      <DependentUpon>ucChoseLib.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\CategoriesViewModel.cs" />
+    <Compile Include="UserControls\ListBookByLib\Control\UCBookCard.xaml.cs">
+      <DependentUpon>UCBookCard.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\Control\UCBookStoreHeader.xaml.cs">
+      <DependentUpon>UCBookStoreHeader.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\PopUp\FileSach.cs" />
+    <Compile Include="UserControls\ListBookByLib\PopUp\thongtin.cs" />
+    <Compile Include="UserControls\ListBookByLib\PopUp\ucChinhSach2.cs" />
+    <Compile Include="UserControls\ListBookByLib\PopUp\ucDeleteThoiGianDoc.cs" />
+    <Compile Include="UserControls\ListBookByLib\PopUp\ucLoginForm.xaml.cs">
+      <DependentUpon>ucLoginForm.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\PopUp\ucShareForm.xaml.cs">
+      <DependentUpon>ucShareForm.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\PopUp\ucThoiGianDoc.cs" />
+    <Compile Include="UserControls\ListBookByLib\PopUp\ucUploadSach.xaml.cs">
+      <DependentUpon>ucUploadSach.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\PopUp\ucUploadThongTin.xaml.cs">
+      <DependentUpon>ucUploadThongTin.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\PopUp\UploadFile.cs" />
+    <Compile Include="UserControls\ListBookByLib\TreeViewItemBase.cs" />
+    <Compile Include="UserControls\ListBookByLib\ucListBook.xaml.cs">
+      <DependentUpon>ucListBook.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ListBookByLib\ucListBookDetail.xaml.cs">
+      <DependentUpon>ucListBookDetail.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ucBookStore.xaml.cs">
+      <DependentUpon>ucBookStore.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ucChinhSach.xaml.cs">
+      <DependentUpon>ucChinhSach.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ucEreader.cs" />
+    <Compile Include="UserControls\ucFooterApp.xaml.cs">
+      <DependentUpon>ucFooterApp.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ucHeaderApp.xaml.cs">
+      <DependentUpon>ucHeaderApp.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ucHome.xaml.cs">
+      <DependentUpon>ucHome.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ucMessageBox.xaml.cs">
+      <DependentUpon>ucMessageBox.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ucProcessingDialog.xaml.cs">
+      <DependentUpon>ucProcessingDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserControls\ViewModelAdditional.cs" />
+    <Compile Include="Utils\DownloadBackgroundWorker.cs" />
+    <Compile Include="Utils\HtmlToText.cs" />
+    <Compile Include="Utils\UtilContants.cs" />
+    <Compile Include="WMPLib\IWMPControls.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resources" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+    <None Include="app.manifest" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </ApplicationDefinition>
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="custcontrol\ratingscontrol.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="custcontrol\starcontrol.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MainApp.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Player.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Book\Controls\UCComment.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Book\ucBookDetail.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Book\ucBorrowBook.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Ereader\Popup\AdditionalContentViewer.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Ereader\Popup\BrowserForm.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Ereader\Popup\clickcontentview.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Ereader\Popup\ucAddNote.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Ereader\Popup\ucBookMark.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Ereader\Popup\ucGotoPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="usercontrols\ereader\ucereader.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Library\Controls\ucAddLibrary.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Library\ucBookShelf.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\Library\ucChoseLib.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\Control\UCBookCard.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\Control\UCBookStoreHeader.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\ucLoginForm.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\ucShareForm.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\ucUploadSach.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\ucUploadThongTin.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\uschinhsach.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\usdeletethoigiandoc.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\usthoigiandoc.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\PopUp\usthongtin - copy.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\ucListBook.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ListBookByLib\ucListBookDetail.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ucBookStore.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ucChinhSach.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ucFooterApp.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ucHeaderApp.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ucHome.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ucMessageBox.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UserControls\ucProcessingDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="bookworm.ico" />
+    <Resource Include="images\add-comment-button.png" />
+    <Resource Include="images\anhsao\khongsao.png" />
+    <Resource Include="images\anhsao\nuasao.png" />
+    <Resource Include="images\anhsao\sao.png" />
+    <Resource Include="images\arow_down.png" />
+    <Resource Include="images\audio.png" />
+    <Resource Include="images\authoricon.png" />
+    <Resource Include="images\back-arrow.png" />
+    <Resource Include="images\backbutton.png" />
+    <Resource Include="images\background.png" />
+    <Resource Include="images\bannner.png" />
+    <Resource Include="images\bookmark.png" />
+    <Resource Include="images\bookmarks.png" />
+    <Resource Include="images\bookshelf\add.png" />
+    <Resource Include="images\bookshelf\add1 (1).png" />
+    <Resource Include="images\bookshelf\btn_menu.png" />
+    <Resource Include="images\bookshelf\ellipse.png" />
+    <Resource Include="images\bookshelf\group.png" />
+    <Resource Include="images\bookshelf\group1.png" />
+    <Resource Include="images\bookshelf\icon_add.png" />
+    <Resource Include="images\bookshelf\icon_copy.png" />
+    <Resource Include="images\bookshelf\icon_cut.jpg" />
+    <Resource Include="images\bookshelf\icon_cut.png" />
+    <Resource Include="images\bookshelf\icon_delete.png" />
+    <Resource Include="images\bookshelf\icon_givebook.png" />
+    <Resource Include="images\bookshelf\icon_refresh.png" />
+    <Resource Include="images\bookshelf\icon_refreshs.png" />
+    <Resource Include="images\bookshelf\rectangle.png" />
+    <Resource Include="images\bookworm.ico" />
+    <Resource Include="images\btnbookmarkred.png" />
+    <Resource Include="images\btnclickable.png" />
+    <Resource Include="images\btnclickable_red.png" />
+    <Resource Include="images\btnlock.png" />
+    <Resource Include="images\btnlock_red.png" />
+    <Resource Include="images\btnvideo.png" />
+    <Resource Include="images\btnzoomin.png" />
+    <Resource Include="images\btnzoomin_red.png" />
+    <Resource Include="images\btnzoomout.png" />
+    <Resource Include="images\btnzoomout_red.png" />
+    <Resource Include="images\choselib.png" />
+    <Resource Include="images\ellipse.png" />
+    <Resource Include="images\eraser.png" />
+    <Resource Include="images\eraser_red.png" />
+    <Resource Include="images\exit-white.png" />
+    <Resource Include="images\exit.png" />
+    <Resource Include="images\giasach.png" />
+    <Resource Include="images\girl.jpg" />
+    <Resource Include="images\go-back-left-arrow.png" />
+    <Resource Include="images\group 1.png" />
+    <Resource Include="images\headericon\backbutton-w.png" />
+    <Resource Include="images\headericon\backbutton.png" />
+    <Resource Include="images\headericon\bookreading-w.png" />
+    <Resource Include="images\headericon\bookreading.png" />
+    <Resource Include="images\headericon\choselib-w.png" />
+    <Resource Include="images\headericon\choselib.png" />
+    <Resource Include="images\headericon\giasach-w.png" />
+    <Resource Include="images\headericon\giasach.png" />
+    <Resource Include="images\headericon\login-w.png" />
+    <Resource Include="images\headericon\login.png" />
+    <Resource Include="images\headericon\thuvien-w.png" />
+    <Resource Include="images\headericon\thuvien.png" />
+    <Resource Include="images\highlight.png" />
+    <Resource Include="images\highlight_red.png" />
+    <Resource Include="images\icon-read-book.png" />
+    <Resource Include="images\iconlibol.ico" />
+    <Resource Include="images\iconlibol.png" />
+    <Resource Include="images\iconmoi\anhtailieugiasach.png" />
+    <Resource Include="images\iconmoi\anhtrong.png" />
+    <Resource Include="images\iconmoi\back.png" />
+    <Resource Include="images\iconmoi\backden.png" />
+    <Resource Include="images\iconmoi\backpage.png" />
+    <Resource Include="images\iconmoi\backtrang.png" />
+    <Resource Include="images\iconmoi\butchi.png" />
+    <Resource Include="images\iconmoi\butchi_a.png" />
+    <Resource Include="images\iconmoi\butchi_d.png" />
+    <Resource Include="images\iconmoi\chiase.png" />
+    <Resource Include="images\iconmoi\chiase2.png" />
+    <Resource Include="images\iconmoi\chiase_a.png" />
+    <Resource Include="images\iconmoi\chiase_d.png" />
+    <Resource Include="images\iconmoi\chitiet.png" />
+    <Resource Include="images\iconmoi\chuot.png" />
+    <Resource Include="images\iconmoi\chuot_a.png" />
+    <Resource Include="images\iconmoi\chuot_d.png" />
+    <Resource Include="images\iconmoi\danhsach.png" />
+    <Resource Include="images\iconmoi\danhsach_a.png" />
+    <Resource Include="images\iconmoi\danhsach_d.png" />
+    <Resource Include="images\iconmoi\dautrang.png" />
+    <Resource Include="images\iconmoi\dautrang_a.png" />
+    <Resource Include="images\iconmoi\dautrang_d.png" />
+    <Resource Include="images\iconmoi\dulieu.png" />
+    <Resource Include="images\iconmoi\dulieu_a.png" />
+    <Resource Include="images\iconmoi\dulieu_d.png" />
+    <Resource Include="images\iconmoi\giahansach.png" />
+    <Resource Include="images\iconmoi\giasach.png" />
+    <Resource Include="images\iconmoi\giasachden.png" />
+    <Resource Include="images\iconmoi\giasachtrang.png" />
+    <Resource Include="images\iconmoi\group 154.png" />
+    <Resource Include="images\iconmoi\libol.png" />
+    <Resource Include="images\iconmoi\logo2.png" />
+    <Resource Include="images\iconmoi\logodangnhap.png" />
+    <Resource Include="images\iconmoi\logovnu.png" />
+    <Resource Include="images\iconmoi\next.png" />
+    <Resource Include="images\iconmoi\nextden.png" />
+    <Resource Include="images\iconmoi\phongto.png" />
+    <Resource Include="images\iconmoi\phongto_a.png" />
+    <Resource Include="images\iconmoi\phongto_d.png" />
+    <Resource Include="images\iconmoi\prepage.png" />
+    <Resource Include="images\iconmoi\pretrang.png" />
+    <Resource Include="images\iconmoi\taikhoan.png" />
+    <Resource Include="images\iconmoi\tailai.png" />
+    <Resource Include="images\iconmoi\tailieu.png" />
+    <Resource Include="images\iconmoi\tailieutrang.png" />
+    <Resource Include="images\iconmoi\tay.png" />
+    <Resource Include="images\iconmoi\tay_a.png" />
+    <Resource Include="images\iconmoi\tay_d.png" />
+    <Resource Include="images\iconmoi\thietlap.png" />
+    <Resource Include="images\iconmoi\thoigian.png" />
+    <Resource Include="images\iconmoi\thoigiando2.png" />
+    <Resource Include="images\iconmoi\thoigiandoc.png" />
+    <Resource Include="images\iconmoi\thongbao.png" />
+    <Resource Include="images\iconmoi\thongtin.png" />
+    <Resource Include="images\iconmoi\thunho.png" />
+    <Resource Include="images\iconmoi\thunho_a.png" />
+    <Resource Include="images\iconmoi\thunho_d.png" />
+    <Resource Include="images\iconmoi\thuvien.png" />
+    <Resource Include="images\iconmoi\thuvienden.png" />
+    <Resource Include="images\iconmoi\thuvientrang.png" />
+    <Resource Include="images\iconmoi\tomau.png" />
+    <Resource Include="images\iconmoi\tomau_a.png" />
+    <Resource Include="images\iconmoi\tomau_d.png" />
+    <Resource Include="images\iconmoi\trasach.png" />
+    <Resource Include="images\iconmoi\trasach2.png" />
+    <Resource Include="images\iconmoi\upload.png" />
+    <Resource Include="images\icon_doc.png" />
+    <Resource Include="images\icon_video.png" />
+    <Resource Include="images\imnext.png" />
+    <Resource Include="images\imprevious.png" />
+    <Resource Include="images\imprevious_arrow.png" />
+    <Resource Include="images\libmenu.png" />
+    <Resource Include="images\libolicon.ico" />
+    <Resource Include="images\loading.gif" />
+    <Resource Include="images\login.png" />
+    <Resource Include="images\logodefault.png" />
+    <Resource Include="images\next-arrow2.png" />
+    <Resource Include="images\nextarrow.png" />
+    <Resource Include="images\nextpage-button.png" />
+    <Resource Include="images\note.png" />
+    <Resource Include="images\note_red.png" />
+    <Resource Include="images\photoicon.png" />
+    <Resource Include="images\quizicon.png" />
+    <Resource Include="images\rubbish-bin-delete-button.png" />
+    <Resource Include="images\save-button.png" />
+    <Resource Include="images\search.png" />
+    <Resource Include="images\searching-magnifying-glass.png" />
+    <Resource Include="images\thongbao.png" />
+    <Resource Include="images\thongbao\chiase.png" />
+    <Resource Include="images\thongtin.png" />
+    <Resource Include="images\thuvien.png" />
+    <Resource Include="images\underline-button.png" />
+    <Resource Include="images\userinside.png" />
+    <Resource Include="images\videoicon.png" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
