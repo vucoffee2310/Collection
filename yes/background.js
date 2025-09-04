@@ -1,61 +1,47 @@
-// Background script (Service Worker) for Chrome Extension
-// This monitors all web requests across all tabs
+// background.js: Service Worker for Chrome Extension
+// Monitors web requests and notifies the content script upon detection.
 
 let lastRequestTime = 0;
-const REQUEST_COOLDOWN = 1000; // 1 second cooldown to avoid duplicate logs
+const REQUEST_COOLDOWN = 1000; // 1-second cooldown to prevent log spam
 
-// List of endpoints to detect (exact matches)
-const TARGET_ENDPOINTS = [
+// Use a Set for efficient lookups (O(1) average time complexity)
+const TARGET_ENDPOINTS = new Set([
   'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate',
   'https://chat.mistral.ai/api/chat',
   'https://chat.deepseek.com/api/v0/chat/completion',
   'https://chatgpt.com/backend-api/f/conversation'
-];
+]);
 
-// Function to check if URL exactly matches any target endpoint
-function isExactMatch(url) {
-  return TARGET_ENDPOINTS.some(endpoint => {
-    // Remove query parameters and fragments from the URL for comparison
-    const cleanUrl = url.split('?')[0].split('#')[0];
-    return cleanUrl === endpoint;
-  });
-}
-
+// Listen for web requests
 chrome.webRequest.onBeforeRequest.addListener(
-  function(details) {
-    // Check if the request URL exactly matches any of the target endpoints
-    if (isExactMatch(details.url)) {
+  (details) => {
+    // Remove query parameters and fragments from the URL for a clean comparison
+    const cleanUrl = details.url.split('?')[0].split('#')[0];
+
+    // Check if the request URL is one of our targets
+    if (TARGET_ENDPOINTS.has(cleanUrl)) {
       const currentTime = Date.now();
       
-      // Only log if this is a new request (not within cooldown period)
+      // Apply cooldown
       if (currentTime - lastRequestTime > REQUEST_COOLDOWN) {
-        console.log('yes');
         lastRequestTime = currentTime;
         
-        // Send message to content script for the latest request
-        try {
-          if (details.tabId && details.tabId > 0) {
-            chrome.tabs.sendMessage(details.tabId, {
-              type: 'LATEST_AI_REQUEST_DETECTED',
-              url: details.url,
-              timestamp: currentTime
-            }).catch(() => {
-              // Ignore errors if content script is not available
+        // Notify the content script in the relevant tab.
+        // Check for tabId > 0 to ignore non-tab requests (e.g., from other extensions).
+        if (details.tabId > 0) {
+          chrome.tabs.sendMessage(details.tabId, { type: 'AI_REQUEST_DETECTED' })
+            .catch(() => {
+              // This catch is necessary to prevent errors if the content script
+              // isn't available on the page (e.g., chrome:// pages, or if it hasn't loaded yet).
             });
-          }
-        } catch (error) {
-          // Ignore messaging errors
         }
       }
     }
   },
-  {
-    urls: ["<all_urls>"]
-  }
+  { urls: ["<all_urls>"] }
 );
 
-// Optional: Listen for extension installation
+// Log a message when the extension is installed or updated
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('AI Chat Request Detector extension installed');
-  lastRequestTime = 0; // Reset on installation
+  console.log('AI Chat Request Detector extension installed.');
 });

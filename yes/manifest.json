@@ -5,7 +5,6 @@
   "description": "Detects requests to AI chat endpoints (Gemini, ChatGPT, Mistral, DeepSeek)",
   "permissions": [
     "webRequest",
-    "activeTab",
     "tabs"
   ],
   "host_permissions": [
