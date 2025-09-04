@@ -1,8 +1,7 @@
 // popup.js: Handles file selection and queue setup
-const POST_FILE_TEXT = "This is the text after Ctrl V file";
 
 // Clear any existing paste state when popup opens
-chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
+chrome.storage.local.remove(['itemQueue', 'nextItemIndex']);
 
 document.getElementById('fileInput').addEventListener('change', async (event) => {
   const files = event.target.files;
@@ -18,12 +17,12 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
   try {
     // readFileAsDataURL is available globally from modules/utils.js
     const dataUrls = await Promise.all(Array.from(files).map(readFileAsDataURL));
+    // POST_FILE_TEXT is now available globally from modules/config.js
     const mixedQueue = dataUrls.flatMap(url => [url, POST_FILE_TEXT]);
 
     chrome.storage.local.set({
       itemQueue: mixedQueue,
-      nextItemIndex: 0,
-      lastPastedType: null
+      nextItemIndex: 0
     }, () => {
       if (chrome.runtime.lastError) {
         status.textContent = 'Storage error. Please try again.';

@@ -1,5 +1,7 @@
 // modules/config.js: Central configuration for AI platforms
 
+const POST_FILE_TEXT = "This is the text after Ctrl V file";
+
 const AI_PLATFORMS = {
   'gemini.google.com': {
     apiEndpoint: 'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate',

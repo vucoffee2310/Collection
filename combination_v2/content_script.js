@@ -21,27 +21,23 @@ document.addEventListener('keydown', (event) => {
   event.preventDefault();
   event.stopImmediatePropagation();
 
-  chrome.storage.local.get(['itemQueue', 'nextItemIndex', 'lastPastedType'], async (result) => {
-    const { itemQueue = [], nextItemIndex = 0, lastPastedType = null } = result;
+  chrome.storage.local.get(['itemQueue', 'nextItemIndex'], async (result) => {
+    const { itemQueue = [], nextItemIndex = 0 } = result;
     
     if (nextItemIndex >= itemQueue.length) {
       isFileReadyToPaste = false;
-      chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
+      chrome.storage.local.remove(['itemQueue', 'nextItemIndex']);
       return;
     }
 
     const item = itemQueue[nextItemIndex];
-    const isFile = item.startsWith('data:');
     
-    if ((isFile && lastPastedType === 'file') || (!isFile && lastPastedType !== 'file' && lastPastedType !== null)) {
-      alert(`Order violation! Cannot paste ${isFile ? 'file' : 'text'} after ${lastPastedType || 'start'}`);
-      isFileReadyToPaste = false;
-      chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
-      return;
-    }
-
     try {
-      isFile ? await pasteFile(item) : pasteText(item);
+      if (item.startsWith('data:')) {
+        await pasteFile(item);
+      } else {
+        pasteText(item);
+      }
       lastPasteTime = Date.now();
       submissionHandled = false; // Reset for new paste
     } catch (e) {
@@ -53,63 +49,52 @@ document.addEventListener('keydown', (event) => {
     const newIndex = nextItemIndex + 1;
     if (newIndex >= itemQueue.length) {
       isFileReadyToPaste = false;
-      chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
+      chrome.storage.local.remove(['itemQueue', 'nextItemIndex']);
     } else {
-      chrome.storage.local.set({ 
-        nextItemIndex: newIndex,
-        lastPastedType: isFile ? 'file' : 'text'
-      });
+      chrome.storage.local.set({ nextItemIndex: newIndex });
     }
   });
 }, true);
 
+
+// --- Submission Detection Logic ---
+
 // Unified function to notify background script of submission
 function handleSubmission() {
-  // Prevent multiple notifications for the same submission
-  if (submissionHandled) {
-    return;
-  }
+  if (submissionHandled) return; // Prevent multiple notifications
 
   const input = findInput();
-  if (!input) return;
-  
-  const hasContent = input.value?.trim() || input.textContent?.trim() || input.innerText?.trim();
-  if (!hasContent) return;
+  if (!input || !(input.value?.trim() || input.textContent?.trim())) return;
 
-  // Mark as handled immediately
   submissionHandled = true;
-  
-  // Send message to background
   chrome.runtime.sendMessage({ type: 'PASTE_COMPLETED' });
   
-  // Reset after 5 seconds (allows for a new submission)
-  setTimeout(() => {
-    submissionHandled = false;
-  }, 5000);
+  // Reset after a delay to allow for a new, separate submission.
+  setTimeout(() => { submissionHandled = false; }, 5000);
 }
 
-// Handle Enter key to detect form submission
-document.addEventListener('keydown', (event) => {
-  // Only handle if we recently pasted
+// Helper to attempt submission handling after a short delay
+function attemptSubmissionHandling() {
+  // Only handle if a paste happened recently
   if (Date.now() - lastPasteTime > 5000) return;
-  
+  // Use a small delay to ensure the submission event has been processed by the page
+  setTimeout(handleSubmission, 50);
+}
+
+// Handle Enter key for form submission
+document.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.shiftKey) {
     const input = findInput();
     if (input && (input === document.activeElement || input.contains(document.activeElement))) {
-      // Small delay to ensure the submission actually happens
-      setTimeout(handleSubmission, 50);
+      attemptSubmissionHandling();
     }
   }
 }, true);
 
 // Listen for clicks on submit buttons
 document.addEventListener('click', (event) => {
-  // Only handle if we recently pasted
-  if (Date.now() - lastPasteTime > 5000) return;
-  
   const submitButton = findSubmitButton();
   if (submitButton && (event.target === submitButton || submitButton.contains(event.target))) {
-    // Small delay to ensure the submission actually happens
-    setTimeout(handleSubmission, 50);
+    attemptSubmissionHandling();
   }
 }, true);

@@ -3,8 +3,8 @@
 
 importScripts('modules/config.js');
 
-let tabOpeningEnabled = false;
-let tabAlreadyOpened = false;
+// A single timestamp is sufficient to manage the state.
+// 0 means tab opening is disabled. A future timestamp means it's enabled until that time.
 let enabledUntil = 0;
 
 // Build the target map from the shared config
@@ -21,21 +21,14 @@ chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
     const cleanUrl = details.url.split('?')[0].split('#')[0];
     const urlToOpen = TARGET_MAP.get(cleanUrl);
+    const now = Date.now();
 
-    if (urlToOpen) {
-      const now = Date.now();
-      
-      // Check if we should open a tab
-      if (tabOpeningEnabled && !tabAlreadyOpened && now < enabledUntil) {
-        tabAlreadyOpened = true;
-        chrome.tabs.create({ url: urlToOpen });
-        console.log(`Opened new tab: ${urlToOpen}`);
-        
-        // Disable tab opening immediately after opening one
-        tabOpeningEnabled = false;
-        tabAlreadyOpened = false;
-        enabledUntil = 0;
-      }
+    // If a target URL is matched and we are within the enabled time window...
+    if (urlToOpen && now < enabledUntil) {
+      // Open the tab and immediately disable further tab opening to prevent duplicates.
+      chrome.tabs.create({ url: urlToOpen });
+      enabledUntil = 0; 
+      console.log(`Opened new tab: ${urlToOpen}`);
     }
   },
   { urls: ["<all_urls>"] }
@@ -44,21 +37,10 @@ chrome.webRequest.onBeforeRequest.addListener(
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'PASTE_COMPLETED') {
-    // Enable tab opening for the next 5 seconds
-    tabOpeningEnabled = true;
-    tabAlreadyOpened = false;
+    // Enable tab opening for the next 5 seconds.
     enabledUntil = Date.now() + 5000;
-    
-    console.log('Tab opening enabled for next AI request');
-    
-    // Auto-disable after 5 seconds if no request came through
-    setTimeout(() => {
-      if (tabOpeningEnabled && Date.now() >= enabledUntil) {
-        tabOpeningEnabled = false;
-        tabAlreadyOpened = false;
-        console.log('Tab opening window expired');
-      }
-    }, 5000);
+    console.log('Tab opening enabled for the next 5 seconds for any matching AI request.');
+    // The state will automatically expire. No setTimeout is needed to clean it up.
   }
 });
 
