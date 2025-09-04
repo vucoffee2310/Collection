@@ -1,8 +1,7 @@
 // content_script.js: Handles user interaction events for pasting and submission detection.
 let isFileReadyToPaste = false;
 let lastPasteTime = 0;
-let submissionNotified = false; // Flag to prevent duplicate submission notifications
-const SUBMISSION_COOLDOWN = 1000; // 1 second cooldown
+let submissionHandled = false;
 
 // Initialize and listen for storage changes
 chrome.storage.local.get(['itemQueue'], (result) => {
@@ -44,6 +43,7 @@ document.addEventListener('keydown', (event) => {
     try {
       isFile ? await pasteFile(item) : pasteText(item);
       lastPasteTime = Date.now();
+      submissionHandled = false; // Reset for new paste
     } catch (e) {
       console.error('Error pasting content:', e);
       alert('Error pasting content. Please try again.');
@@ -54,7 +54,6 @@ document.addEventListener('keydown', (event) => {
     if (newIndex >= itemQueue.length) {
       isFileReadyToPaste = false;
       chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
-      // We send the message via the submission handlers now, not here.
     } else {
       chrome.storage.local.set({ 
         nextItemIndex: newIndex,
@@ -65,42 +64,52 @@ document.addEventListener('keydown', (event) => {
 }, true);
 
 // Unified function to notify background script of submission
-function notifyOnSubmit() {
-  // If we've already sent a notification recently, do nothing.
-  if (submissionNotified) {
+function handleSubmission() {
+  // Prevent multiple notifications for the same submission
+  if (submissionHandled) {
     return;
   }
 
   const input = findInput();
-  if (input && (input.value?.trim() || input.textContent?.trim() || input.innerText?.trim())) {
-    // Set the flag immediately to prevent duplicates from other events (like click).
-    submissionNotified = true;
+  if (!input) return;
+  
+  const hasContent = input.value?.trim() || input.textContent?.trim() || input.innerText?.trim();
+  if (!hasContent) return;
 
-    setTimeout(() => chrome.runtime.sendMessage({ type: 'PASTE_COMPLETED' }), 100);
-
-    // Reset the flag after the cooldown period.
-    setTimeout(() => {
-      submissionNotified = false;
-    }, SUBMISSION_COOLDOWN);
-  }
+  // Mark as handled immediately
+  submissionHandled = true;
+  
+  // Send message to background
+  chrome.runtime.sendMessage({ type: 'PASTE_COMPLETED' });
+  
+  // Reset after 5 seconds (allows for a new submission)
+  setTimeout(() => {
+    submissionHandled = false;
+  }, 5000);
 }
 
 // Handle Enter key to detect form submission
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && !event.shiftKey && (Date.now() - lastPasteTime < 5000)) {
+  // Only handle if we recently pasted
+  if (Date.now() - lastPasteTime > 5000) return;
+  
+  if (event.key === 'Enter' && !event.shiftKey) {
     const input = findInput();
     if (input && (input === document.activeElement || input.contains(document.activeElement))) {
-      notifyOnSubmit();
+      // Small delay to ensure the submission actually happens
+      setTimeout(handleSubmission, 50);
     }
   }
 }, true);
 
 // Listen for clicks on submit buttons
 document.addEventListener('click', (event) => {
-  if (Date.now() - lastPasteTime < 5000) {
-    const submitButton = findSubmitButton();
-    if (submitButton && (event.target === submitButton || submitButton.contains(event.target))) {
-      notifyOnSubmit();
-    }
+  // Only handle if we recently pasted
+  if (Date.now() - lastPasteTime > 5000) return;
+  
+  const submitButton = findSubmitButton();
+  if (submitButton && (event.target === submitButton || submitButton.contains(event.target))) {
+    // Small delay to ensure the submission actually happens
+    setTimeout(handleSubmission, 50);
   }
 }, true);

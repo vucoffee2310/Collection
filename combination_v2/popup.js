@@ -2,7 +2,7 @@
 const POST_FILE_TEXT = "This is the text after Ctrl V file";
 
 // Clear any existing paste state when popup opens
-chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType', 'shouldOpenTab']);
+chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
 
 document.getElementById('fileInput').addEventListener('change', async (event) => {
   const files = event.target.files;
@@ -23,8 +23,7 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
     chrome.storage.local.set({
       itemQueue: mixedQueue,
       nextItemIndex: 0,
-      lastPastedType: null,
-      shouldOpenTab: false  // Initialize auto-tab flag
+      lastPastedType: null
     }, () => {
       if (chrome.runtime.lastError) {
         status.textContent = 'Storage error. Please try again.';

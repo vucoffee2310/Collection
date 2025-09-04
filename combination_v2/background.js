@@ -3,9 +3,9 @@
 
 importScripts('modules/config.js');
 
-// In-memory lock to prevent race conditions from multiple, near-simultaneous web requests for a single submission.
-// This is reset by the 'PASTE_COMPLETED' message, ensuring it's ready for the next user action.
-let isProcessingTabCreation = false;
+let tabOpeningEnabled = false;
+let tabAlreadyOpened = false;
+let enabledUntil = 0;
 
 // Build the target map from the shared config
 const TARGET_MAP = new Map();
@@ -19,28 +19,23 @@ for (const host in AI_PLATFORMS) {
 // Listen for web requests
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
-    // If a tab is already being created for the current submission, ignore all subsequent requests.
-    if (isProcessingTabCreation) {
-      return;
-    }
-
     const cleanUrl = details.url.split('?')[0].split('#')[0];
     const urlToOpen = TARGET_MAP.get(cleanUrl);
 
     if (urlToOpen) {
-      chrome.storage.local.get(['shouldOpenTab'], (result) => {
-        // Check if the trigger is armed and the lock is not already taken (double-check after async call).
-        if (result.shouldOpenTab && !isProcessingTabCreation) {
-          // Acquire the lock to prevent other concurrent requests from proceeding.
-          isProcessingTabCreation = true;
-
-          // Disarm the persistent trigger first, then create the tab.
-          chrome.storage.local.set({ shouldOpenTab: false }, () => {
-            chrome.tabs.create({ url: urlToOpen });
-            console.log(`AI request detected after paste. Opened new tab: ${urlToOpen}`);
-          });
-        }
-      });
+      const now = Date.now();
+      
+      // Check if we should open a tab
+      if (tabOpeningEnabled && !tabAlreadyOpened && now < enabledUntil) {
+        tabAlreadyOpened = true;
+        chrome.tabs.create({ url: urlToOpen });
+        console.log(`Opened new tab: ${urlToOpen}`);
+        
+        // Disable tab opening immediately after opening one
+        tabOpeningEnabled = false;
+        tabAlreadyOpened = false;
+        enabledUntil = 0;
+      }
     }
   },
   { urls: ["<all_urls>"] }
@@ -49,10 +44,21 @@ chrome.webRequest.onBeforeRequest.addListener(
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'PASTE_COMPLETED') {
-    // A new submission has been initiated. Reset the lock and arm the persistent trigger.
-    isProcessingTabCreation = false;
-    chrome.storage.local.set({ shouldOpenTab: true });
-    console.log('Paste completed, ready to open tab on next AI request');
+    // Enable tab opening for the next 5 seconds
+    tabOpeningEnabled = true;
+    tabAlreadyOpened = false;
+    enabledUntil = Date.now() + 5000;
+    
+    console.log('Tab opening enabled for next AI request');
+    
+    // Auto-disable after 5 seconds if no request came through
+    setTimeout(() => {
+      if (tabOpeningEnabled && Date.now() >= enabledUntil) {
+        tabOpeningEnabled = false;
+        tabAlreadyOpened = false;
+        console.log('Tab opening window expired');
+      }
+    }, 5000);
   }
 });
 
