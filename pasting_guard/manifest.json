@@ -1,15 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "Gemini File & Text Paster",
-  "version": "3.0",
-  "description": "Upload files and alternately paste a file then a predefined text string with Ctrl+V.",
+  "name": "AI Chat File & Text Paster",
+  "version": "3.1",
+  "description": "Upload files and alternately paste a file then a predefined text string with Ctrl+V across multiple AI chat platforms.",
   "permissions": [
     "storage",
     "tabs",
     "clipboardWrite"
   ],
   "host_permissions": [
-    "*://gemini.google.com/*"
+    "*://gemini.google.com/*",
+    "*://chatgpt.com/*",
+    "*://chat.qwen.ai/*",
+    "*://chat.deepseek.com/*",
+    "*://chat.z.ai/*",
+    "*://chat.mistral.ai/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -21,7 +26,14 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://gemini.google.com/app*"],
+      "matches": [
+        "*://gemini.google.com/app*",
+        "*://chatgpt.com/*",
+        "*://chat.qwen.ai/*",
+        "*://chat.deepseek.com/*",
+        "*://chat.z.ai/*",
+        "*://chat.mistral.ai/chat*"
+      ],
       "js": ["content_script.js"]
     }
   ],
@@ -29,5 +41,6 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "incognito": "spanning"
 }
