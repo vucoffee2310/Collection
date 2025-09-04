@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini File & Text Paster",
+  "version": "3.0",
+  "description": "Upload files and alternately paste a file then a predefined text string with Ctrl+V.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "*://gemini.google.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://gemini.google.com/app*"],
+      "js": ["content_script.js"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
