@@ -1,13 +1,6 @@
 const POST_FILE_TEXT = "This is the text after Ctrl V file";
 
-// Clear memory before first file with error handling
-try {
-  if (chrome.runtime?.id) {
-    chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
-  }
-} catch (e) {
-  console.warn('Storage cleanup error:', e);
-}
+chrome.storage.local.remove(['itemQueue', 'nextItemIndex', 'lastPastedType']);
 
 function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -33,13 +26,6 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
     const dataUrls = await Promise.all(Array.from(files).map(readFileAsDataURL));
     const mixedQueue = dataUrls.flatMap(url => [url, POST_FILE_TEXT]);
 
-    // Check if extension context is still valid
-    if (!chrome.runtime?.id) {
-      status.textContent = 'Extension error. Please reload.';
-      status.style.color = '#F44336';
-      return;
-    }
-
     chrome.storage.local.set({
       itemQueue: mixedQueue,
       nextItemIndex: 0,
@@ -52,11 +38,7 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
       }
       status.textContent = `${mixedQueue.length} paste actions ready in all tabs!`;
       status.style.color = '#4CAF50';
-      setTimeout(() => {
-        if (chrome.runtime?.id) {
-          window.close();
-        }
-      }, 2500);
+      setTimeout(() => window.close(), 2500);
     });
   } catch (error) {
     status.textContent = 'Error reading files.';
