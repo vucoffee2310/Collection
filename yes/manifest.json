@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "AI Chat Request Detector",
+  "version": "1.0",
+  "description": "Detects requests to AI chat endpoints (Gemini, ChatGPT, Mistral, DeepSeek)",
+  "permissions": [
+    "webRequest",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}
