@@ -2,7 +2,7 @@
 
 // modules/config.js: Central configuration for AI platforms
 
-const POST_FILE_TEXT = "This is the text after Ctrl V file";
+const POST_FILE_TEXT = "Tôi không hiểu văn bản, hãy giải thích cho tôi hiểu.";
 
 const AI_PLATFORMS = {
   'gemini.google.com': {
@@ -59,4 +59,5 @@ const AI_PLATFORMS = {
 const GENERAL_SELECTORS = {
   input: 'div[role="textbox"], textarea, div[contenteditable="true"], textarea[placeholder*="message"]',
   submit: 'button[type="submit"], button[aria-label*="Send"], button[data-testid*="send"]',
+
 };
