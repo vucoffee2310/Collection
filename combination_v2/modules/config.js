@@ -48,7 +48,7 @@ const AI_PLATFORMS = {
     submitSelector: 'button#send-message-button',
   },
   'chat.qwen.ai': {
-    apiEndpoint: 'https://chat.qwen.ai/api/v2/chat/completions',
+    apiEndpoint: 'https://chat.qwen.ai/api/v2/chat/completions?chat_id=',
     urlToOpen: 'https://chat.qwen.ai/',
     inputSelector: 'textarea#chat-input',
     submitSelector: 'button#send-message-button',
