@@ -14,7 +14,7 @@ const AI_PLATFORMS = {
   'chatgpt.com': {
     apiEndpoint: 'https://chatgpt.com/backend-api/f/conversation',
     urlToOpen: 'https://chatgpt.com/',
-    inputSelector: '#prompt-textarea', // <-- UPDATED to be more specific
+    inputSelector: '#prompt-textarea',
     submitSelector: 'button[data-testid="send-button"], button[aria-label*="Send"]',
   },
   'chat.mistral.ai': {
@@ -42,10 +42,17 @@ const AI_PLATFORMS = {
     submitSelector: 'div.send-button',
   },
   'chat.z.ai': {
-    // NOTE: Auto-tab opening is not supported until the API endpoint is identified.
+	apiEndpoint: 'https://chat.z.ai/api/chat/completions',
     urlToOpen: 'https://chat.z.ai/',
     inputSelector: 'textarea#chat-input',
     submitSelector: 'button#send-message-button',
+  },
+  'chat.qwen.ai': {
+    apiEndpoint: 'https://chat.qwen.ai/api/v2/chat/completions',
+    urlToOpen: 'https://chat.qwen.ai/',
+    inputSelector: 'textarea#chat-input',
+    submitSelector: 'button[aria-label="Send"]',
+    fileInputSelector: '#filesUpload'
   }
 };
 
