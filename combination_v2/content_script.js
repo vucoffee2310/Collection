@@ -1,63 +1,78 @@
 // content_script.js: Handles user interaction events for pasting and submission detection.
-let isFileReadyToPaste = false;
+let isProcessActive = false;
 let lastPasteTime = 0;
 let submissionHandled = false;
 
 // Initialize and listen for storage changes
-chrome.storage.local.get(['itemQueue'], (result) => {
-  isFileReadyToPaste = result.itemQueue?.length > 0;
+chrome.storage.local.get(['isProcessActive'], (result) => {
+  isProcessActive = !!result.isProcessActive;
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.itemQueue) {
-    isFileReadyToPaste = changes.itemQueue.newValue?.length > 0;
+  if (area === 'local' && changes.isProcessActive) {
+    isProcessActive = !!changes.isProcessActive.newValue;
   }
 });
 
+// Helper function to stop the process and clean up storage
+function stopPastingProcess() {
+  isProcessActive = false;
+  chrome.storage.local.remove(['isProcessActive', 'totalItems', 'nextItemIndex']);
+}
+
 // Handle Ctrl+V pasting
 document.addEventListener('keydown', (event) => {
-  if (!(event.ctrlKey || event.metaKey) || event.key !== 'v' || !isFileReadyToPaste) return;
+  if (!(event.ctrlKey || event.metaKey) || event.key !== 'v' || !isProcessActive) return;
 
   event.preventDefault();
   event.stopImmediatePropagation();
 
-  chrome.storage.local.get(['itemQueue', 'nextItemIndex'], async (result) => {
-    const { itemQueue = [], nextItemIndex = 0 } = result;
+  chrome.storage.local.get(['totalItems', 'nextItemIndex'], (result) => {
+    const { totalItems = 0, nextItemIndex = 0 } = result;
     
-    if (nextItemIndex >= itemQueue.length) {
-      isFileReadyToPaste = false;
-      chrome.storage.local.remove(['itemQueue', 'nextItemIndex']);
+    if (nextItemIndex >= totalItems) {
+      stopPastingProcess();
       return;
     }
 
-    const item = itemQueue[nextItemIndex];
-    
-    try {
-      if (item.startsWith('data:')) {
-        await pasteFile(item);
-      } else {
-        pasteText(item);
+    // Request the content for the current item from the background script
+    chrome.runtime.sendMessage({ type: 'GET_ITEM_CONTENT', index: nextItemIndex }, async (response) => {
+      if (!response || response.error || !response.data) {
+        console.error('Error getting item content from background:', response?.error || 'No response');
+        alert('An error occurred. Stopping the paste process.');
+        stopPastingProcess();
+        return;
       }
-      lastPasteTime = Date.now();
-      submissionHandled = false; // Reset for new paste
-    } catch (e) {
-      console.error('Error pasting content:', e);
-      alert('Error pasting content. Please try again.');
-      return;
-    }
+      
+      const item = response.data;
 
-    const newIndex = nextItemIndex + 1;
-    if (newIndex >= itemQueue.length) {
-      isFileReadyToPaste = false;
-      chrome.storage.local.remove(['itemQueue', 'nextItemIndex']);
-    } else {
-      chrome.storage.local.set({ nextItemIndex: newIndex });
-    }
+      try {
+        if (item.startsWith('data:')) {
+          await pasteFile(item);
+        } else {
+          pasteText(item);
+        }
+        lastPasteTime = Date.now();
+        submissionHandled = false; // Reset for new paste
+      } catch (e) {
+        console.error('Error pasting content:', e);
+        alert('Error pasting content. Please try again.');
+        stopPastingProcess();
+        return;
+      }
+
+      const newIndex = nextItemIndex + 1;
+      if (newIndex >= totalItems) {
+        stopPastingProcess(); // All items pasted, clean up
+      } else {
+        chrome.storage.local.set({ nextItemIndex: newIndex });
+      }
+    });
   });
 }, true);
 
 
-// --- Submission Detection Logic ---
+// --- Submission Detection Logic (Unchanged) ---
 
 // Unified function to notify background script of submission
 function handleSubmission() {

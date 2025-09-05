@@ -10,7 +10,14 @@
     "webRequest"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://gemini.google.com/*",
+    "https://chatgpt.com/*",
+    "https://chat.mistral.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://www.kimi.com/*",
+    "https://chat.z.ai/*",
+    "https://chat.qwen.ai/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -25,7 +32,16 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://gemini.google.com/app*",
+        "https://chatgpt.com/*",
+        "https://chat.mistral.ai/chat/*",
+        "https://chat.deepseek.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.kimi.com/chat/*",
+        "https://chat.z.ai/*",
+        "https://chat.qwen.ai/*"
+      ],
       "js": [
         "modules/config.js",
         "modules/utils.js",

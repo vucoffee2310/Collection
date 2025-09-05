@@ -34,6 +34,23 @@
     #fileInput {
       display: none; /* Hide the default input */
     }
+    #stopButton {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.2s;
+      width: 100%; /* Make it prominent */
+    }
+    #stopButton:hover {
+      background-color: #c82333;
+    }
+    #stop-controls {
+      display: none; /* Hidden by default */
+    }
     #status {
       margin-top: 20px;
       font-weight: bold;
@@ -44,10 +61,16 @@
 </head>
 <body>
   <h3>AI Chat Paster</h3>
-  <p>Select files to prepare them for pasting with Ctrl+V.</p>
+  <p id="instructionText">Select files to prepare them for pasting with Ctrl+V.</p>
 
-  <label for="fileInput" id="fileInputLabel">Select Files</label>
-  <input type="file" id="fileInput" multiple>
+  <div id="upload-controls">
+    <label for="fileInput" id="fileInputLabel">Select Files</label>
+    <input type="file" id="fileInput" multiple>
+  </div>
+  
+  <div id="stop-controls">
+    <button id="stopButton">Stop Pasting Process</button>
+  </div>
 
   <div id="status"></div>
 
