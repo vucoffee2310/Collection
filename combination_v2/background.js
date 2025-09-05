@@ -19,14 +19,23 @@ for (const host in AI_PLATFORMS) {
 
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
-    const cleanUrl = details.url.split('?')[0].split('#')[0];
-    const urlToOpen = TARGET_MAP.get(cleanUrl);
+    // --- START: MODIFIED LOGIC ---
+    // Change from an exact match to a prefix match (startsWith) to handle dynamic URLs.
+    let urlToOpen = null;
+    for (const [apiEndpoint, targetUrl] of TARGET_MAP.entries()) {
+      if (details.url.startsWith(apiEndpoint)) {
+        urlToOpen = targetUrl;
+        break; // Match found, exit loop.
+      }
+    }
+    // --- END: MODIFIED LOGIC ---
+
     const now = Date.now();
 
     if (urlToOpen && now < enabledUntil) {
       chrome.tabs.create({ url: urlToOpen });
-      enabledUntil = 0;
-      console.log(`Opened new tab: ${urlToOpen}`);
+      enabledUntil = 0; // Reset timer to prevent multiple tabs opening from a single submission
+      console.log(`Opened new tab: ${urlToOpen} based on request to ${details.url}`);
     }
   },
   { urls: ["<all_urls>"] }

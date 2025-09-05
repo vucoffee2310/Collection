@@ -35,10 +35,10 @@
       "matches": [
         "https://gemini.google.com/app*",
         "https://chatgpt.com/*",
-        "https://chat.mistral.ai/chat/*",
+        "https://chat.mistral.ai/chat*",
         "https://chat.deepseek.com/*",
         "https://copilot.microsoft.com/*",
-        "https://www.kimi.com/chat/*",
+        "https://www.kimi.com/chat*",
         "https://chat.z.ai/*",
         "https://chat.qwen.ai/*"
       ],

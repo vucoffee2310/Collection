@@ -72,17 +72,20 @@ document.addEventListener('keydown', (event) => {
 }, true);
 
 
-// --- Submission Detection Logic (Unchanged) ---
+// --- Submission Detection Logic (REVISED) ---
 
 // Unified function to notify background script of submission
 function handleSubmission() {
   if (submissionHandled) return; // Prevent multiple notifications
 
-  const input = findInput();
-  if (!input || !(input.value?.trim() || input.textContent?.trim())) return;
-
+  // --- FIX: REMOVED the check for input value ---
+  // The original check caused a race condition where the web page would clear the
+  // input before this function could read its value. We now trust that the event
+  // listeners for Enter/click are sufficient to determine a submission.
+  
   submissionHandled = true;
   chrome.runtime.sendMessage({ type: 'PASTE_COMPLETED' });
+  console.log('Submission detected, sent PASTE_COMPLETED to background.');
   
   // Reset after a delay to allow for a new, separate submission.
   setTimeout(() => { submissionHandled = false; }, 5000);
@@ -108,8 +111,12 @@ document.addEventListener('keydown', (event) => {
 
 // Listen for clicks on submit buttons
 document.addEventListener('click', (event) => {
-  const submitButton = findSubmitButton();
-  if (submitButton && (event.target === submitButton || submitButton.contains(event.target))) {
+  // --- FIX: IMPROVED click detection using closest() ---
+  // This is more robust and correctly detects a click even if it's on an
+  // icon or other element inside the actual button.
+  const platform = AI_PLATFORMS[window.location.hostname];
+  const selector = platform?.submitSelector || GENERAL_SELECTORS.submit;
+  if (event.target.closest(selector)) {
     attemptSubmissionHandling();
   }
 }, true);
