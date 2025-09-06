@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/My computer.DESKTOP-I6I43CB/libjpeg-turbo/build/cmake_install.cmake",
+		"C:/Users/My computer.DESKTOP-I6I43CB/libjpeg-turbo/build/simd/cmake_install.cmake",
+		"C:/Users/My computer.DESKTOP-I6I43CB/libjpeg-turbo/build/sharedlib/cmake_install.cmake",
+		"C:/Users/My computer.DESKTOP-I6I43CB/libjpeg-turbo/build/src/md5/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
