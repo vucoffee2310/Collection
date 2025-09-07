@@ -19,11 +19,13 @@ module.exports = {
   },
   resolve: {
     fallback: {
+      "buffer": require.resolve("buffer/"),
       "stream": require.resolve("stream-browserify"),
       "https": require.resolve("https-browserify"),
       "http": require.resolve("stream-http"),
       "os": require.resolve("os-browserify/browser"),
-      "buffer": require.resolve("buffer/"),
+      // This is the important part for the resolver
+      "process": require.resolve("process/browser"),
       "url": false,
       "assert": false,
       "crypto": false,
@@ -40,9 +42,17 @@ module.exports = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env']
-          }
-        }
+            presets: [
+              [
+                '@babel/preset-env',
+                {
+                  useBuiltIns: 'entry',
+                  corejs: 3,
+                },
+              ],
+            ],
+          },
+        },
       },
     ],
   },
@@ -52,8 +62,8 @@ module.exports = {
       patterns: [
         {
           from: 'public',
-          to: '.'
-        }
+          to: '.',
+        },
       ],
     }),
     new HtmlPlugin({
@@ -61,9 +71,10 @@ module.exports = {
       filename: 'popup.html',
       chunks: ['popup'],
     }),
+    // The ProvidePlugin should reference the module name, not the path.
     new webpack.ProvidePlugin({
       Buffer: ['buffer', 'Buffer'],
-      process: require.resolve('process/browser'),
+      process: 'process', // <-- THE FIX
     }),
   ],
 };
