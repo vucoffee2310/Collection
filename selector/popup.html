@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 250px;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+    }
+    h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 4px;
+      background-color: #4285f4;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #3367d6;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      display: none;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <h3>Simple Inspector</h3>
+  <button id="startBtn">Start Inspecting</button>
+  <button id="stopBtn" disabled>Stop Inspecting</button>
+  <div id="status"></div>
+  <div id="elementInfo">Right-click anywhere on a page and select “Start Inspecting”, then click any element to copy its HTML.</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
