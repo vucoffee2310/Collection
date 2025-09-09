@@ -119,12 +119,15 @@ function htmlToMarkdown(html) {
     fence: '```'
   });
 
-  // ✅ USE OFFICIAL GFM PLUGIN
-  if (window.turndownPluginGfm?.gfm) {
-    td.use(window.turndownPluginGfm.gfm);
-  } else {
-    console.warn('⚠️ GFM plugin not loaded. Tables, task lists, strikethrough may not work.');
-  }
+// ✅ DEBUG: Check if GFM plugin is available
+console.log('GFM Plugin Debug:', window.turndownPluginGfm);
+
+// ✅ USE OFFICIAL GFM PLUGIN
+if (window.turndownPluginGfm?.gfm) {
+  td.use(window.turndownPluginGfm.gfm);
+} else {
+  console.warn('⚠️ GFM plugin not loaded. Tables, task lists, strikethrough may not work.');
+}
 
   // ✅ APPLY OUR CUSTOM ENHANCEMENTS
   enhanceTurndown(td);
@@ -178,9 +181,10 @@ function handleClick(e) {
   try {
     const md = htmlToMarkdown(currentHoverElement.outerHTML);
     navigator.clipboard.writeText(md).then(() => {
-      showStatus('✅ Copied as Markdown!', '#4CAF50');
-      stopInspectMode();
-      chrome.runtime.sendMessage({ type: 'inspectModeStopped' });
+		showStatus('✅ Copied as Markdown!', '#4CAF50');
+		stopInspectMode();
+		chrome.runtime.sendMessage({ type: 'inspectModeStopped' }).catch(err => {
+		});
     });
   } catch (err) {
     showStatus('❌ Failed', '#dc3545');
@@ -203,7 +207,8 @@ function startInspectMode() {
   document.addEventListener('mousemove', handleMouseMove, true);
   document.addEventListener('click', handleClick, true);
   document.body.style.cursor = 'crosshair';
-  chrome.runtime.sendMessage({ type: 'inspectModeStarted' });
+  chrome.runtime.sendMessage({ type: 'inspectModeStarted' }).catch(err => {
+});
 }
 
 function stopInspectMode() {
