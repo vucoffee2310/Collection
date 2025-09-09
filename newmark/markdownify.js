@@ -656,3 +656,5 @@ MarkdownConverter.prototype.convert_th = MarkdownConverter.prototype.convert_td;
 function markdownify(html, options = {}) {
     return new MarkdownConverter(options).convert(html);
 }
+
+export { markdownify as convert };

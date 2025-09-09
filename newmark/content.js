@@ -1,5 +1,5 @@
 // content.js
-import { convert as htmlToMarkdown } from './html-to-markdown-js/html-to-markdown.js';
+import { convert as markdownify } from './markdownify.js';
 
 let inspectModeActive = false;
 let currentHoverElement = null;
@@ -91,9 +91,9 @@ function handleClick(event) {
 
   try {
     // --- NEW CONVERSION LOGIC ---
-    // The new library is used here. Tables and Strikethrough are on by default.
-    // The BasePlugin automatically handles removing script/style tags.
-    const markdown = htmlToMarkdown(html);
+    // Using markdownify.js for conversion.
+    // Options can be passed to the converter. 'atx' headings (#) are common.
+    const markdown = markdownify(html, { heading_style: 'atx' });
     // --- END OF NEW LOGIC ---
 
     // Copy to clipboard

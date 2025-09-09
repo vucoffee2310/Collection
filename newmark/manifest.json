@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HTML to Markdown Inspector",
-  "version": "1.1",
+  "version": "2.0",
   "description": "Inspect an element, click it, and copy its HTML as Markdown.",
   "permissions": [
     "contextMenus",
@@ -30,8 +30,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "html-to-markdown-js/*",
-        "html-to-markdown-js/plugins/*"
+        "markdownify.js"
       ],
       "matches": ["<all_urls>"]
     }
