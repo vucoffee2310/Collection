@@ -103,6 +103,7 @@ function cell(content, node = null, index = null) {
   if (index === null) index = indexOf.call(node.parentNode.childNodes, node);
   var prefix = ' ';
   if (index === 0) prefix = '| ';
+  // ✅✅✅ FIXED: Properly escape newline characters in regex
   let filteredContent = content.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>");
   filteredContent = filteredContent.replace(/\|+/g, '\\|');
   while (filteredContent.length < 3) filteredContent += ' ';

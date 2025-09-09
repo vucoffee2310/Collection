@@ -106,7 +106,6 @@ function enhanceTurndown(td) {
 // ======== MAIN CONVERTER ========
 function htmlToMarkdown(html) {
   if (!window.TurndownService) throw new Error('Turndown not loaded');
-
   const td = new window.TurndownService({
     headingStyle: 'atx',
     codeBlockStyle: 'fenced',
@@ -115,31 +114,29 @@ function htmlToMarkdown(html) {
     linkStyle: 'inlined',
     bulletListMarker: '-',
     hr: '---',
-    br: '  \n',
+    br: '  ',
     fence: '```'
   });
 
-// ✅ DEBUG: Check if GFM plugin is available
+// ✅ DEBUG: Check if GFM Plugin is available
 console.log('GFM Plugin Debug:', window.turndownPluginGfm);
 
-// ✅ USE OFFICIAL GFM PLUGIN
-if (window.turndownPluginGfm?.gfm) {
-  td.use(window.turndownPluginGfm.gfm);
+// ✅✅✅ FIXED: USE OFFICIAL GFM PLUGIN
+// The plugin function is directly on window.turndownPluginGfm, not under .gfm
+if (window.turndownPluginGfm) {
+  td.use(window.turndownPluginGfm);
 } else {
   console.warn('⚠️ GFM plugin not loaded. Tables, task lists, strikethrough may not work.');
 }
 
   // ✅ APPLY OUR CUSTOM ENHANCEMENTS
   enhanceTurndown(td);
-
   // ✅ CONVERT & CLEAN
   let markdown = td.turndown(html);
-
   // Final cleanup
-  markdown = markdown.replace(/\n{3,}/g, '\n\n'); // collapse excess newlines
+  markdown = markdown.replace(/\n{3,}/g, '\n'); // collapse excess newlines
   markdown = markdown.split('\n').map(line => line.trimEnd()).join('\n'); // trim trailing spaces
   markdown = markdown.trim();
-
   return markdown;
 }
 
