@@ -69,8 +69,6 @@ body {
 
 .btn-primary { background: var(--blue-dark); }
 .btn-primary:hover { background: var(--blue); }
-.btn-secondary { background: var(--gray-dark); }
-.btn-secondary:hover { background: #707B87; }
 
 .visually-hidden {
     position: absolute;

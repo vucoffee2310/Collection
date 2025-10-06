@@ -8,10 +8,8 @@ import { getMergedState } from './merger.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const els = {
-    autoFitAll: document.getElementById('auto-fit-all-btn'),
     fileInput: document.getElementById('file-input'),
     jsonInput: document.getElementById('json-input'),
-    exportBtn: document.getElementById('export-btn'),
     saveBtn: document.getElementById('save-btn'),
     palette: document.getElementById('palette-container'),
     container: document.getElementById('pdf-container'),
@@ -78,17 +76,6 @@ function populatePaletteSwatches() {
 }
 
 // Event Listeners
-els.autoFitAll.addEventListener('click', () => {
-    if (!isPdfLoaded()) return alert("Please load a PDF file first.");
-    const { overlayData } = getState();
-    Object.entries(overlayData).forEach(([pageKey, pageData]) => {
-        const pageNum = parseInt(pageKey.split('_')[1]);
-        Object.keys(pageData).forEach(coords => updateOverlay(pageNum, coords, { fontSize: 'auto' }));
-    });
-    renderUI();
-    alert("All overlays have been set to auto-fit.");
-});
-
 els.fileInput.addEventListener('change', (e) => {
     resetStreak();
     const file = e.target.files[0];
@@ -132,19 +119,6 @@ els.mergeToggle.addEventListener('change', (e) => {
     resetStreak();
     setMergeActive(e.target.checked);
     renderUI();
-});
-
-els.exportBtn.addEventListener('click', () => {
-    resetStreak();
-    const exportData = {};
-    Object.entries(getState().overlayData).forEach(([pageKey, pageValue]) => {
-        exportData[pageKey] = {};
-        Object.entries(pageValue).forEach(([coords, info]) => exportData[pageKey][coords] = info.text);
-    });
-    const a = document.createElement('a');
-    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-    a.download = "overlay_data.json";
-    a.click();
 });
 
 els.saveBtn.addEventListener('click', () => {
