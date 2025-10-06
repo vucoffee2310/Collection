@@ -14,186 +14,168 @@ export class PDFOverlayApp {
         this.lastLoadedPdfFile = null;
 
         // Initialize components
-        this.stateManager = new StateManager();
-        this.uiManager = new UIManager();
-        this.overlayMerger = new OverlayMerger();
-        this.fontSizeCalculator = new FontSizeCalculator();
-        this.pdfHandler = new PDFHandler();
-        this.overlayRenderer = new OverlayRenderer(this.stateManager, this.fontSizeCalculator);
-        this.pdfExporter = new PDFExporter(this.pdfHandler);
+        this.state = new StateManager();
+        this.ui = new UIManager();
+        this.merger = new OverlayMerger();
+        this.fontCalc = new FontSizeCalculator();
+        this.pdf = new PDFHandler();
+        this.renderer = new OverlayRenderer(this.state, this.fontCalc);
+        this.exporter = new PDFExporter(this.pdf);
 
-        // Setup PDF.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = CONFIG.PDF.WORKER_SRC;
         
-        this.initializeElements();
-        this.attachEventListeners();
-        this.initializeUI();
-
-        // Initial load with default data
-        this.processAndLoadData(this.defaultJsonData);
+        this.cacheElements();
+        this.attachEvents();
+        this.initUI();
+        this.processAndLoadData(defaultJsonData);
     }
     
-    initializeElements() {
-        this.elements = {
+    cacheElements() {
+        this.el = {
             fileInput: document.getElementById('file-input'),
             jsonInput: document.getElementById('json-input'),
             saveBtn: document.getElementById('save-btn'),
             palette: document.getElementById('palette-container'),
-            container: document.getElementById('pdf-container'),
             pdfFileName: document.getElementById('pdf-file-name'),
             jsonFileName: document.getElementById('json-file-name'),
-            expandAmountInput: document.getElementById('expand-amount'),
-            expandAllBtn: document.getElementById('expand-all-btn'),
-            opacitySlider: document.getElementById('opacity-slider'),
-            opacityValue: document.getElementById('opacity-value'),
-            brightnessSlider: document.getElementById('brightness-slider'),
-            brightnessValue: document.getElementById('brightness-value'),
+            expandAmount: document.getElementById('expand-amount'),
+            expandBtn: document.getElementById('expand-all-btn'),
+            opacity: document.getElementById('opacity-slider'),
+            opacityVal: document.getElementById('opacity-value'),
+            brightness: document.getElementById('brightness-slider'),
+            brightnessVal: document.getElementById('brightness-value'),
         };
     }
     
-    initializeUI() {
-        this.uiManager.populatePaletteSwatches(this.elements.palette, CONFIG.DEFAULT_PALETTE);
-        this.stateManager.setActivePalette(CONFIG.DEFAULT_PALETTE);
-        this.handleOpacityChange();
-        this.handleBrightnessChange();
+    initUI() {
+        this.ui.populatePaletteSwatches(this.el.palette, CONFIG.DEFAULT_PALETTE);
+        this.state.setActivePalette(CONFIG.DEFAULT_PALETTE);
+        this.updateOpacity();
+        this.updateBrightness();
     }
     
-    attachEventListeners() {
-        this.elements.fileInput.addEventListener('change', (e) => this.handlePDFUpload(e));
-        this.elements.jsonInput.addEventListener('change', (e) => this.handleJSONUpload(e));
-        this.elements.saveBtn.addEventListener('click', () => this.handleSave());
-        this.elements.palette.addEventListener('click', (e) => this.handlePaletteChange(e));
-        this.elements.expandAllBtn.addEventListener('click', () => this.handleExpandAll());
-        this.elements.opacitySlider.addEventListener('input', () => this.handleOpacityChange());
-        this.elements.brightnessSlider.addEventListener('input', () => this.handleBrightnessChange());
+    attachEvents() {
+        this.el.fileInput.onchange = e => this.loadPDF(e);
+        this.el.jsonInput.onchange = e => this.loadJSON(e);
+        this.el.saveBtn.onclick = () => this.save();
+        this.el.palette.onclick = e => this.changePalette(e);
+        this.el.expandBtn.onclick = () => this.expandAll();
+        this.el.opacity.oninput = () => this.updateOpacity();
+        this.el.brightness.oninput = () => this.updateBrightness();
     }
     
-    async handlePDFUpload(e) {
+    async loadPDF(e) {
         const file = e.target.files[0];
         if (!file || file.type !== 'application/pdf') return;
 
         this.originalPdfName = file.name.replace(/\.pdf$/i, '');
-        this.uiManager.updateFileName(this.elements.pdfFileName, file.name, 'No file selected');
+        this.ui.updateFileName(this.el.pdfFileName, file.name, 'No file selected');
         
         const reader = new FileReader();
-        reader.onload = async (event) => {
+        reader.onload = async event => {
             this.lastLoadedPdfFile = event.target.result;
-            this.elements.jsonInput.value = '';
-            this.uiManager.updateFileName(this.elements.jsonFileName, null, 'Using default');
+            this.el.jsonInput.value = '';
+            this.ui.updateFileName(this.el.jsonFileName, null, 'Using default');
             await this.processAndLoadData(this.defaultJsonData);
         };
         reader.readAsArrayBuffer(file);
     }
     
-    async handleJSONUpload(e) {
+    async loadJSON(e) {
         const file = e.target.files[0];
         if (!file || !file.name.endsWith('.json')) return;
 
-        this.uiManager.updateFileName(this.elements.jsonFileName, file.name, 'Using default');
+        this.ui.updateFileName(this.el.jsonFileName, file.name, 'Using default');
         
         const reader = new FileReader();
-        reader.onload = async (event) => {
+        reader.onload = async event => {
             try {
-                const customJsonData = JSON.parse(event.target.result);
-                await this.processAndLoadData(customJsonData);
+                await this.processAndLoadData(JSON.parse(event.target.result));
             } catch (error) {
-                alert('Error parsing JSON file: ' + error.message);
-                this.uiManager.updateFileName(this.elements.jsonFileName, 'Load failed. Using default.', 'Using default');
+                alert('Error parsing JSON: ' + error.message);
+                this.ui.updateFileName(this.el.jsonFileName, 'Load failed. Using default.', 'Using default');
                 await this.processAndLoadData(this.defaultJsonData);
             }
         };
         reader.readAsText(file);
     }
     
-    async handleSave() {
-        if (!this.pdfHandler.isLoaded()) {
-            alert('Please load a PDF file first.');
-            return;
-        }
+    async save() {
+        if (!this.pdf.isLoaded()) return alert('Please load a PDF file first.');
         
-        const state = this.stateManager.getState();
-        const dataToSave = this.overlayMerger.mergeAllPages(state.overlayData);
-        const brightness = parseInt(this.elements.brightnessSlider.value, 10);
+        const data = this.merger.mergeAllPages(this.state.overlayData);
+        const brightness = parseInt(this.el.brightness.value, 10);
             
-        await this.pdfExporter.save(this.originalPdfName, dataToSave, state.activePalette, brightness, this.uiManager);
+        await this.exporter.save(this.originalPdfName, data, this.state.activePalette, brightness, this.ui);
     }
 
-    async handleExpandAll() {
-        const amount = parseInt(this.elements.expandAmountInput.value, 10);
-        if (isNaN(amount)) {
-            alert('Please enter a valid number to expand by.');
-            return;
-        }
-        this.stateManager.expandAllOverlays(amount);
-        await this.renderUI();
+    async expandAll() {
+        const amount = parseInt(this.el.expandAmount.value, 10);
+        if (isNaN(amount)) return alert('Please enter a valid number.');
+        
+        this.state.expandAllOverlays(amount);
+        await this.render();
     }
 
-    handlePaletteChange(e) {
+    changePalette(e) {
         const swatch = e.target.closest('.palette-swatch');
         if (!swatch) return;
         
-        this.elements.palette.querySelector('.active')?.classList.remove('active');
+        this.el.palette.querySelector('.active')?.classList.remove('active');
         swatch.classList.add('active');
-        const paletteKey = swatch.dataset.paletteKey;
-        this.stateManager.setActivePalette(paletteKey);
-        
-        // Re-apply visual settings based on the new theme
-        this.handleOpacityChange();
-        this.handleBrightnessChange();
+        this.state.setActivePalette(swatch.dataset.paletteKey);
+        this.updateOpacity();
+        this.updateBrightness();
     }
 
-    handleOpacityChange() {
-        const opacity = parseInt(this.elements.opacitySlider.value, 10);
-        this.elements.opacityValue.textContent = `${opacity}%`;
-        const activePaletteKey = this.stateManager.getState().activePalette;
-        this.uiManager.updateOverlayOpacity(activePaletteKey, opacity);
+    updateOpacity() {
+        const val = parseInt(this.el.opacity.value, 10);
+        this.el.opacityVal.textContent = `${val}%`;
+        this.ui.updateOverlayOpacity(this.state.activePalette, val);
     }
     
-    handleBrightnessChange() {
-        const brightness = parseInt(this.elements.brightnessSlider.value, 10);
-        this.elements.brightnessValue.textContent = `${brightness}%`;
-        this.uiManager.updateTextBrightness(brightness);
+    updateBrightness() {
+        const val = parseInt(this.el.brightness.value, 10);
+        this.el.brightnessVal.textContent = `${val}%`;
+        this.ui.updateTextBrightness(val);
     }
     
     async processAndLoadData(jsonData) {
-        this.stateManager.initialize(jsonData);
+        this.state.initialize(jsonData);
         if (this.lastLoadedPdfFile) {
-            this.uiManager.showLoading('Loading PDF...');
+            this.ui.showLoading('Loading PDF...');
             try {
-                await this.pdfHandler.loadPDF(this.lastLoadedPdfFile);
-                this.uiManager.updatePageInfo(`Total pages: ${this.pdfHandler.pdfDoc.numPages}`);
-                await this.renderUI();
+                await this.pdf.loadPDF(this.lastLoadedPdfFile);
+                this.ui.updatePageInfo(`Total pages: ${this.pdf.pdfDoc.numPages}`);
+                await this.render();
             } catch (error) {
-                this.uiManager.showLoading('Failed to load PDF.');
+                this.ui.showLoading('Failed to load PDF.');
             }
         }
     }
     
-    async renderUI() {
-        if (!this.pdfHandler.isLoaded()) return;
+    async render() {
+        if (!this.pdf.isLoaded()) return;
 
-        const state = this.stateManager.getState();
-        const displayData = this.overlayMerger.mergeAllPages(state.overlayData);
-
-        this.uiManager.clearContainer();
-        this.pdfHandler.resetRenderQueue();
+        const displayData = this.merger.mergeAllPages(this.state.overlayData);
+        this.ui.clearContainer();
+        this.pdf.resetRenderQueue();
         
         const pages = await Promise.all(
-            Array.from({ length: this.pdfHandler.getNumPages() }, (_, i) => this.pdfHandler.getPage(i + 1))
+            Array.from({ length: this.pdf.getNumPages() }, (_, i) => this.pdf.getPage(i + 1))
         );
         
         pages.forEach((page, i) => {
             const pageNum = i + 1;
             const viewport = page.getViewport({ scale: CONFIG.PDF.SCALE });
-            const wrapper = this.uiManager.createPageWrapper(pageNum, viewport);
+            const wrapper = this.ui.createPageWrapper(pageNum, viewport);
             
-            const renderTask = async () => {
-                await this.pdfHandler.renderPageToCanvas(wrapper, pageNum, CONFIG.PDF.SCALE);
-                this.overlayRenderer.renderPageOverlays(wrapper, pageNum, viewport, displayData);
-            };
-            this.pdfHandler.queuePageForRender(wrapper, renderTask);
+            this.pdf.queuePageForRender(wrapper, async () => {
+                await this.pdf.renderPageToCanvas(wrapper, pageNum, CONFIG.PDF.SCALE);
+                this.renderer.renderPageOverlays(wrapper, pageNum, viewport, displayData);
+            });
         });
         
-        this.pdfHandler.startObserving();
+        this.pdf.startObserving();
     }
 }

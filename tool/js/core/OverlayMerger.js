@@ -8,12 +8,11 @@ export class OverlayMerger {
         const [topA, leftA, bottomA, rightA] = blockA.coords;
         const [topB, leftB, bottomB, rightB] = blockB.coords;
         
-        const isAligned = 
-            Math.abs(leftA - leftB) < CONFIG.MERGE.TOLERANCE_HORIZONTAL && 
-            Math.abs(rightA - rightB) < CONFIG.MERGE.TOLERANCE_HORIZONTAL;
-        
+        const aligned = Math.abs(leftA - leftB) < CONFIG.MERGE.TOLERANCE_HORIZONTAL && 
+                       Math.abs(rightA - rightB) < CONFIG.MERGE.TOLERANCE_HORIZONTAL;
         const gap = topB - bottomA;
-        return isAligned && gap >= -2 && gap < CONFIG.MERGE.TOLERANCE_VERTICAL;
+        
+        return aligned && gap >= -2 && gap < CONFIG.MERGE.TOLERANCE_VERTICAL;
     }
     
     mergePage(pageState) {
@@ -30,36 +29,25 @@ export class OverlayMerger {
         
         if (!blocks.length) return {};
         
-        const mergedBlocks = [];
-        let currentGroup = [blocks[0]];
-        
-        for (let i = 1; i < blocks.length; i++) {
-            if (this.canMerge(currentGroup[currentGroup.length - 1], blocks[i])) {
-                currentGroup.push(blocks[i]);
+        const groups = blocks.reduce((acc, block) => {
+            const lastGroup = acc[acc.length - 1];
+            if (lastGroup && this.canMerge(lastGroup[lastGroup.length - 1], block)) {
+                lastGroup.push(block);
             } else {
-                mergedBlocks.push(currentGroup);
-                currentGroup = [blocks[i]];
+                acc.push([block]);
             }
-        }
-        mergedBlocks.push(currentGroup);
+            return acc;
+        }, []);
         
-        const result = {};
-        mergedBlocks.forEach(group => {
+        return Object.fromEntries(groups.map(group => {
             if (group.length === 1) {
-                result[group[0].originalKey] = group[0].data;
-            } else {
-                const first = group[0];
-                const last = group[group.length - 1];
-                const newKey = JSON.stringify([first.coords[0], first.coords[1], last.coords[2], first.coords[3]]);
-                
-                result[newKey] = { 
-                    ...first.data, 
-                    text: group.map(b => '    ' + b.data.text).join('\n')
-                };
+                return [group[0].originalKey, group[0].data];
             }
-        });
-        
-        return result;
+            const first = group[0];
+            const last = group[group.length - 1];
+            const key = JSON.stringify([first.coords[0], first.coords[1], last.coords[2], first.coords[3]]);
+            return [key, { ...first.data, text: group.map(b => '    ' + b.data.text).join('\n') }];
+        }));
     }
     
     mergeAllPages(overlayData) {

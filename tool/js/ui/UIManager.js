@@ -1,22 +1,21 @@
 import { CONFIG } from '../config.js';
 
 export class UIManager {
-    constructor(containerSelector = '#pdf-container') {
-        this.container = document.querySelector(containerSelector);
+    constructor() {
+        this.container = document.querySelector('#pdf-container');
     }
     
-    showLoading(message) {
-        if (this.container) this.container.innerHTML = `<div class="loading">${message}</div>`;
+    showLoading(msg) {
+        if (this.container) this.container.innerHTML = `<div class="loading">${msg}</div>`;
     }
     
-    updatePageInfo(message) {
+    updatePageInfo(msg) {
         const el = document.getElementById('page-info');
-        if (el) el.textContent = message;
+        if (el) el.textContent = msg;
     }
     
     updateFileName(element, fileName, defaultText) {
-        const spanId = element.id.replace('-input', '-file-name');
-        const span = document.getElementById(spanId);
+        const span = document.getElementById(element.id.replace('-input', '-file-name'));
         if (span) span.textContent = fileName || defaultText;
     }
     
@@ -25,46 +24,37 @@ export class UIManager {
     }
     
     createPageWrapper(pageNum, viewport) {
-        if (!this.container) return null;
-        
         const wrapper = document.createElement('div');
         wrapper.className = 'page-wrapper page-placeholder';
         wrapper.id = `page-wrapper-${pageNum}`;
-        wrapper.style.width = `${viewport.width}px`;
-        wrapper.style.height = `${viewport.height}px`;
+        wrapper.style.cssText = `width:${viewport.width}px;height:${viewport.height}px`;
         wrapper.innerHTML = `<span>Loading page ${pageNum}...</span>`;
-        this.container.appendChild(wrapper);
-        
+        this.container?.appendChild(wrapper);
         return wrapper;
     }
     
     populatePaletteSwatches(container, defaultKey) {
-        Object.entries(CONFIG.COLOR_PALETTES).forEach(([key, palette]) => {
+        Object.entries(CONFIG.COLOR_PALETTES).forEach(([key, p]) => {
             const swatch = document.createElement('div');
             swatch.className = 'palette-swatch' + (key === defaultKey ? ' active' : '');
             swatch.dataset.paletteKey = key;
-            swatch.title = palette.name;
-            swatch.style.background = `rgb(${palette.background.join(',')})`;
-            swatch.style.color = `rgb(${palette.text.join(',')})`;
+            swatch.title = p.name;
+            swatch.style.cssText = `background:rgb(${p.background});color:rgb(${p.text})`;
             swatch.innerHTML = '<span>Aa</span>';
             container.appendChild(swatch);
         });
     }
 
     updateOverlayOpacity(paletteKey, opacity) {
-        const palette = CONFIG.COLOR_PALETTES[paletteKey];
-        if (!palette) return;
-
-        const alpha = opacity / 100;
-        const bg = `rgba(${palette.background.join(',')}, ${alpha})`;
-        document.body.style.setProperty('--overlay-bg', bg);
-        document.body.style.setProperty('--overlay-border', `rgb(${palette.border.join(',')})`);
+        const p = CONFIG.COLOR_PALETTES[paletteKey];
+        if (!p) return;
+        document.body.style.setProperty('--overlay-bg', `rgba(${p.background}, ${opacity / 100})`);
+        document.body.style.setProperty('--overlay-border', `rgb(${p.border})`);
     }
 
     updateTextBrightness(brightness) {
-        const value = Math.round(brightness * 2.55);
-        const color = `rgb(${value}, ${value}, ${value})`;
-        document.body.style.setProperty('--overlay-text', color);
+        const v = Math.round(brightness * 2.55);
+        document.body.style.setProperty('--overlay-text', `rgb(${v}, ${v}, ${v})`);
     }
     
     showSavingIndicator() {
