@@ -1,117 +1,99 @@
-// js/ui.js
 import { colorPalettes } from './config.js';
 import { parseCoords } from './utils.js';
+
+const MIN_OVERLAY_HEIGHT = 25;
+
+const checkOverflow = (el) => el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth;
 
 export function autoFitFontSizeForElement(overlay) {
     const textSpan = overlay.querySelector('.overlay-text');
     if (!textSpan) return;
+    
     textSpan.style.fontSize = '';
-    const doesOverflow = () => textSpan.scrollHeight > textSpan.clientHeight || textSpan.scrollWidth > textSpan.clientWidth;
-    const textLength = textSpan.textContent.length;
-    const containerWidth = overlay.clientWidth;
-    const containerHeight = overlay.clientHeight;
-    const sizeFromWidth = (containerWidth / (textLength + 2)) * 1.6;
-    const sizeFromHeight = containerHeight * 0.9;
-
-    let fontSize = Math.max(4, Math.min(sizeFromWidth, sizeFromHeight, 80));
+    const textLen = textSpan.textContent.length;
+    const { clientWidth: w, clientHeight: h } = overlay;
+    let fontSize = Math.max(4, Math.min((w / (textLen + 2)) * 1.6, h * 0.9, 80));
     
     textSpan.style.fontSize = `${fontSize}px`;
-
-    while (doesOverflow() && fontSize > 4) {
-        fontSize -= 0.5;
-        textSpan.style.fontSize = `${fontSize}px`;
+    
+    while (checkOverflow(textSpan) && fontSize > 4) {
+        textSpan.style.fontSize = `${--fontSize}px`;
     }
-    if (!doesOverflow()) {
-        while (!doesOverflow() && fontSize < 100) {
-            fontSize += 0.5;
-            textSpan.style.fontSize = `${fontSize}px`;
+    
+    if (!checkOverflow(textSpan)) {
+        while (!checkOverflow(textSpan) && fontSize < 100) {
+            textSpan.style.fontSize = `${++fontSize}px`;
         }
-        fontSize -= 0.5;
-        textSpan.style.fontSize = `${fontSize}px`;
+        textSpan.style.fontSize = `${--fontSize}px`;
     }
 }
 
 export function applyTheme(paletteKey) {
-    const palette = colorPalettes[paletteKey];
-    if (!palette) return;
-    const bg = `rgba(${palette.background.join(',')}, 0.9)`;
-    const text = `rgb(${palette.text.join(',')})`;
-    const border = `rgb(${palette.border.join(',')})`;
-    document.body.style.setProperty('--overlay-bg', bg);
-    document.body.style.setProperty('--overlay-text', text);
-    document.body.style.setProperty('--overlay-border', border);
+    const p = colorPalettes[paletteKey];
+    if (!p) return;
+    const styles = document.body.style;
+    styles.setProperty('--overlay-bg', `rgba(${p.background.join(',')}, 0.9)`);
+    styles.setProperty('--overlay-text', `rgb(${p.text.join(',')})`);
+    styles.setProperty('--overlay-border', `rgb(${p.border.join(',')})`);
 }
 
-export function showLoading(message) {
-    const pdfContainer = document.getElementById('pdf-container');
-    if (pdfContainer) {
-        pdfContainer.innerHTML = `<div class="loading">${message}</div>`;
-    }
-}
+export const showLoading = (msg) => {
+    const c = document.getElementById('pdf-container');
+    c && (c.innerHTML = `<div class="loading">${msg}</div>`);
+};
 
-export function updatePageInfo(message) {
-    const pageInfo = document.getElementById('page-info');
-    if (pageInfo) {
-        pageInfo.textContent = message;
-    }
-}
+export const updatePageInfo = (msg) => {
+    const el = document.getElementById('page-info');
+    el && (el.textContent = msg);
+};
 
-export function clearPdfContainer() {
-    const pdfContainer = document.getElementById('pdf-container');
-    if (pdfContainer) {
-        pdfContainer.innerHTML = '';
-    }
-}
+export const clearPdfContainer = () => {
+    const c = document.getElementById('pdf-container');
+    c && (c.innerHTML = '');
+};
 
 export function createPageWrapper(pageNum, viewport) {
-    const pdfContainer = document.getElementById('pdf-container');
-    if (!pdfContainer) return null;
-    const pageWrapper = document.createElement('div');
-    pageWrapper.className = 'page-wrapper page-placeholder';
-    pageWrapper.id = `page-wrapper-${pageNum}`;
-    pageWrapper.dataset.pageNum = pageNum;
-    pageWrapper.style.width = `${viewport.width}px`;
-    pageWrapper.style.height = `${viewport.height}px`;
-    pageWrapper.innerHTML = `<span>Loading page ${pageNum}...</span>`; 
-    pdfContainer.appendChild(pageWrapper);
-    return pageWrapper;
+    const container = document.getElementById('pdf-container');
+    if (!container) return null;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'page-wrapper page-placeholder';
+    wrapper.id = `page-wrapper-${pageNum}`;
+    wrapper.dataset.pageNum = pageNum;
+    wrapper.style.width = `${viewport.width}px`;
+    wrapper.style.height = `${viewport.height}px`;
+    wrapper.innerHTML = `<span>Loading page ${pageNum}...</span>`;
+    container.appendChild(wrapper);
+    return wrapper;
 }
-
-const MIN_OVERLAY_HEIGHT_PX = 25;
 
 export function addOverlaysToPage(pageWrapper, pageNum, viewport, overlayData) {
     const fragment = document.createDocumentFragment();
-
     pageWrapper.querySelectorAll('.overlay').forEach(el => el.remove());
-    const pageKey = `page_${pageNum}`;
-    const pageData = overlayData[pageKey];
+    
+    const pageData = overlayData[`page_${pageNum}`];
     if (!pageData) return;
-
-    const scaleFactorWidth = viewport.width / 1000;
-    const scaleFactorHeight = viewport.height / 1000;
-
-    for (const [coords, overlayInfo] of Object.entries(pageData)) {
-        const coordsArray = parseCoords(coords);
-        const [top, left, bottom, right] = coordsArray;
-
-        const x = left * scaleFactorWidth;
-        const y = top * scaleFactorHeight;
-        const width = (right - left) * scaleFactorWidth;
-        
-        const originalHeight = (bottom - top) * scaleFactorHeight;
-        const height = Math.max(originalHeight, MIN_OVERLAY_HEIGHT_PX);
-
+    
+    const scaleX = viewport.width / 1000;
+    const scaleY = viewport.height / 1000;
+    
+    Object.entries(pageData).forEach(([coords, info]) => {
+        const [top, left, bottom, right] = parseCoords(coords);
         const overlay = document.createElement('div');
         overlay.className = 'overlay';
-        Object.assign(overlay.style, { left: `${x}px`, top: `${y}px`, width: `${width}px`, height: `${height}px` });
+        Object.assign(overlay.style, {
+            left: `${left * scaleX}px`,
+            top: `${top * scaleY}px`,
+            width: `${(right - left) * scaleX}px`,
+            height: `${Math.max((bottom - top) * scaleY, MIN_OVERLAY_HEIGHT)}px`
+        });
         Object.assign(overlay.dataset, { coords, pageNum });
-
+        
         const textSpan = document.createElement('span');
         textSpan.className = 'overlay-text';
-        textSpan.textContent = overlayInfo.text;
+        textSpan.textContent = info.text;
         textSpan.contentEditable = "true";
         overlay.appendChild(textSpan);
-
+        
         const controls = document.createElement('div');
         controls.className = 'overlay-controls';
         controls.innerHTML = `
@@ -120,27 +102,24 @@ export function addOverlaysToPage(pageWrapper, pageNum, viewport, overlayData) {
             <button class="font-size-btn" data-action="auto" title="Auto-fit Font Size">A</button>
         `;
         overlay.appendChild(controls);
-        
         fragment.appendChild(overlay);
-
-        if (typeof overlayInfo.fontSize === 'number') {
-            textSpan.style.fontSize = `${overlayInfo.fontSize}px`;
+        
+        if (typeof info.fontSize === 'number') {
+            textSpan.style.fontSize = `${info.fontSize}px`;
         } else {
             setTimeout(() => autoFitFontSizeForElement(overlay), 0);
         }
-    }
+    });
     
     pageWrapper.appendChild(fragment);
 }
 
-export function showSavingIndicator() {
-    const indicator = document.createElement('div');
-    indicator.className = 'saving-indicator';
-    indicator.textContent = 'Saving to PDF... Please wait.';
-    document.body.appendChild(indicator);
-    return indicator;
-}
+export const showSavingIndicator = () => {
+    const div = document.createElement('div');
+    div.className = 'saving-indicator';
+    div.textContent = 'Saving to PDF... Please wait.';
+    document.body.appendChild(div);
+    return div;
+};
 
-export function removeSavingIndicator(indicator) {
-    if (indicator) document.body.removeChild(indicator);
-}
+export const removeSavingIndicator = (indicator) => indicator?.remove();

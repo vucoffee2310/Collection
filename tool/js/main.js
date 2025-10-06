@@ -1,4 +1,3 @@
-// js/main.js
 import { jsonData as defaultJsonData } from './data.js';
 import { colorPalettes, DEFAULT_PALETTE_KEY } from './config.js';
 import { initializeState, getState, updateOverlay, setMergeActive, setActivePalette } from './state.js';
@@ -8,155 +7,116 @@ import { getMergedState } from './merger.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const autoFitAllBtn = document.getElementById('auto-fit-all-btn');
-const fileInput = document.getElementById('file-input');
-const jsonInput = document.getElementById('json-input');
-const exportBtn = document.getElementById('export-btn');
-const saveBtn = document.getElementById('save-btn');
-const paletteContainer = document.getElementById('palette-container');
-const pdfContainer = document.getElementById('pdf-container');
-const mergeToggle = document.getElementById('merge-toggle');
-const pdfFileNameSpan = document.getElementById('pdf-file-name');
-const jsonFileNameSpan = document.getElementById('json-file-name');
-
-let lastLoadedPdfFile = null;
-
-let increaseStreak = {
-    pageNum: null,
-    coords: null,
-    count: 0
+const els = {
+    autoFitAll: document.getElementById('auto-fit-all-btn'),
+    fileInput: document.getElementById('file-input'),
+    jsonInput: document.getElementById('json-input'),
+    exportBtn: document.getElementById('export-btn'),
+    saveBtn: document.getElementById('save-btn'),
+    palette: document.getElementById('palette-container'),
+    container: document.getElementById('pdf-container'),
+    mergeToggle: document.getElementById('merge-toggle'),
+    pdfFileName: document.getElementById('pdf-file-name'),
+    jsonFileName: document.getElementById('json-file-name')
 };
 
-function resetIncreaseStreak() {
-    increaseStreak = { pageNum: null, coords: null, count: 0 };
-}
+let lastLoadedPdfFile = null;
+let increaseStreak = { pageNum: null, coords: null, count: 0 };
+
+const resetStreak = () => increaseStreak = { pageNum: null, coords: null, count: 0 };
+const renderUI = () => isPdfLoaded() && renderPdfPages(getState().isMergeActive ? getMergedState(getState().overlayData) : getState().overlayData);
+const updateFileName = (input, span) => span.textContent = input.files?.[0]?.name || (span === els.pdfFileName ? 'No file selected' : 'Using default');
+const textOverflows = (text, container) => text.scrollHeight > container.clientHeight || text.scrollWidth > container.clientWidth;
 
 function autoIncreaseFont(overlay, textSpan, pageNum, coords) {
-    resetIncreaseStreak();
-    increaseStreak.pageNum = pageNum;
-    increaseStreak.coords = coords;
-    let lastGoodSize = parseFloat(window.getComputedStyle(textSpan).fontSize);
-    function step() {
-        let currentSize = parseFloat(window.getComputedStyle(textSpan).fontSize);
+    resetStreak();
+    Object.assign(increaseStreak, { pageNum, coords });
+    let lastGoodSize = parseFloat(getComputedStyle(textSpan).fontSize);
+    
+    const step = () => {
+        const currentSize = parseFloat(getComputedStyle(textSpan).fontSize);
         increaseStreak.count++;
-        const increases = 1;
-        const decreases = Math.floor(increaseStreak.count / 2) - Math.floor((increaseStreak.count - 1) / 2);
-        const netChange = increases - decreases;
+        const netChange = 1 - (Math.floor(increaseStreak.count / 2) - Math.floor((increaseStreak.count - 1) / 2));
         const finalSize = currentSize + netChange;
-        if (finalSize > 150) { 
+        
+        if (finalSize > 150) {
             updateOverlay(pageNum, coords, { fontSize: lastGoodSize });
-            resetIncreaseStreak();
+            resetStreak();
             return;
         }
+        
         textSpan.style.fontSize = `${finalSize}px`;
-        if (doesTextOverflow(textSpan, overlay)) {
+        
+        if (textOverflows(textSpan, overlay)) {
             textSpan.style.fontSize = `${lastGoodSize}px`;
             updateOverlay(pageNum, coords, { fontSize: lastGoodSize });
-            resetIncreaseStreak();
+            resetStreak();
         } else {
             lastGoodSize = finalSize;
-            setTimeout(step, 0); 
+            setTimeout(step, 0);
         }
-    }
+    };
     step();
 }
 
-/**
- * REVISED renderUI function
- * This now safely calls the render-only function from pdfHandler.
- */
-function renderUI() {
-    if (!isPdfLoaded()) return;
-    const state = getState();
-    const dataToShow = state.isMergeActive ? getMergedState(state.overlayData) : state.overlayData;
-    renderPdfPages(dataToShow);
-}
-
-/**
- * Handles the initial load and parsing of a PDF file.
- * @param {object} rawJsonData - The JSON data to use for the first render.
- */
 function processAndLoadInitialData(rawJsonData) {
-    initializeState(rawJsonData, mergeToggle.checked);
-    if (lastLoadedPdfFile) {
-        const state = getState();
-        // Call the full loadPDF function which parses the ArrayBuffer for the first time.
-        loadPDF(lastLoadedPdfFile, state.overlayData);
-    }
-}
-
-function updateFileNameDisplay(inputElement, spanElement) {
-    if (inputElement.files && inputElement.files.length > 0) {
-        spanElement.textContent = inputElement.files[0].name;
-    } else {
-        spanElement.textContent = (spanElement === pdfFileNameSpan) ? 'No file selected' : 'Using default';
-    }
-}
-
-function doesTextOverflow(textElement, containerElement) {
-    return textElement.scrollHeight > containerElement.clientHeight ||
-           textElement.scrollWidth > containerElement.clientWidth;
+    initializeState(rawJsonData, els.mergeToggle.checked);
+    lastLoadedPdfFile && loadPDF(lastLoadedPdfFile, getState().overlayData);
 }
 
 function populatePaletteSwatches() {
-    for (const [key, palette] of Object.entries(colorPalettes)) {
+    Object.entries(colorPalettes).forEach(([key, palette]) => {
         const swatch = document.createElement('div');
-        swatch.className = 'palette-swatch';
+        swatch.className = 'palette-swatch' + (key === DEFAULT_PALETTE_KEY ? ' active' : '');
         swatch.dataset.paletteKey = key;
         swatch.title = palette.name;
         swatch.style.background = `rgb(${palette.background.join(',')})`;
         swatch.style.color = `rgb(${palette.text.join(',')})`;
         swatch.innerHTML = '<span>Aa</span>';
-        if (key === DEFAULT_PALETTE_KEY) swatch.classList.add('active');
-        paletteContainer.appendChild(swatch);
-    }
+        els.palette.appendChild(swatch);
+    });
 }
 
-autoFitAllBtn.addEventListener('click', () => {
-    if (!isPdfLoaded()) {
-        alert("Please load a PDF file first.");
-        return;
-    }
-    const state = getState();
-    for (const pageKey in state.overlayData) {
+// Event Listeners
+els.autoFitAll.addEventListener('click', () => {
+    if (!isPdfLoaded()) return alert("Please load a PDF file first.");
+    const { overlayData } = getState();
+    Object.entries(overlayData).forEach(([pageKey, pageData]) => {
         const pageNum = parseInt(pageKey.split('_')[1]);
-        const pageData = state.overlayData[pageKey];
-        for (const coords in pageData) {
-            updateOverlay(pageNum, coords, { fontSize: 'auto' });
-        }
-    }
+        Object.keys(pageData).forEach(coords => updateOverlay(pageNum, coords, { fontSize: 'auto' }));
+    });
     renderUI();
-    alert("All overlays have been set to auto-fit. The changes will be applied as you scroll through the document.");
+    alert("All overlays have been set to auto-fit.");
 });
 
-fileInput.addEventListener('change', (e) => {
-    resetIncreaseStreak();
+els.fileInput.addEventListener('change', (e) => {
+    resetStreak();
     const file = e.target.files[0];
-    updateFileNameDisplay(fileInput, pdfFileNameSpan);
-    if (file && file.type === 'application/pdf') {
+    updateFileName(els.fileInput, els.pdfFileName);
+    if (file?.type === 'application/pdf') {
         const reader = new FileReader();
         reader.onload = function() {
-            lastLoadedPdfFile = this.result.slice(0); // Use slice(0) to create a copy
-            jsonInput.value = '';
-            updateFileNameDisplay(jsonInput, jsonFileNameSpan);
+            lastLoadedPdfFile = this.result.slice(0);
+            els.jsonInput.value = '';
+            updateFileName(els.jsonInput, els.jsonFileName);
             processAndLoadInitialData(defaultJsonData);
         };
         reader.readAsArrayBuffer(file);
     }
 });
 
-jsonInput.addEventListener('change', (e) => {
-    resetIncreaseStreak();
+els.jsonInput.addEventListener('change', (e) => {
+    resetStreak();
     const file = e.target.files[0];
-    updateFileNameDisplay(jsonInput, jsonFileNameSpan);
-    if (file && file.type === 'application/json') {
+    updateFileName(els.jsonInput, els.jsonFileName);
+    if (file?.type === 'application/json') {
         const reader = new FileReader();
-        reader.onload = function(event) {
+        reader.onload = (event) => {
             try {
                 const newJsonData = JSON.parse(event.target.result);
                 if (isPdfLoaded()) {
-                    initializeState(newJsonData, mergeToggle.checked);
-                    renderUI(); // Just re-render with the new data
+                    initializeState(newJsonData, els.mergeToggle.checked);
+                    renderUI();
                 } else {
                     alert("Please choose a PDF file to apply this JSON data to.");
                 }
@@ -168,54 +128,45 @@ jsonInput.addEventListener('change', (e) => {
     }
 });
 
-mergeToggle.addEventListener('change', (e) => {
-    resetIncreaseStreak();
+els.mergeToggle.addEventListener('change', (e) => {
+    resetStreak();
     setMergeActive(e.target.checked);
     renderUI();
 });
 
-exportBtn.addEventListener('click', () => {
-    resetIncreaseStreak();
-    const { overlayData } = getState();
+els.exportBtn.addEventListener('click', () => {
+    resetStreak();
     const exportData = {};
-    for (const [pageKey, pageValue] of Object.entries(overlayData)) {
+    Object.entries(getState().overlayData).forEach(([pageKey, pageValue]) => {
         exportData[pageKey] = {};
-        for (const [coords, overlayInfo] of Object.entries(pageValue)) {
-            exportData[pageKey][coords] = overlayInfo.text;
-        }
-    }
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+        Object.entries(pageValue).forEach(([coords, info]) => exportData[pageKey][coords] = info.text);
+    });
     const a = document.createElement('a');
-    a.href = dataStr;
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
     a.download = "overlay_data.json";
     a.click();
-    a.remove();
 });
 
-saveBtn.addEventListener('click', () => {
-    resetIncreaseStreak();
-    if (!isPdfLoaded()) {
-        alert("Please load a PDF file first.");
-        return;
-    }
+els.saveBtn.addEventListener('click', () => {
+    resetStreak();
+    if (!isPdfLoaded()) return alert("Please load a PDF file first.");
     const state = getState();
-    const originalFileName = fileInput.files[0]?.name.replace('.pdf', '') || 'document';
+    const fileName = els.fileInput.files[0]?.name.replace('.pdf', '') || 'document';
     const dataToSave = state.isMergeActive ? getMergedState(state.overlayData) : state.overlayData;
-    saveAsPDF(originalFileName, dataToSave, state.activePalette);
+    saveAsPDF(fileName, dataToSave, state.activePalette);
 });
 
-paletteContainer.addEventListener('click', (e) => {
+els.palette.addEventListener('click', (e) => {
     const swatch = e.target.closest('.palette-swatch');
     if (!swatch) return;
-    paletteContainer.querySelector('.active')?.classList.remove('active');
+    els.palette.querySelector('.active')?.classList.remove('active');
     swatch.classList.add('active');
-    const paletteKey = swatch.dataset.paletteKey;
-    setActivePalette(paletteKey);
-    applyTheme(paletteKey);
+    setActivePalette(swatch.dataset.paletteKey);
+    applyTheme(swatch.dataset.paletteKey);
 });
 
-pdfContainer.addEventListener('blur', (e) => {
-    resetIncreaseStreak();
+els.container.addEventListener('blur', (e) => {
+    resetStreak();
     const textSpan = e.target;
     if (!textSpan.matches('.overlay-text')) return;
     const overlay = textSpan.closest('.overlay');
@@ -223,63 +174,56 @@ pdfContainer.addEventListener('blur', (e) => {
     const { coords, pageNum } = overlay.dataset;
     const cleanedText = textSpan.textContent.trimEnd();
     updateOverlay(pageNum, coords, { text: cleanedText });
-    if (textSpan.textContent !== cleanedText) {
-        textSpan.textContent = cleanedText;
-    }
+    if (textSpan.textContent !== cleanedText) textSpan.textContent = cleanedText;
     if (getState().overlayData[`page_${pageNum}`][coords]?.fontSize === 'auto') {
         autoFitFontSizeForElement(overlay);
     }
 }, true);
 
-
-pdfContainer.addEventListener('click', (e) => {
+els.container.addEventListener('click', (e) => {
     const target = e.target;
     if (!target.matches('.font-size-btn')) {
-        resetIncreaseStreak();
+        resetStreak();
         return;
     }
+    
     const overlay = target.closest('.overlay');
     if (!overlay) return;
     const { coords, pageNum } = overlay.dataset;
     const textSpan = overlay.querySelector('.overlay-text');
-    let currentSize = parseFloat(window.getComputedStyle(textSpan).fontSize);
+    const currentSize = parseFloat(getComputedStyle(textSpan).fontSize);
     const action = target.dataset.action;
-    if (increaseStreak.coords !== coords || increaseStreak.pageNum !== pageNum) {
-        resetIncreaseStreak();
-    }
-    increaseStreak.pageNum = pageNum;
-    increaseStreak.coords = coords;
+    
+    if (increaseStreak.coords !== coords || increaseStreak.pageNum !== pageNum) resetStreak();
+    Object.assign(increaseStreak, { pageNum, coords });
+    
     switch (action) {
         case 'increase': {
             increaseStreak.count++;
-            const increases = 1;
-            const decreases = Math.floor(increaseStreak.count / 2) - Math.floor((increaseStreak.count - 1) / 2);
-            const netChange = increases - decreases;
+            const netChange = 1 - (Math.floor(increaseStreak.count / 2) - Math.floor((increaseStreak.count - 1) / 2));
             const finalSize = currentSize + netChange;
             textSpan.style.fontSize = `${finalSize}px`;
-            if (doesTextOverflow(textSpan, overlay)) {
+            if (textOverflows(textSpan, overlay)) {
                 textSpan.style.fontSize = `${currentSize}px`;
-                resetIncreaseStreak();
+                resetStreak();
             } else {
                 updateOverlay(pageNum, coords, { fontSize: finalSize });
             }
             break;
         }
         case 'decrease': {
-            resetIncreaseStreak();
+            resetStreak();
             const newSize = Math.max(4, currentSize - 1);
             updateOverlay(pageNum, coords, { fontSize: newSize });
             textSpan.style.fontSize = `${newSize}px`;
             break;
         }
-        case 'auto': {
+        case 'auto':
             autoIncreaseFont(overlay, textSpan, pageNum, coords);
             break;
-        }
     }
 });
 
-// --- Initialize UI ---
 populatePaletteSwatches();
 setActivePalette(DEFAULT_PALETTE_KEY);
 applyTheme(DEFAULT_PALETTE_KEY);
