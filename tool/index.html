@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Overlay Editor</title>
+    
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preload" href="Bookerly-Regular.ttf" as="font" type="font/ttf" crossorigin>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header id="controls">
+        <!-- GROUP 1: FILE INPUTS -->
+        <div class="control-group file-inputs">
+            <div class="file-input-wrapper">
+                <label for="file-input" class="btn">Choose PDF</label>
+                <span id="pdf-file-name">No file selected</span>
+                <input type="file" id="file-input" accept=".pdf" class="visually-hidden">
+            </div>
+            <div class="file-input-wrapper">
+                <label for="json-input" class="btn">Choose JSON</label>
+                <span id="json-file-name">Using default</span>
+                <input type="file" id="json-input" accept=".json" class="visually-hidden">
+            </div>
+        </div>
+
+        <!-- GROUP 2: OPTIONS -->
+        <div class="control-group options">
+            <div class="checkbox-wrapper">
+                <input type="checkbox" id="merge-toggle" checked>
+                <label for="merge-toggle">Merge Adjacent Overlays</label>
+            </div>
+            <div class="theme-wrapper">
+                <span>Theme:</span>
+                <div id="palette-container">
+                    <!-- Color swatches will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- GROUP 3: ACTIONS & STATUS -->
+        <div class="control-group actions">
+            <button id="auto-fit-all-btn" class="btn btn-secondary">Auto-Fit All</button>
+            <button id="export-btn" class="btn btn-secondary">Export JSON</button>
+            <button id="save-btn" class="btn btn-primary">Save to PDF</button>
+            <span id="page-info">Please select a PDF file</span>
+        </div>
+    </header>
+
+    <main id="pdf-container">
+        <div class="loading">Select a PDF file to begin</div>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
