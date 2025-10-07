@@ -27,3 +27,7 @@ export function calculateOverlayPosition({ coords, containerWidth, containerHeig
         height: Math.max((bottom - top) * scaleY, minHeight)
     };
 }
+
+export function toPercentage(value, total) {
+    return total > 0 ? `${(value / total) * 100}%` : '0%';
+}

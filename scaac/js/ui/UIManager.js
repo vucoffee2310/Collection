@@ -23,12 +23,10 @@ export class UIManager {
         if (this.container) this.container.innerHTML = '';
     }
     
-    // This function creates the .page-wrapper element that our CSS rule targets.
     createPageWrapper(pageNum, viewport) {
         const wrapper = document.createElement('div');
         wrapper.className = 'page-wrapper page-placeholder';
         wrapper.id = `page-wrapper-${pageNum}`;
-        // Use aspect-ratio for responsive sizing instead of fixed width/height
         wrapper.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
         wrapper.innerHTML = `<span>Loading page ${pageNum}...</span>`;
         this.container?.appendChild(wrapper);
@@ -36,22 +34,28 @@ export class UIManager {
     }
     
     populatePaletteSwatches(container, defaultKey) {
+        const fragment = document.createDocumentFragment();
+        
         Object.entries(CONFIG.COLOR_PALETTES).forEach(([key, p]) => {
             const swatch = document.createElement('div');
-            swatch.className = 'palette-swatch' + (key === defaultKey ? ' active' : '');
+            swatch.className = `palette-swatch${key === defaultKey ? ' active' : ''}`;
             swatch.dataset.paletteKey = key;
             swatch.title = p.name;
             swatch.style.cssText = `background:rgb(${p.background});color:rgb(${p.text})`;
             swatch.innerHTML = '<span>Aa</span>';
-            container.appendChild(swatch);
+            fragment.appendChild(swatch);
         });
+        
+        container.appendChild(fragment);
     }
 
     updateOverlayOpacity(paletteKey, opacity) {
         const p = CONFIG.COLOR_PALETTES[paletteKey];
         if (!p) return;
-        document.body.style.setProperty('--overlay-bg', `rgba(${p.background}, ${opacity / 100})`);
-        document.body.style.setProperty('--overlay-border', `rgb(${p.border})`);
+        
+        const root = document.body.style;
+        root.setProperty('--overlay-bg', `rgba(${p.background}, ${opacity / 100})`);
+        root.setProperty('--overlay-border', `rgb(${p.border})`);
     }
 
     updateTextBrightness(brightness) {

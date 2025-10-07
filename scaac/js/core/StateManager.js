@@ -21,7 +21,9 @@ export class StateManager {
         );
     }
     
-    setActivePalette(key) { this.activePalette = key; }
+    setActivePalette(key) { 
+        this.activePalette = key; 
+    }
 
     expandAllOverlays(amount) {
         for (const pageKey in this.overlayData) {

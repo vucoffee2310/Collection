@@ -4,7 +4,10 @@ import * as Utils from '../utils.js';
 export class FontSizeCalculator {
     calculateOptimalSize(overlay) {
         const textSpan = overlay.querySelector('.overlay-text');
-        if (!textSpan) return;
+        if (!textSpan?.textContent.length) {
+            if (textSpan) textSpan.style.fontSize = `${CONFIG.OVERLAY.MIN_FONT_SIZE}px`;
+            return;
+        }
 
         const pageWrapper = overlay.closest('.page-wrapper');
         const { clientWidth: w, clientHeight: h } = overlay;
@@ -12,40 +15,37 @@ export class FontSizeCalculator {
         const availableW = w - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
         const availableH = h - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
         
-        if (!textSpan.textContent.length || availableW <= 0 || availableH <= 0) {
+        if (availableW <= 0 || availableH <= 0) {
             textSpan.style.fontSize = `${CONFIG.OVERLAY.MIN_FONT_SIZE}px`;
             return;
         }
 
-        textSpan.style.fontSize = ''; // Reset for calculation
-        let optimalSizePx = this._binarySearch(textSpan, availableW, availableH);
-        optimalSizePx = this._incrementalFit(textSpan, optimalSizePx);
+        textSpan.style.fontSize = '';
+        const optimalSizePx = this._calculateFontSize(textSpan, availableW, availableH);
 
-        // This is the key logic that activates with our CSS change.
-        // It detects the scalable base font size on pageWrapper and uses percentages.
+        // Use percentage-based sizing for responsiveness
         if (pageWrapper) {
             const baseSizePx = parseFloat(getComputedStyle(pageWrapper).fontSize);
             if (baseSizePx > 0) {
-                const finalSizePercent = (optimalSizePx / baseSizePx) * 100;
-                // Apply percentage to the overlay itself, and the text span will inherit it.
-                overlay.style.fontSize = `${finalSizePercent}%`;
-                textSpan.style.fontSize = ''; // Let it inherit
+                overlay.style.fontSize = `${(optimalSizePx / baseSizePx) * 100}%`;
+                textSpan.style.fontSize = '';
                 return;
             }
         }
         
-        // Fallback for safety: set the size in pixels if the percentage method fails.
         textSpan.style.fontSize = `${optimalSizePx}px`;
     }
 
-    _binarySearch(textSpan, maxW, maxH) {
+    _calculateFontSize(textSpan, maxW, maxH) {
         const textLen = textSpan.textContent.length;
         const charsPerLine = Math.max(1, maxW / (maxH * 0.55));
         const lines = Math.ceil(textLen / charsPerLine);
+        
         let high = Math.min((maxH / lines) * 0.8, CONFIG.OVERLAY.MAX_FONT_SIZE);
         let low = CONFIG.OVERLAY.MIN_FONT_SIZE;
         let best = low;
         
+        // Binary search
         while (high - low > 0.1) {
             const mid = (high + low) / 2;
             textSpan.style.fontSize = `${mid}px`;
@@ -57,14 +57,11 @@ export class FontSizeCalculator {
                 low = mid;
             }
         }
-        return best;
-    }
-    
-    _incrementalFit(textSpan, fontSize) {
-        let step = 0.5;
         
+        // Fine-tune
+        let step = 0.5;
         while (step > 0.05) {
-            const next = fontSize + step;
+            const next = best + step;
             if (next > CONFIG.OVERLAY.MAX_FONT_SIZE) {
                 step /= 2;
                 continue;
@@ -73,9 +70,10 @@ export class FontSizeCalculator {
             if (Utils.checkOverflow(textSpan, 0)) {
                 step /= 2;
             } else {
-                fontSize = next;
+                best = next;
             }
         }
-        return fontSize;
+        
+        return best;
     }
 }
