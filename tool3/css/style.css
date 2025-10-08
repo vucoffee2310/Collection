@@ -182,7 +182,7 @@ canvas {
     border: 0.1vw solid var(--overlay-border);
     color: var(--overlay-text);
     font-family: 'Bookerly', serif;
-    line-height: 1.2;
+    line-height: 1.15;
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -205,8 +205,9 @@ canvas {
     margin-bottom: var(--paragraph-spacing);
 }
 
-.overlay-text:focus {
+.overlay-text[contenteditable="true"]:focus {
     outline: 2px solid var(--blue);
+    box-shadow: 0 0 10px var(--blue);
     background: rgba(255, 255, 255, 0.1);
 }
 
@@ -215,6 +216,58 @@ canvas {
     transform: scale(1.01);
     z-index: 200;
 }
+
+/* --- STYLES FOR DELETE BUTTON --- */
+.delete-overlay-btn {
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 22px;
+    height: 22px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    background: rgba(211, 84, 0, 0.8); /* A reddish color */
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 20px;
+    text-align: center;
+    padding: 0;
+    z-index: 210;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.8);
+    transition: all 0.2s ease-in-out;
+}
+
+.overlay:hover .delete-overlay-btn {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+.delete-overlay-btn:hover {
+    background: rgba(231, 76, 60, 1.0); /* Brighter red on hover */
+    transform: scale(1.1);
+}
+/* --- END STYLES --- */
+
+/* --- STYLES FOR VERTICAL TEXT --- */
+.overlay.vertical-text {
+    /* Adjust flex alignment for vertical flow */
+    justify-content: center; /* Center text horizontally in the narrow box */
+    align-items: center; /* Center text vertically */
+}
+
+.overlay.vertical-text .overlay-text {
+    writing-mode: vertical-rl; /* Set text flow to top-to-bottom, right-to-left */
+    transform: rotate(180deg); /* Keeps Latin text characters upright */
+    white-space: nowrap; /* Prevent text from wrapping into multiple columns */
+    text-align: center; /* Ensures single characters are centered */
+    line-height: 1; /* Adjust line height for better spacing */
+}
+/* --- END STYLES --- */
 
 .saving-indicator {
     position: fixed;
@@ -228,7 +281,7 @@ canvas {
 
 @media print {
     body { background: none; }
-    header#controls, .saving-indicator { display: none; }
+    header#controls, .saving-indicator, .delete-overlay-btn { display: none; }
     main#pdf-container { margin: 0; padding: 0; }
     .page-wrapper { 
         box-shadow: none; 

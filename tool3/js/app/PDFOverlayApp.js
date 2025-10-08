@@ -163,8 +163,11 @@ export class PDFOverlayApp {
         this.el.spacingValue.textContent = `${val.toFixed(2)}em`;
         document.body.style.setProperty('--paragraph-spacing', `${val}em`);
 
-        // FIX: Defer recalculation until after the browser has repainted.
-        // This ensures the measurements are taken on the *new* layout.
+        // The global paragraph spacing has changed, which invalidates all
+        // cached font size calculations for merged text blocks.
+        this.fontCalc.clearCache();
+
+        // Defer recalculation until after the browser has repainted with the new spacing.
         requestAnimationFrame(() => {
             document.querySelectorAll('.overlay').forEach(overlay => {
                 this.fontCalc.calculateOptimalSize(overlay);

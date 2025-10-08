@@ -3,19 +3,40 @@ import * as Utils from '../utils.js';
 
 export class OverlayMerger {
     canMerge(blockA, blockB) {
+        // Blocks with different font sizes should never merge.
         if (blockA.data.fontSize !== blockB.data.fontSize) return false;
         
         const [topA, leftA, bottomA, rightA] = blockA.coords;
         const [topB, leftB, bottomB, rightB] = blockB.coords;
         
         const H_TOL = CONFIG.MERGE.TOLERANCE_HORIZONTAL;
-        const V_TOL = CONFIG.MERGE.TOLERANCE_VERTICAL;
 
+        // Check for horizontal alignment first.
         const aligned = Math.abs(leftA - leftB) < H_TOL && 
                        Math.abs(rightA - rightB) < H_TOL;
-        const gap = topB - bottomA;
+
+        if (!aligned) return false;
+
+        // --- ALGORITHM IMPROVEMENT ---
+        // Calculate the actual gap between the bottom of A and top of B.
+        const actualGap = topB - bottomA;
+
+        // Define an expected line height ratio. A value of 1.2 means the space
+        // between lines is about 20% of the font size.
+        const LINE_HEIGHT_RATIO = 1.2;
         
-        return aligned && gap >= -2 && gap < V_TOL; 
+        // The font size in the JSON is a string like 'auto', which isn't useful here.
+        // We must estimate it from the bounding box height of the first block.
+        const estimatedLineHeight = bottomA - topA;
+        
+        // Calculate the maximum allowed gap based on the estimated line height.
+        // This makes the vertical tolerance dynamic and proportional to the text size.
+        // We allow a gap of up to 50% of the line height (estimated font size).
+        const dynamicVerticalTolerance = estimatedLineHeight * (LINE_HEIGHT_RATIO - 0.7);
+        
+        // A block can be merged if it's not overlapping too much (gap >= -2)
+        // and if its gap is within the dynamically calculated tolerance.
+        return actualGap >= -2 && actualGap < dynamicVerticalTolerance;
     }
     
     mergePage(pageState) {
@@ -56,9 +77,7 @@ export class OverlayMerger {
                 const last = group[group.length - 1];
                 const key = JSON.stringify([first.coords[0], first.coords[1], last.coords[2], first.coords[3]]);
                 
-                // --- MODIFICATION HERE ---
-                // Wrap each original text block in a div instead of joining with '\n'.
-                const mergedText = group.map(b => `<div class="merged-text-block">      ${b.data.text}</div>`).join('');
+                const mergedText = group.map(b => `<div class="merged-text-block">${b.data.text}</div>`).join('');
                 
                 acc[key] = { ...first.data, text: mergedText };
             }

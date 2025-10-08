@@ -38,4 +38,22 @@ export class StateManager {
             );
         }
     }
+
+    // --- NEW METHODS FOR INTERACTIVITY ---
+
+    updateOverlayText(pageNum, coords, newText) {
+        const pageKey = `page_${pageNum}`;
+        if (this.overlayData[pageKey] && this.overlayData[pageKey][coords]) {
+            this.overlayData[pageKey][coords].text = newText;
+            console.log(`Updated text for page ${pageNum}, coords ${coords}`);
+        }
+    }
+
+    deleteOverlay(pageNum, coords) {
+        const pageKey = `page_${pageNum}`;
+        if (this.overlayData[pageKey] && this.overlayData[pageKey][coords]) {
+            delete this.overlayData[pageKey][coords];
+            console.log(`Deleted overlay for page ${pageNum}, coords ${coords}`);
+        }
+    }
 }

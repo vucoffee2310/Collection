@@ -13,7 +13,10 @@ export const CONFIG = {
         MIN_HEIGHT: 25,
         PADDING: 0,
         MIN_FONT_SIZE: 4,
-        MAX_FONT_SIZE: 150
+        MAX_FONT_SIZE: 150,
+        // An aspect ratio (height/width) above which text is considered vertical.
+        // A value of 2 means a box twice as tall as it is wide will be vertical.
+        VERTICAL_THRESHOLD: 2.0
     },
     MERGE: {
         TOLERANCE_HORIZONTAL: 10,
