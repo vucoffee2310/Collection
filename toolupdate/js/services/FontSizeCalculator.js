@@ -4,9 +4,22 @@ import * as Utils from '../utils.js';
 export class FontSizeCalculator {
     constructor() {
         this.cache = new Map();
+        this.pendingCalculations = new Set();
+        this.maxCacheSize = 500; // Prevent memory leaks
     }
 
-    clearCache() { this.cache.clear(); }
+    clearCache() { 
+        this.cache.clear();
+        this.pendingCalculations.clear();
+    }
+    
+    // Manage cache size to prevent memory issues
+    _manageCacheSize() {
+        if (this.cache.size > this.maxCacheSize) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+        }
+    }
 
     calculateOptimalSize(overlay) {
         const txt = overlay.querySelector('.overlay-text');
@@ -15,15 +28,44 @@ export class FontSizeCalculator {
         const { clientWidth: w, clientHeight: h } = overlay;
         if (w <= 0 || h <= 0) return;
 
-        const key = `${w.toFixed(1)}x${h.toFixed(1)}:${txt.innerHTML}`;
+        // Create more efficient cache key
+        const contentHash = this._hashContent(txt.innerHTML);
+        const key = `${w.toFixed(1)}x${h.toFixed(1)}:${contentHash}`;
+        
+        // Use cached result if available
         if (this.cache.has(key)) {
             this._apply(overlay, this.cache.get(key));
             return;
         }
 
+        // Prevent duplicate calculations for the same overlay
+        const overlayId = overlay.dataset.coords + overlay.dataset.pageNum;
+        if (this.pendingCalculations.has(overlayId)) return;
+        
+        this.pendingCalculations.add(overlayId);
+
+        // Calculate font size
         const size = this._find(txt, overlay);
+        
+        // Store in cache
         this.cache.set(key, size);
+        this._manageCacheSize();
+        
+        // Apply the result
         this._apply(overlay, size);
+        
+        this.pendingCalculations.delete(overlayId);
+    }
+    
+    // Create simple hash for content
+    _hashContent(str) {
+        let hash = 0;
+        const len = Math.min(str.length, 100); // Only hash first 100 chars
+        for (let i = 0; i < len; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return `${hash}:${str.length}`;
     }
 
     _apply(overlay, px) {
@@ -50,6 +92,7 @@ export class FontSizeCalculator {
         const tol = 0.1, maxIter = 20;
         let iter = 0;
 
+        // Better initial guess based on content and area
         const len = txt.textContent.length || 1;
         const area = cont.clientWidth * cont.clientHeight;
         let guess = Math.max(MIN, Math.min(MAX, Math.sqrt(area / len) * 1.5));
@@ -62,6 +105,7 @@ export class FontSizeCalculator {
             best = guess;
         }
 
+        // Binary search for optimal size
         while (high - low > tol && iter < maxIter) {
             const mid = (low + high) / 2;
             txt.style.fontSize = `${mid}px`;

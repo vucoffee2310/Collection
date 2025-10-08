@@ -8,7 +8,7 @@ import { PDFExporter } from '../services/PDFExporter.js';
 import { OverlayRenderer } from '../ui/OverlayRenderer.js';
 import { UIManager } from '../ui/UIManager.js';
 import { CONFIG } from '../config.js';
-import { readFile, setCoordinateOrder, getCoordinateOrder } from '../utils.js';
+import { readFile, debounce, throttle } from '../utils.js';
 
 export class PDFOverlayApp {
     constructor(defJson) {
@@ -31,8 +31,8 @@ export class PDFOverlayApp {
         this.el = {
             fileInput: document.getElementById('file-input'),
             jsonInput: document.getElementById('json-input'),
-            coordOrder: document.getElementById('coord-order'),
-            applyCoordBtn: document.getElementById('apply-coord-btn'),
+            coordDisplay: document.getElementById('coord-display'),
+            coordButtons: document.querySelectorAll('#controls .coord-btn'),
             savePrintBtn: document.getElementById('save-print-btn'),
             saveDirectPdfBtn: document.getElementById('save-direct-pdf-btn'),
             saveHtmlBtn: document.getElementById('save-html-btn'),
@@ -49,11 +49,17 @@ export class PDFOverlayApp {
             spacingValue: document.getElementById('spacing-value'),
         };
         
+        this.currentGlobalCoordOrder = '';
+        
+        // Create debounced/throttled versions of frequent operations
+        this.debouncedUpdateOpacity = debounce(() => this._updateOpacity(), 150);
+        this.debouncedUpdateBrightness = debounce(() => this._updateBrightness(), 150);
+        this.debouncedUpdateSpacing = debounce(() => this._updateSpacing(), 200);
+        
         this.el.fileInput?.addEventListener('change', e => this.loadPDF(e));
         this.el.jsonInput?.addEventListener('change', e => this.loadJSON(e));
-        this.el.applyCoordBtn?.addEventListener('click', () => this.applyCoordinateOrder());
-        this.el.coordOrder?.addEventListener('keypress', e => {
-            if (e.key === 'Enter') this.applyCoordinateOrder();
+        this.el.coordButtons?.forEach(btn => {
+            btn.addEventListener('click', () => this.addGlobalCoordinate(btn.dataset.coord));
         });
         this.el.savePrintBtn?.addEventListener('click', () => this._check(() => this.printExp.save(this.pdf, this.ui)));
         this.el.saveDirectPdfBtn?.addEventListener('click', () => this._check(async () => {
@@ -66,18 +72,18 @@ export class PDFOverlayApp {
         }));
         this.el.palette?.addEventListener('click', e => this.changePalette(e));
         this.el.expandBtn?.addEventListener('click', () => this.expandAll());
-        this.el.opacity?.addEventListener('input', () => this.updateOpacity());
-        this.el.brightness?.addEventListener('input', () => this.updateBrightness());
-        this.el.spacingSlider?.addEventListener('input', () => this.updateSpacing());
+        
+        // Use debounced handlers for slider inputs
+        this.el.opacity?.addEventListener('input', () => this.debouncedUpdateOpacity());
+        this.el.brightness?.addEventListener('input', () => this.debouncedUpdateBrightness());
+        this.el.spacingSlider?.addEventListener('input', () => this.debouncedUpdateSpacing());
         
         this.ui.populatePaletteSwatches(this.el.palette, CONFIG.DEFAULT_PALETTE);
         this.state.setActivePalette(CONFIG.DEFAULT_PALETTE);
         
-        // Set default coordinate order
-        setCoordinateOrder(CONFIG.DEFAULT_COORDINATE_ORDER);
-        if (this.el.coordOrder) {
-            this.el.coordOrder.value = CONFIG.DEFAULT_COORDINATE_ORDER;
-        }
+        // Set default global coordinate order
+        this.state.setGlobalCoordinateOrder(CONFIG.DEFAULT_COORDINATE_ORDER);
+        this.updateGlobalCoordDisplay(CONFIG.DEFAULT_COORDINATE_ORDER);
         
         this.updateOpacity();
         this.updateBrightness();
@@ -85,33 +91,77 @@ export class PDFOverlayApp {
         this.processAndLoad(defJson);
     }
     
-    async applyCoordinateOrder() {
-        const order = this.el.coordOrder.value.trim();
-        if (!order) {
-            alert('Please enter a coordinate order (e.g., TLBR, LBRT, etc.)');
+    addGlobalCoordinate(letter) {
+        // Check if already used
+        if (this.currentGlobalCoordOrder.includes(letter)) {
+            return;
+        }
+        
+        // Add to current order
+        this.currentGlobalCoordOrder += letter;
+        
+        // Update display
+        this.updateGlobalCoordDisplay(this.currentGlobalCoordOrder);
+        
+        // Mark button as used
+        const btn = Array.from(this.el.coordButtons).find(b => b.dataset.coord === letter);
+        if (btn) btn.classList.add('used');
+        
+        // If complete (4 letters), auto-apply
+        if (this.currentGlobalCoordOrder.length === 4) {
+            setTimeout(() => this.applyGlobalCoordinateOrder(), 300);
+        }
+    }
+    
+    clearGlobalCoordinateOrder() {
+        this.currentGlobalCoordOrder = '';
+        this.updateGlobalCoordDisplay('');
+        this.el.coordButtons?.forEach(btn => btn.classList.remove('used'));
+    }
+    
+    updateGlobalCoordDisplay(order) {
+        if (this.el.coordDisplay) {
+            this.el.coordDisplay.textContent = order || '____';
+            this.el.coordDisplay.style.borderColor = order.length === 4 ? 'var(--blue)' : 'var(--gray-dark)';
+        }
+    }
+    
+    async applyGlobalCoordinateOrder() {
+        const order = this.currentGlobalCoordOrder.trim();
+        if (order.length !== 4) {
             return;
         }
         
         try {
-            setCoordinateOrder(order);
-            this.el.coordOrder.style.borderColor = '';
+            // Validate
+            const normalized = order.toUpperCase().trim();
+            const chars = normalized.split('');
+            const required = ['T', 'L', 'B', 'R'];
             
-            // Re-render if PDF is loaded
+            for (const req of required) {
+                if (!chars.includes(req)) {
+                    throw new Error(`Coordinate order must contain ${req}`);
+                }
+            }
+            
+            if (new Set(chars).size !== 4) {
+                throw new Error('Coordinate order must not have duplicate letters');
+            }
+            
+            this.state.setGlobalCoordinateOrder(normalized);
+            
+            // Re-render all pages
             if (this.lastPdf) {
                 await this.render();
             }
             
-            // Show success feedback
-            const originalBg = this.el.coordOrder.style.backgroundColor;
-            this.el.coordOrder.style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
-            setTimeout(() => {
-                this.el.coordOrder.style.backgroundColor = originalBg;
-            }, 500);
+            // Reset for next change
+            this.clearGlobalCoordinateOrder();
+            this.updateGlobalCoordDisplay(normalized);
             
         } catch (error) {
-            alert(`Invalid coordinate order: ${error.message}\n\nPlease use exactly 4 letters: T, L, B, R (in any order)`);
-            this.el.coordOrder.style.borderColor = '#e74c3c';
-            this.el.coordOrder.focus();
+            alert(`Invalid coordinate order: ${error.message}`);
+            this.clearGlobalCoordinateOrder();
         }
     }
     
@@ -162,24 +212,45 @@ export class PDFOverlayApp {
         this.updateBrightness();
     }
 
+    // Public methods that immediately update display values
     updateOpacity() {
         const v = parseInt(this.el.opacity.value, 10);
         this.el.opacityVal.textContent = `${v}%`;
-        this.ui.updateOverlayOpacity(this.state.activePalette, v);
+        this._updateOpacity();
     }
     
     updateBrightness() {
-        this.el.brightnessVal.textContent = `${this.el.brightness.value}%`;
-        this.ui.updateTextBrightness(parseInt(this.el.brightness.value, 10));
+        const v = parseInt(this.el.brightness.value, 10);
+        this.el.brightnessVal.textContent = `${v}%`;
+        this._updateBrightness();
     }
     
     updateSpacing() {
         const v = parseInt(this.el.spacingSlider.value, 10) / 100;
         this.el.spacingValue.textContent = `${v.toFixed(2)}em`;
+        this._updateSpacing();
+    }
+    
+    // Private debounced methods for actual updates
+    _updateOpacity() {
+        const v = parseInt(this.el.opacity.value, 10);
+        this.ui.updateOverlayOpacity(this.state.activePalette, v);
+    }
+    
+    _updateBrightness() {
+        const v = parseInt(this.el.brightness.value, 10);
+        this.ui.updateTextBrightness(v);
+    }
+    
+    _updateSpacing() {
+        const v = parseInt(this.el.spacingSlider.value, 10) / 100;
         document.body.style.setProperty('--paragraph-spacing', `${v}em`);
         this.fontCalc.clearCache();
+        
+        // Batch DOM updates for better performance
         requestAnimationFrame(() => {
-            document.querySelectorAll('.overlay').forEach(o => this.fontCalc.calculateOptimalSize(o));
+            const overlays = document.querySelectorAll('.overlay');
+            overlays.forEach(o => this.fontCalc.calculateOptimalSize(o));
         });
     }
 
@@ -200,7 +271,7 @@ export class PDFOverlayApp {
     async render() {
         if (!this.pdf.isLoaded()) return;
 
-        const data = this.merger.mergeAllPages(this.state.overlayData);
+        const data = this.merger.mergeAllPages(this.state.overlayData, this.state);
         this.ui.clearContainer();
         this.pdf.resetRenderQueue();
         
@@ -215,10 +286,15 @@ export class PDFOverlayApp {
             
             this.pdf.queuePageForRender(w, async () => {
                 await this.pdf.renderPageToCanvas(w, n, CONFIG.PDF.SCALE);
+                this.ui.addPageCoordControls(w, n, this.state, () => this.renderSinglePage(w, n, data));
                 this.renderer.renderPageOverlays(w, n, { width: w.clientWidth, height: w.clientHeight }, data);
             });
         });
         
         this.pdf.startObserving();
+    }
+    
+    renderSinglePage(wrapper, pageNum, data) {
+        this.renderer.renderPageOverlays(wrapper, pageNum, { width: wrapper.clientWidth, height: wrapper.clientHeight }, data);
     }
 }

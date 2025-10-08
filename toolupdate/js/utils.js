@@ -1,37 +1,37 @@
-const cache = new Map();
-let coordinateOrder = 'TLBR'; // Default: Top, Left, Bottom, Right
+import { CONFIG } from './config.js';
 
-export const setCoordinateOrder = (order) => {
-    const normalized = order.toUpperCase().trim();
-    
-    // Validate: must be exactly 4 characters and contain T, L, B, R
-    if (normalized.length !== 4) {
-        throw new Error('Coordinate order must be exactly 4 characters');
-    }
-    
-    const chars = normalized.split('');
-    const required = ['T', 'L', 'B', 'R'];
-    
-    for (const req of required) {
-        if (!chars.includes(req)) {
-            throw new Error(`Coordinate order must contain ${req}`);
-        }
-    }
-    
-    // Check for duplicates
-    if (new Set(chars).size !== 4) {
-        throw new Error('Coordinate order must not have duplicate letters');
-    }
-    
-    coordinateOrder = normalized;
-    cache.clear(); // Clear cache when order changes
-    return true;
+const cache = new Map();
+
+// Debouncing utility
+export const debounce = (fn, delay = 300) => {
+    let timeoutId;
+    return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn(...args), delay);
+    };
 };
 
-export const getCoordinateOrder = () => coordinateOrder;
+// Throttling utility
+export const throttle = (fn, limit = 100) => {
+    let inThrottle;
+    return (...args) => {
+        if (!inThrottle) {
+            fn(...args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+};
 
-export const parseCoords = (str) => {
-    const cacheKey = `${coordinateOrder}:${str}`;
+// Batch DOM operations
+export const batchDOMUpdates = (callback) => {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(callback);
+    });
+};
+
+export const parseCoords = (str, coordOrder = CONFIG.DEFAULT_COORDINATE_ORDER) => {
+    const cacheKey = `${coordOrder}:${str}`;
     
     if (!cache.has(cacheKey)) {
         try {
@@ -43,7 +43,7 @@ export const parseCoords = (str) => {
             
             // Map the input order to [T, L, B, R]
             const mapping = {};
-            coordinateOrder.split('').forEach((letter, index) => {
+            coordOrder.split('').forEach((letter, index) => {
                 mapping[letter] = raw[index];
             });
             
@@ -64,8 +64,8 @@ export const parseCoords = (str) => {
 
 export const checkOverflow = (el, tol = 1) => el.scrollHeight > el.clientHeight + tol || el.scrollWidth > el.clientWidth + tol;
 
-export const calculateOverlayPosition = ({ coords, containerWidth: cw, containerHeight: ch, minHeight = 0, sourceWidth = 1000, sourceHeight = 1000 }) => {
-    const [top, left, bottom, right] = parseCoords(coords);
+export const calculateOverlayPosition = ({ coords, containerWidth: cw, containerHeight: ch, minHeight = 0, sourceWidth = 1000, sourceHeight = 1000, coordOrder = CONFIG.DEFAULT_COORDINATE_ORDER }) => {
+    const [top, left, bottom, right] = parseCoords(coords, coordOrder);
     const sx = cw / sourceWidth, sy = ch / sourceHeight;
     return { left: left * sx, top: top * sy, width: (right - left) * sx, height: Math.max((bottom - top) * sy, minHeight) };
 };

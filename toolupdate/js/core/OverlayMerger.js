@@ -10,10 +10,10 @@ export class OverlayMerger {
         return gap >= -2 && gap < dynTol;
     }
     
-    mergePage(ps) {
+    mergePage(ps, coordOrder) {
         if (!ps || !Object.keys(ps).length) return {};
         const blocks = Object.entries(ps)
-            .map(([k, d]) => ({ originalKey: k, coords: Utils.parseCoords(k), data: d }))
+            .map(([k, d]) => ({ originalKey: k, coords: Utils.parseCoords(k, coordOrder), data: d }))
             .filter(b => b.coords?.length === 4)
             .sort((a, b) => a.coords[0] - b.coords[0] || a.coords[1] - b.coords[1]);
         
@@ -47,7 +47,13 @@ export class OverlayMerger {
         }, {});
     }
     
-    mergeAllPages(data) {
-        return Object.fromEntries(Object.keys(data).map(k => [k, this.mergePage(data[k])]));
+    mergeAllPages(data, stateManager) {
+        return Object.fromEntries(
+            Object.keys(data).map(k => {
+                const pageNum = k.replace('page_', '');
+                const coordOrder = stateManager ? stateManager.getPageCoordinateOrder(pageNum) : CONFIG.DEFAULT_COORDINATE_ORDER;
+                return [k, this.mergePage(data[k], coordOrder)];
+            })
+        );
     }
 }

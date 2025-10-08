@@ -11,19 +11,42 @@ export class OverlayRenderer {
         const pd = data[`page_${page}`];
         if (!pd) return;
 
-        const frag = document.createDocumentFragment();
+        // Remove old overlays
         wrapper.querySelectorAll('.overlay').forEach(el => el.remove());
         
+        const coordOrder = this.state.getPageCoordinateOrder(page);
+        
+        // Create all overlays in a document fragment (batch DOM operations)
+        const frag = document.createDocumentFragment();
+        const overlaysToCalculate = [];
+        
         Object.keys(pd).forEach(coords => {
-            frag.appendChild(this._create(coords, pd[coords], page, dims.width, dims.height));
+            const overlay = this._create(coords, pd[coords], page, dims.width, dims.height, coordOrder);
+            frag.appendChild(overlay);
+            overlaysToCalculate.push(overlay);
         });
+        
+        // Single DOM append operation
         wrapper.appendChild(frag);
+        
+        // Batch font size calculations
+        Utils.batchDOMUpdates(() => {
+            overlaysToCalculate.forEach(overlay => {
+                this.fontCalc.calculateOptimalSize(overlay);
+            });
+        });
     }
     
-    _create(coords, info, page, W, H) {
+    _create(coords, info, page, W, H, coordOrder) {
         if (W <= 0 || H <= 0) return document.createElement('div');
 
-        const pos = Utils.calculateOverlayPosition({ coords, containerWidth: W, containerHeight: H, minHeight: CONFIG.OVERLAY.MIN_HEIGHT });
+        const pos = Utils.calculateOverlayPosition({ 
+            coords, 
+            containerWidth: W, 
+            containerHeight: H, 
+            minHeight: CONFIG.OVERLAY.MIN_HEIGHT,
+            coordOrder 
+        });
 
         const ov = document.createElement('div');
         ov.className = 'overlay';
@@ -48,13 +71,17 @@ export class OverlayRenderer {
         } else {
             txt.textContent = info.text;
         }
-        txt.addEventListener('blur', (e) => {
+        
+        // Debounce text updates
+        const debouncedUpdate = Utils.debounce((e) => {
             const o = e.target.closest('.overlay');
             if (!o) return;
             const newTxt = e.target.querySelector('.merged-text-block') ? e.target.innerHTML : e.target.innerText;
             this.state.updateOverlayText(o.dataset.pageNum, o.dataset.coords, newTxt);
             this.fontCalc.calculateOptimalSize(o);
-        });
+        }, 300);
+        
+        txt.addEventListener('blur', debouncedUpdate);
 
         const del = document.createElement('button');
         del.className = 'delete-overlay-btn';
@@ -68,7 +95,6 @@ export class OverlayRenderer {
         });
 
         ov.append(txt, del);
-        requestAnimationFrame(() => this.fontCalc.calculateOptimalSize(ov));
         
         return ov;
     }

@@ -68,19 +68,34 @@ export class PDFHandler {
         this.renderQueue.set(wrapper, task);
     }
     
+    // Priority-based rendering: Render pages closest to viewport first
     startObserving() {
-        this.observer = new IntersectionObserver((entries, obs) => {
-            entries.forEach(e => {
-                if (e.isIntersecting) {
-                    const task = this.renderQueue.get(e.target);
-                    if (task) {
-                        task();
-                        this.renderQueue.delete(e.target);
-                        obs.unobserve(e.target);
-                    }
+        this.observer = new IntersectionObserver((entries) => {
+            // Sort entries by distance from viewport center
+            const sorted = entries
+                .filter(e => e.isIntersecting)
+                .map(e => {
+                    const rect = e.boundingClientRect;
+                    const viewportCenter = window.innerHeight / 2;
+                    const elementCenter = rect.top + rect.height / 2;
+                    const distance = Math.abs(viewportCenter - elementCenter);
+                    return { entry: e, distance };
+                })
+                .sort((a, b) => a.distance - b.distance);
+            
+            // Process pages in priority order (closest first)
+            sorted.forEach(({ entry }) => {
+                const task = this.renderQueue.get(entry.target);
+                if (task) {
+                    task();
+                    this.renderQueue.delete(entry.target);
+                    this.observer.unobserve(entry.target);
                 }
             });
-        }, { rootMargin: '200px 0px' });
+        }, { 
+            rootMargin: '300px 0px', // Load pages 300px before they're visible
+            threshold: [0, 0.25, 0.5, 0.75, 1] 
+        });
         
         document.querySelectorAll('.page-placeholder').forEach(el => this.observer.observe(el));
     }
@@ -88,6 +103,8 @@ export class PDFHandler {
     async renderAllQueuedPages() {
         if (!this.renderQueue.size) return;
         this.observer?.disconnect();
+        
+        // Render all queued pages
         await Promise.all(Array.from(this.renderQueue.values()).map(t => t()));
         this.renderQueue.clear();
     }

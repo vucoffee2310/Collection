@@ -24,9 +24,14 @@
                 <input type="file" id="json-input" accept=".json" class="visually-hidden">
             </div>
             <div class="file-input-wrapper coord-order-wrapper">
-                <label for="coord-order" title="Define coordinate order (T=Top, L=Left, B=Bottom, R=Right)">Coords Order:</label>
-                <input type="text" id="coord-order" class="coord-input" maxlength="4" placeholder="TLBR" title="Enter 4 letters: T(top), L(left), B(bottom), R(right)">
-                <button id="apply-coord-btn" class="btn btn-small">Apply</button>
+                <span class="coord-label">Global:</span>
+                <div id="coord-display" class="coord-display" title="Global coordinate order">TLBR</div>
+                <div class="coord-buttons">
+                    <button class="coord-btn" data-coord="T" title="Top">T</button>
+                    <button class="coord-btn" data-coord="L" title="Left">L</button>
+                    <button class="coord-btn" data-coord="B" title="Bottom">B</button>
+                    <button class="coord-btn" data-coord="R" title="Right">R</button>
+                </div>
             </div>
         </div>
         <div class="control-group options">
