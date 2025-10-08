@@ -186,7 +186,7 @@ canvas {
     overflow: hidden;
     display: flex;
     align-items: center;
-    white-space: pre-wrap; /* This is essential for respecting '\n' */
+    white-space: pre-wrap;
     word-wrap: break-word;
     transition: all 0.2s;
     z-index: 10;
@@ -200,6 +200,19 @@ canvas {
     cursor: text;
     user-select: text;
 }
+
+/* --- CORRECTED RULES --- */
+/* For single-line overlays, control horizontal alignment via the parent flexbox. */
+.overlay.single-line-layout {
+    justify-content: flex-start; /* Align child span to the left */
+}
+
+/* For the text span inside, let it shrink to fit its content. */
+.overlay.single-line-layout .overlay-text {
+    width: auto; /* Remove the 100% width */
+    text-align: left; /* Ensure it's left-aligned */
+}
+/* --- END CORRECTION --- */
 
 .merged-text-block:not(:last-child) {
     margin-bottom: var(--paragraph-spacing);
@@ -217,7 +230,6 @@ canvas {
     z-index: 200;
 }
 
-/* --- STYLES FOR DELETE BUTTON --- */
 .delete-overlay-btn {
     position: absolute;
     top: -1px;
@@ -226,7 +238,7 @@ canvas {
     height: 22px;
     border: 1px solid rgba(255,255,255,0.3);
     border-radius: 50%;
-    background: rgba(211, 84, 0, 0.8); /* A reddish color */
+    background: rgba(211, 84, 0, 0.8);
     color: white;
     cursor: pointer;
     font-size: 16px;
@@ -248,26 +260,22 @@ canvas {
 }
 
 .delete-overlay-btn:hover {
-    background: rgba(231, 76, 60, 1.0); /* Brighter red on hover */
+    background: rgba(231, 76, 60, 1.0);
     transform: scale(1.1);
 }
-/* --- END STYLES --- */
 
-/* --- STYLES FOR VERTICAL TEXT --- */
 .overlay.vertical-text {
-    /* Adjust flex alignment for vertical flow */
-    justify-content: center; /* Center text horizontally in the narrow box */
-    align-items: center; /* Center text vertically */
+    justify-content: center;
+    align-items: center;
 }
 
 .overlay.vertical-text .overlay-text {
-    writing-mode: vertical-rl; /* Set text flow to top-to-bottom, right-to-left */
-    transform: rotate(180deg); /* Keeps Latin text characters upright */
-    white-space: nowrap; /* Prevent text from wrapping into multiple columns */
-    text-align: center; /* Ensures single characters are centered */
-    line-height: 1; /* Adjust line height for better spacing */
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1;
 }
-/* --- END STYLES --- */
 
 .saving-indicator {
     position: fixed;

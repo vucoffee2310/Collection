@@ -38,13 +38,20 @@ export class OverlayRenderer {
         overlay.dataset.coords = coords;
         overlay.dataset.pageNum = pageNum;
         
-        // --- NEW: VERTICAL TEXT DETECTION ---
-        // Check if the box's height is significantly greater than its width.
         const isVertical = pos.width > 0 && (pos.height / pos.width) > CONFIG.OVERLAY.VERTICAL_THRESHOLD;
         if (isVertical) {
             overlay.classList.add('vertical-text');
         }
-        // --- END NEW ---
+
+        // --- CORRECTED LOGIC ---
+        // A block is considered single-line if it's not a merged block
+        // and doesn't contain explicit newlines.
+        const isSingleLine = !info.text.includes('<div') && !info.text.includes('\n');
+        if (isSingleLine) {
+            // Apply the layout class to the PARENT overlay element
+            overlay.classList.add('single-line-layout');
+        }
+        // --- END CORRECTION ---
 
         Object.assign(overlay.style, {
             left: Utils.toPercentage(pos.left, W),
@@ -58,7 +65,6 @@ export class OverlayRenderer {
         
         overlay.append(textSpan, deleteBtn);
         
-        // Defer font size calculation until after the element is in the DOM.
         requestAnimationFrame(() => this.fontSizeCalculator.calculateOptimalSize(overlay));
         
         return overlay;
@@ -67,16 +73,15 @@ export class OverlayRenderer {
     _createTextSpan(text) {
         const textSpan = document.createElement('span');
         textSpan.className = 'overlay-text';
-        textSpan.contentEditable = true; // Make text editable
+        textSpan.contentEditable = true;
         
-        // Use innerHTML for merged blocks, textContent for others
+        // No special class needed here anymore
         if (text.includes('<div')) {
             textSpan.innerHTML = text;
         } else {
             textSpan.textContent = text;
         }
 
-        // Add event listener to save changes
         textSpan.addEventListener('blur', (e) => this._handleTextUpdate(e));
         
         return textSpan;
@@ -85,7 +90,7 @@ export class OverlayRenderer {
     _createDeleteButton(overlayEl) {
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-overlay-btn';
-        deleteBtn.innerHTML = '&times;'; // Multiplication sign as 'x'
+        deleteBtn.innerHTML = '&times;';
         deleteBtn.title = 'Delete this overlay';
         
         deleteBtn.addEventListener('click', (e) => this._handleDelete(e));
@@ -99,13 +104,11 @@ export class OverlayRenderer {
         if (!overlay) return;
 
         const { pageNum, coords } = overlay.dataset;
-        // For merged blocks, we save the outerHTML. For simple text, innerText.
         const newText = textSpan.querySelector('.merged-text-block') 
             ? textSpan.innerHTML 
             : textSpan.innerText;
 
         this.stateManager.updateOverlayText(pageNum, coords, newText);
-        // Recalculate font size in case text length changed significantly
         this.fontSizeCalculator.calculateOptimalSize(overlay);
     }
 
@@ -117,7 +120,7 @@ export class OverlayRenderer {
         if (confirm('Are you sure you want to delete this overlay?')) {
             const { pageNum, coords } = overlay.dataset;
             this.stateManager.deleteOverlay(pageNum, coords);
-            overlay.remove(); // Remove from the DOM
+            overlay.remove();
         }
     }
 }
