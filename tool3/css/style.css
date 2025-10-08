@@ -185,6 +185,7 @@ canvas {
     line-height: 1.15;
     overflow: hidden;
     display: flex;
+    align-items: center;
     white-space: pre-wrap; /* This is essential for respecting '\n' */
     word-wrap: break-word;
     transition: all 0.2s;
@@ -195,7 +196,6 @@ canvas {
 
 .overlay-text {
     width: 100%;
-    height: 100%;
     text-align: justify;
     cursor: text;
     user-select: text;

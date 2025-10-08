@@ -89,8 +89,8 @@ export class HTMLExporter {
             main{margin:0 auto;max-width:100%}
             .page-wrapper{position:relative;width:100%;height:auto;margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,.3);line-height:0;font-size:1vw}
             .bg-image{display:block;width:100%;height:auto}
-            .overlay{position:absolute;border:.1vw solid;font-family:'Bookerly',serif;line-height:1.15;overflow:hidden;display:flex;white-space:pre-wrap;word-wrap:break-word;border-radius:.3vw}
-            .overlay-text{width:100%;height:100%;text-align:justify}
+            .overlay{position:absolute;border:.1vw solid;font-family:'Bookerly',serif;line-height:1.15;overflow:hidden;display:flex;align-items:center;white-space:pre-wrap;word-wrap:break-word;border-radius:.3vw}
+            .overlay-text{width:100%;text-align:justify}
             .merged-text-block:not(:last-child){margin-bottom:${paragraphSpacing}}
         `.replace(/\s*\n\s*/g, ''); // Minify for compactness
 

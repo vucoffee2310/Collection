@@ -10,7 +10,7 @@ export class FontSizeCalculator {
         const { clientWidth: w, clientHeight: h } = overlay;
         if (w <= 0 || h <= 0) return;
 
-        const optimalSizePx = this._calculateFontSize(textSpan, w, h);
+        const optimalSizePx = this._calculateFontSize(textSpan, overlay, w, h);
 
         if (pageWrapper) {
             const baseSizePx = parseFloat(getComputedStyle(pageWrapper).fontSize) || 16; 
@@ -25,7 +25,7 @@ export class FontSizeCalculator {
         textSpan.style.fontSize = `${optimalSizePx}px`;
     }
 
-    _calculateFontSize(textSpan, maxW, maxH) {
+    _calculateFontSize(textSpan, container, maxW, maxH) {
         const { MIN_FONT_SIZE, MAX_FONT_SIZE } = CONFIG.OVERLAY;
         textSpan.style.fontSize = ''; // Reset for measurement
         
@@ -39,7 +39,7 @@ export class FontSizeCalculator {
             const mid = (high + low) / 2;
             textSpan.style.fontSize = `${mid}px`;
             
-            if (Utils.checkOverflow(textSpan, 0)) {
+            if (Utils.checkOverflow(container, 0)) {
                 high = mid; // Too big
             } else {
                 best = mid;
