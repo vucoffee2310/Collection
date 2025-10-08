@@ -25,18 +25,23 @@ export function calculateOverlayPosition({ coords, containerWidth, containerHeig
     const scaleX = containerWidth / sourceWidth;
     const scaleY = containerHeight / sourceHeight;
     
-    // Optimization: Ensure calculation uses Math.max only once
-    const width = (right - left) * scaleX;
-    const height = Math.max((bottom - top) * scaleY, minHeight);
-    
     return {
         left: left * scaleX,
         top: top * scaleY,
-        width: width,
-        height: height
+        width: (right - left) * scaleX,
+        height: Math.max((bottom - top) * scaleY, minHeight)
     };
 }
 
 export function toPercentage(value, total) {
     return total > 0 ? `${(value / total) * 100}%` : '0%';
+}
+
+export function readFileAs(file, readAs) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(reader.error);
+        reader[readAs](file);
+    });
 }

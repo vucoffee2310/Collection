@@ -15,10 +15,7 @@ export class UIManager {
     }
     
     updateFileName(element, fileName, defaultText) {
-        // Optimization: Use provided element (which is the input element) to derive the output span ID
-        const spanId = element.id.replace('-input', '-file-name');
-        const span = document.getElementById(spanId);
-        if (span) span.textContent = fileName || defaultText;
+        if (element) element.textContent = fileName || defaultText;
     }
     
     clearContainer() {
@@ -36,19 +33,15 @@ export class UIManager {
     }
     
     populatePaletteSwatches(container, defaultKey) {
-        const fragment = document.createDocumentFragment();
-        
-        Object.entries(CONFIG.COLOR_PALETTES).forEach(([key, p]) => {
-            const swatch = document.createElement('div');
-            swatch.className = `palette-swatch${key === defaultKey ? ' active' : ''}`;
-            swatch.dataset.paletteKey = key;
-            swatch.title = p.name;
-            swatch.style.cssText = `background:rgb(${p.background});color:rgb(${p.text})`;
-            swatch.innerHTML = '<span>Aa</span>';
-            fragment.appendChild(swatch);
-        });
-        
-        container.appendChild(fragment);
+        container.innerHTML = Object.entries(CONFIG.COLOR_PALETTES).map(([key, p]) => `
+            <div 
+                class="palette-swatch ${key === defaultKey ? 'active' : ''}" 
+                data-palette-key="${key}" 
+                title="${p.name}" 
+                style="background:rgb(${p.background}); color:rgb(${p.text});">
+                <span>Aa</span>
+            </div>
+        `).join('');
     }
 
     updateOverlayOpacity(paletteKey, opacity) {

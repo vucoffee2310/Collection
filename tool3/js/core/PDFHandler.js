@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import { readFileAs } from '../utils.js';
 
 export class PDFHandler {
     constructor() {
@@ -18,15 +19,9 @@ export class PDFHandler {
             const response = await fetch(CONFIG.FONT.URL);
             if (!response.ok) throw new Error(`Font file not found at ${CONFIG.FONT.URL}`);
             const blob = await response.blob();
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    this.fontBase64 = reader.result.split(',')[1];
-                    resolve(this.fontBase64);
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
+            const dataUrl = await readFileAs(blob, 'readAsDataURL');
+            this.fontBase64 = dataUrl.split(',')[1];
+            return this.fontBase64;
         } catch (error) {
             console.error("Failed to load custom font:", error);
             alert(`Error: Could not load "${CONFIG.FONT.FILE}". PDF will use default font.`);
@@ -101,7 +96,6 @@ export class PDFHandler {
     async renderAllQueuedPages() {
         if (this.pageRenderQueue.size === 0) return;
 
-        // Disconnect the observer to prevent it from firing while we manually render.
         this.intersectionObserver?.disconnect();
 
         const renderPromises = Array.from(this.pageRenderQueue.values()).map(task => task());

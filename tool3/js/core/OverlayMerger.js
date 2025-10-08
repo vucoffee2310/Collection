@@ -15,7 +15,6 @@ export class OverlayMerger {
                        Math.abs(rightA - rightB) < H_TOL;
         const gap = topB - bottomA;
         
-        // Allows slight overlap (gap >= -2) up to the vertical tolerance V_TOL
         return aligned && gap >= -2 && gap < V_TOL; 
     }
     
@@ -36,7 +35,6 @@ export class OverlayMerger {
         const mergedBlocks = [];
         let currentGroup = [blocks[0]];
         
-        // Optimization: Sequential grouping loop
         for (let i = 1; i < blocks.length; i++) {
             const currentBlock = blocks[i];
             const lastInGroup = currentGroup[currentGroup.length - 1];
@@ -50,25 +48,22 @@ export class OverlayMerger {
         }
         mergedBlocks.push(currentGroup);
 
-        const output = {};
-        mergedBlocks.forEach(group => {
+        return mergedBlocks.reduce((acc, group) => {
             const first = group[0];
-            
             if (group.length === 1) {
-                output[first.originalKey] = first.data;
+                acc[first.originalKey] = first.data;
             } else {
                 const last = group[group.length - 1];
-                // Recalculate merged coordinates based on first top/left and last bottom/right
                 const key = JSON.stringify([first.coords[0], first.coords[1], last.coords[2], first.coords[3]]);
                 
-                // Concatenate text
-                const mergedText = group.map(b => '      ' + b.data.text).join('\n');
+                // --- MODIFICATION HERE ---
+                // Wrap each original text block in a div instead of joining with '\n'.
+                const mergedText = group.map(b => `<div class="merged-text-block">      ${b.data.text}</div>`).join('');
                 
-                output[key] = { ...first.data, text: mergedText };
+                acc[key] = { ...first.data, text: mergedText };
             }
-        });
-
-        return output;
+            return acc;
+        }, {});
     }
     
     mergeAllPages(overlayData) {

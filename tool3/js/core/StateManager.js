@@ -14,7 +14,10 @@ export class StateManager {
                 Object.fromEntries(
                     Object.entries(pageData).map(([coords, text]) => [
                         coords,
-                        { text: text.trimEnd(), fontSize: 'auto' }
+                        // Use trim() to remove all leading/trailing whitespace,
+                        // which correctly handles a final unwanted newline
+                        // without affecting internal newlines.
+                        { text: text.trim(), fontSize: 'auto' }
                     ])
                 )
             ])
@@ -26,8 +29,6 @@ export class StateManager {
     }
 
     expandAllOverlays(amount) {
-        // This process requires regenerating all keys, making it inherently iterative.
-        // Modern JS object iteration methods are used for maximum speed.
         for (const pageKey in this.overlayData) {
             this.overlayData[pageKey] = Object.fromEntries(
                 Object.entries(this.overlayData[pageKey]).map(([coordsStr, value]) => {

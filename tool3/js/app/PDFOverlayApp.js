@@ -8,6 +8,7 @@ import { PDFExporter } from '../services/PDFExporter.js';
 import { OverlayRenderer } from '../ui/OverlayRenderer.js';
 import { UIManager } from '../ui/UIManager.js';
 import { CONFIG } from '../config.js';
+import { readFileAs } from '../utils.js';
 
 export class PDFOverlayApp {
     constructor(defaultJsonData) {
@@ -24,10 +25,7 @@ export class PDFOverlayApp {
         this.renderer = new OverlayRenderer(this.state, this.fontCalc);
         this.htmlExporter = new HTMLExporter(this.pdf);
         this.printExporter = new PrintExporter();
-        // --- START OF FIX ---
-        // Pass the pdf handler dependency to the exporter
         this.pdfExporter = new PDFExporter(this.pdf);
-        // --- END OF FIX ---
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = CONFIG.PDF.WORKER_SRC;
         
@@ -64,78 +62,66 @@ export class PDFOverlayApp {
     }
     
     attachEvents() {
-        this.el.fileInput.onchange = e => this.loadPDF(e);
-        this.el.jsonInput.onchange = e => this.loadJSON(e);
-        this.el.savePrintBtn.onclick = () => this.saveWithPrint();
-        this.el.saveDirectPdfBtn.onclick = () => this.saveAsDirectPdf();
-        this.el.saveHtmlBtn.onclick = () => this.saveAsHtml();
-        this.el.palette.onclick = e => this.changePalette(e);
-        this.el.expandBtn.onclick = () => this.expandAll();
-        this.el.opacity.oninput = () => this.updateOpacity();
-        this.el.brightness.oninput = () => this.updateBrightness();
+        Object.entries({
+            fileInput: ['change', e => this.loadPDF(e)],
+            jsonInput: ['change', e => this.loadJSON(e)],
+            savePrintBtn: ['click', this.saveWithPrint],
+            saveDirectPdfBtn: ['click', this.saveAsDirectPdf],
+            saveHtmlBtn: ['click', this.saveAsHtml],
+            palette: ['click', e => this.changePalette(e)],
+            expandBtn: ['click', this.expandAll],
+            opacity: ['input', this.updateOpacity],
+            brightness: ['input', this.updateBrightness],
+        }).forEach(([key, [evt, handler]]) => this.el[key]?.addEventListener(evt, handler.bind(this)));
     }
     
     async loadPDF(e) {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (!file || file.type !== 'application/pdf') return;
 
-        this.originalPdfName = file.name.replace(/\.pdf$/i, '');
         this.ui.updateFileName(this.el.pdfFileName, file.name, 'No file selected');
-        
-        const reader = new FileReader();
-        reader.onload = async event => {
-            this.lastLoadedPdfFile = event.target.result;
-            this.el.jsonInput.value = '';
-            this.ui.updateFileName(this.el.jsonFileName, null, 'Using default');
-            await this.processAndLoadData(this.defaultJsonData);
-        };
-        reader.readAsArrayBuffer(file);
+        this.lastLoadedPdfFile = await readFileAs(file, 'readAsArrayBuffer');
+        this.originalPdfName = file.name.replace(/\.pdf$/i, '');
+        this.el.jsonInput.value = ''; // Reset JSON input
+        this.ui.updateFileName(this.el.jsonFileName, null, 'Using default');
+        await this.processAndLoadData(this.defaultJsonData);
     }
     
     async loadJSON(e) {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (!file || !file.name.endsWith('.json')) return;
 
         this.ui.updateFileName(this.el.jsonFileName, file.name, 'Using default');
-        
-        const reader = new FileReader();
-        reader.onload = async event => {
-            try {
-                await this.processAndLoadData(JSON.parse(event.target.result));
-            } catch (error) {
-                alert('Error parsing JSON: ' + error.message);
-                this.ui.updateFileName(this.el.jsonFileName, 'Load failed. Using default.', 'Using default');
-                await this.processAndLoadData(this.defaultJsonData);
-            }
-        };
-        reader.readAsText(file);
+        try {
+            const jsonText = await readFileAs(file, 'readAsText');
+            await this.processAndLoadData(JSON.parse(jsonText));
+        } catch (error) {
+            alert('Error parsing JSON: ' + error.message);
+            this.ui.updateFileName(this.el.jsonFileName, 'Load failed. Using default.', 'Using default');
+            await this.processAndLoadData(this.defaultJsonData);
+        }
     }
 
-    async saveWithPrint() {
-        if (!this.pdf.isLoaded()) return alert('Please load a PDF file first.');
-        await this.printExporter.save(this.pdf, this.ui);
+    _withPdfCheck(action) {
+        return this.pdf.isLoaded() ? action() : alert('Please load a PDF file first.');
     }
 
-    async saveAsDirectPdf() {
-        if (!this.pdf.isLoaded()) return alert('Please load a PDF file first.');
-        await this.pdf.renderAllQueuedPages();
-        await this.pdfExporter.save(this.originalPdfName, this.ui);
+    saveWithPrint() {
+        this._withPdfCheck(() => this.printExporter.save(this.pdf, this.ui));
+    }
+
+    saveAsDirectPdf() {
+        this._withPdfCheck(async () => {
+            await this.pdf.renderAllQueuedPages();
+            await this.pdfExporter.save(this.originalPdfName, this.ui);
+        });
     }
     
-    async saveAsHtml() {
-        if (!this.pdf.isLoaded()) return alert('Please load a PDF file first.');
-        
-        const indicator = this.ui.showSavingIndicator('Preparing all pages for export...');
-        try {
+    saveAsHtml() {
+        this._withPdfCheck(async () => {
             await this.pdf.renderAllQueuedPages();
-            indicator.textContent = 'Generating HTML file...';
             await this.htmlExporter.save(this.originalPdfName, this.ui);
-        } catch (error) {
-            console.error('HTML export failed:', error);
-            alert('Could not save as HTML. See console for details.');
-        } finally {
-            this.ui.removeSavingIndicator(indicator);
-        }
+        });
     }
 
     async expandAll() {
@@ -164,9 +150,8 @@ export class PDFOverlayApp {
     }
     
     updateBrightness() {
-        const val = parseInt(this.el.brightness.value, 10);
-        this.el.brightnessVal.textContent = `${val}%`;
-        this.ui.updateTextBrightness(val);
+        this.el.brightnessVal.textContent = `${this.el.brightness.value}%`;
+        this.ui.updateTextBrightness(parseInt(this.el.brightness.value, 10));
     }
     
     async processAndLoadData(jsonData) {
