@@ -5,7 +5,7 @@ const CALIBRATION_MULTIPLIERS = {
     x: 1.0, y: 1.0, w: 1.0, h: 1.0,
     borderWidth: 1.0, borderRadius: 1.0, opacity: 1.0,
     paddingTop: 1.0, paddingLeft: 1.0, paddingRight: 1.0,
-    fontSize: 0.99, baselineMultiplier: 1.13, 
+    fontSize: 0.993, baselineMultiplier: 1.13, 
 };
 // --- END OF CALIBRATION CONFIGURATION ---
 

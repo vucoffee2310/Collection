@@ -182,7 +182,7 @@ canvas {
     border: 0.1vw solid var(--overlay-border);
     color: var(--overlay-text);
     font-family: 'Bookerly', serif;
-    line-height: 1.15;
+    line-height: 1.2;
     overflow: hidden;
     display: flex;
     align-items: center;
