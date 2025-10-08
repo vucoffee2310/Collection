@@ -7,9 +7,7 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preload" href="./Bookerly-Regular.ttf" as="font" type="font/ttf" crossorigin>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- jsPDF is still needed -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- html2canvas is no longer required for the PDF exporter -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -24,6 +22,11 @@
                 <label for="json-input" class="btn">Choose JSON</label>
                 <span id="json-file-name">Using default</span>
                 <input type="file" id="json-input" accept=".json" class="visually-hidden">
+            </div>
+            <div class="file-input-wrapper coord-order-wrapper">
+                <label for="coord-order" title="Define coordinate order (T=Top, L=Left, B=Bottom, R=Right)">Coords Order:</label>
+                <input type="text" id="coord-order" class="coord-input" maxlength="4" placeholder="TLBR" title="Enter 4 letters: T(top), L(left), B(bottom), R(right)">
+                <button id="apply-coord-btn" class="btn btn-small">Apply</button>
             </div>
         </div>
         <div class="control-group options">

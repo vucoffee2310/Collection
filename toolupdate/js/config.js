@@ -3,6 +3,7 @@ export const CONFIG = {
     PDF: { WORKER_SRC: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', SCALE: 1.5, RENDER_SCALE: 2.0 },
     OVERLAY: { MIN_HEIGHT: 25, MIN_FONT_SIZE: 4, MAX_FONT_SIZE: 150, VERTICAL_THRESHOLD: 2.0 },
     MERGE: { TOLERANCE_HORIZONTAL: 10 },
+    DEFAULT_COORDINATE_ORDER: 'TLBR', // Top, Left, Bottom, Right
     COLOR_PALETTES: {
         modernDark: { name: "Modern Dark (Default)", background: [44, 62, 80], text: [255, 255, 255], border: [52, 73, 94] },
         highContrast: { name: "High Contrast (Yellow/Black)", background: [255, 241, 118], text: [21, 21, 21], border: [253, 216, 53] },

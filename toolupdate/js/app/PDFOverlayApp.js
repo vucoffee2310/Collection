@@ -8,7 +8,7 @@ import { PDFExporter } from '../services/PDFExporter.js';
 import { OverlayRenderer } from '../ui/OverlayRenderer.js';
 import { UIManager } from '../ui/UIManager.js';
 import { CONFIG } from '../config.js';
-import { readFile } from '../utils.js';
+import { readFile, setCoordinateOrder, getCoordinateOrder } from '../utils.js';
 
 export class PDFOverlayApp {
     constructor(defJson) {
@@ -31,6 +31,8 @@ export class PDFOverlayApp {
         this.el = {
             fileInput: document.getElementById('file-input'),
             jsonInput: document.getElementById('json-input'),
+            coordOrder: document.getElementById('coord-order'),
+            applyCoordBtn: document.getElementById('apply-coord-btn'),
             savePrintBtn: document.getElementById('save-print-btn'),
             saveDirectPdfBtn: document.getElementById('save-direct-pdf-btn'),
             saveHtmlBtn: document.getElementById('save-html-btn'),
@@ -49,6 +51,10 @@ export class PDFOverlayApp {
         
         this.el.fileInput?.addEventListener('change', e => this.loadPDF(e));
         this.el.jsonInput?.addEventListener('change', e => this.loadJSON(e));
+        this.el.applyCoordBtn?.addEventListener('click', () => this.applyCoordinateOrder());
+        this.el.coordOrder?.addEventListener('keypress', e => {
+            if (e.key === 'Enter') this.applyCoordinateOrder();
+        });
         this.el.savePrintBtn?.addEventListener('click', () => this._check(() => this.printExp.save(this.pdf, this.ui)));
         this.el.saveDirectPdfBtn?.addEventListener('click', () => this._check(async () => {
             await this.pdf.renderAllQueuedPages();
@@ -66,10 +72,47 @@ export class PDFOverlayApp {
         
         this.ui.populatePaletteSwatches(this.el.palette, CONFIG.DEFAULT_PALETTE);
         this.state.setActivePalette(CONFIG.DEFAULT_PALETTE);
+        
+        // Set default coordinate order
+        setCoordinateOrder(CONFIG.DEFAULT_COORDINATE_ORDER);
+        if (this.el.coordOrder) {
+            this.el.coordOrder.value = CONFIG.DEFAULT_COORDINATE_ORDER;
+        }
+        
         this.updateOpacity();
         this.updateBrightness();
         this.updateSpacing();
         this.processAndLoad(defJson);
+    }
+    
+    async applyCoordinateOrder() {
+        const order = this.el.coordOrder.value.trim();
+        if (!order) {
+            alert('Please enter a coordinate order (e.g., TLBR, LBRT, etc.)');
+            return;
+        }
+        
+        try {
+            setCoordinateOrder(order);
+            this.el.coordOrder.style.borderColor = '';
+            
+            // Re-render if PDF is loaded
+            if (this.lastPdf) {
+                await this.render();
+            }
+            
+            // Show success feedback
+            const originalBg = this.el.coordOrder.style.backgroundColor;
+            this.el.coordOrder.style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
+            setTimeout(() => {
+                this.el.coordOrder.style.backgroundColor = originalBg;
+            }, 500);
+            
+        } catch (error) {
+            alert(`Invalid coordinate order: ${error.message}\n\nPlease use exactly 4 letters: T, L, B, R (in any order)`);
+            this.el.coordOrder.style.borderColor = '#e74c3c';
+            this.el.coordOrder.focus();
+        }
     }
     
     async loadPDF(e) {

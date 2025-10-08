@@ -1,303 +1,308 @@
 @font-face {
-    font-family: 'Bookerly';
-    src: url('../Bookerly-Regular.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
+  font-family: 'Bookerly';
+  src: url('../Bookerly-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
 :root {
-    --overlay-bg: rgb(44, 62, 80);
-    --overlay-text: rgb(236, 240, 241);
-    --overlay-border: rgb(52, 73, 94);
-    --bg-dark: #2c3e50;
-    --bg-darker: #34495e;
-    --text-light: #ecf0f1;
-    --text-muted: #bdc3c7;
-    --blue: #3498db;
-    --blue-dark: #2980b9;
-    --gray: #7f8c8d;
-    --gray-light: #95a5a6;
-    --gray-dark: #566573;
-    --paragraph-spacing: 0.4em; /* Default paragraph spacing */
+  --overlay-bg: rgb(44, 62, 80);
+  --overlay-text: rgb(236, 240, 241);
+  --overlay-border: rgb(52, 73, 94);
+  --bg-dark: #2c3e50;
+  --bg-darker: #34495e;
+  --text-light: #ecf0f1;
+  --text-muted: #bdc3c7;
+  --blue: #3498db;
+  --blue-dark: #2980b9;
+  --gray: #7f8c8d;
+  --gray-light: #95a5a6;
+  --gray-dark: #566573;
+  --paragraph-spacing: 0.4em;
 }
 
 * { box-sizing: border-box; }
 
 body {
-    margin: 0;
-    background: #e9e9e9;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text-light);
+  margin: 0;
+  background: #e9e9e9;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-light);
 }
 
-/* --- Consolidated Layouts --- */
-#controls, .control-group, .file-input-wrapper, .theme-wrapper, 
+/* Layout */
+#controls, .control-group, .file-input-wrapper, .theme-wrapper,
 .expand-controls, .slider-wrapper, #palette-container,
 .page-placeholder, .saving-indicator, .palette-swatch, .overlay {
-    display: flex;
-    align-items: center;
+  display: flex;
+  align-items: center;
 }
 
 .page-placeholder, .saving-indicator { justify-content: center; }
 
 #controls {
-    gap: 20px;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    background: var(--bg-dark);
-    padding: 12px 20px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  background: var(--bg-dark);
+  padding: 12px 20px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .control-group { gap: 20px; flex-wrap: wrap; }
 .file-input-wrapper, .theme-wrapper, .expand-controls, .slider-wrapper { gap: 10px; }
 #palette-container { gap: 5px; }
 
-/* Button styles */
+/* Buttons */
+.btn, #page-info, .slider-wrapper { font-size: 14px; }
+
 .btn {
-    padding: 8px 16px;
-    cursor: pointer;
-    border: 0;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s;
-    color: white;
-    background-color: var(--blue);
-    will-change: transform, box-shadow; /* Optimization */
+  padding: 8px 16px;
+  cursor: pointer;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s;
+  color: white;
+  background-color: var(--blue);
+  will-change: transform, box-shadow;
 }
 
 .file-input-wrapper .btn { background-color: var(--gray); }
 .btn-primary { background-color: var(--blue-dark); }
 
 .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 .file-input-wrapper .btn:hover { background-color: var(--gray-light); }
 .btn-primary:hover { background-color: var(--blue); }
 
+.btn-small { padding: 7px 12px; font-size: 13px; }
+
+/* A11y */
 .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    white-space: nowrap;
-    border: 0;
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
 }
 
+/* File info */
 #pdf-file-name, #json-file-name {
-    font-size: 13px;
-    color: var(--text-muted);
-    word-break: break-all;
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-all;
 }
 
 #page-info {
-    font-weight: 500;
-    background: rgba(0,0,0,0.2);
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 14px;
-    white-space: nowrap;
+  font-weight: 500;
+  background: rgba(0,0,0,0.2);
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
-.slider-wrapper { font-size: 14px; }
-
-#expand-amount {
-    width: 60px;
-    padding: 7px;
-    border-radius: 6px;
-    border: 1px solid var(--gray-dark);
-    background: var(--bg-darker);
-    color: var(--text-light);
+/* Controls */
+#expand-amount, .coord-input {
+  padding: 7px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-dark);
+  background: var(--bg-darker);
+  color: var(--text-light);
 }
+
+#expand-amount { width: 60px; }
 
 .slider-wrapper input[type="range"] {
-    width: 80px;
-    border-radius: 6px;
-    accent-color: var(--blue);
+  width: 80px;
+  border-radius: 6px;
+  accent-color: var(--blue);
 }
 
 .slider-wrapper span {
-    font-variant-numeric: tabular-nums;
-    width: 40px;
-    text-align: right;
-    color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  width: 40px;
+  text-align: right;
+  color: var(--text-muted);
 }
 
+/* Palette */
 .palette-swatch {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 3px solid transparent;
-    transition: transform 0.2s, border-color 0.2s;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 12px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.2s, border-color 0.2s;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
 }
-
 .palette-swatch:hover, .palette-swatch.active { transform: scale(1.1); }
 .palette-swatch.active { border-color: var(--blue); }
 
+/* Page */
 .page-wrapper {
-    position: relative;
-    margin: 0 auto 20px; /* Use auto for horizontal centering */
-    background: white;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    contain: layout style;
-    width: 100%;
-    height: auto;
-    font-size: 1vw;
+  position: relative;
+  margin: 0 auto 20px;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  contain: layout style;
+  width: 100%; height: auto;
+  font-size: 1vw;
 }
 
 .page-placeholder {
-    background: #f0f0f0;
-    color: #888;
+  background: #f0f0f0;
+  color: #888;
 }
 
 canvas, .page-wrapper { line-height: 0; }
-
-canvas {
-    width: 100%;
-    height: auto;
-}
+canvas { width: 100%; height: auto; }
 
 .loading {
-    text-align: center;
-    padding: 40px;
-    color: #333;
-    font-size: 18px;
+  text-align: center;
+  padding: 40px;
+  color: #333;
+  font-size: 18px;
 }
 
+/* Overlays */
 .overlay {
-    position: absolute;
-    background: var(--overlay-bg);
-    border: 0.1vw solid var(--overlay-border);
-    color: var(--overlay-text);
-    font-family: 'Bookerly', serif;
-    line-height: 1.15;
-    overflow: hidden;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    transition: all 0.2s;
-    z-index: 10;
-    border-radius: 3px;
-    will-change: transform, box-shadow, opacity, background-color;
+  position: absolute;
+  background: var(--overlay-bg);
+  border: 0.1vw solid var(--overlay-border);
+  color: var(--overlay-text);
+  font-family: 'Bookerly', serif;
+  line-height: 1.15;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  transition: all 0.2s;
+  z-index: 10;
+  border-radius: 3px;
+  will-change: transform, box-shadow, opacity, background-color;
 }
 
 .overlay-text {
-    width: 100%;
-    text-align: justify;
-    cursor: text;
-    user-select: text;
+  width: 100%;
+  text-align: justify;
+  cursor: text;
+  user-select: text;
 }
 
-/* For single-line overlays, control horizontal alignment via the parent flexbox. */
-.overlay.single-line-layout {
-    justify-content: flex-start; /* Align child span to the left */
-}
-
-/* For the text span inside, let it shrink to fit its content. */
+/* Single-line overlays */
+.overlay.single-line-layout { justify-content: flex-start; }
 .overlay.single-line-layout .overlay-text {
-    width: auto; /* Remove the 100% width */
-    text-align: left; /* Ensure it's left-aligned */
+  width: auto;
+  text-align: left;
 }
 
-.merged-text-block:not(:last-child) {
-    margin-bottom: var(--paragraph-spacing);
-}
+.merged-text-block:not(:last-child) { margin-bottom: var(--paragraph-spacing); }
 
 .overlay-text[contenteditable="true"]:focus {
-    outline: 2px solid var(--blue);
-    box-shadow: 0 0 10px var(--blue);
-    background: rgba(255, 255, 255, 0.1);
+  outline: 2px solid var(--blue);
+  box-shadow: 0 0 10px var(--blue);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .overlay:hover {
-    box-shadow: 0 0 12px rgba(52, 152, 219, 0.8);
-    transform: scale(1.01);
-    z-index: 200;
+  box-shadow: 0 0 12px rgba(52, 152, 219, 0.8);
+  transform: scale(1.01);
+  z-index: 200;
 }
 
+/* Delete button */
 .delete-overlay-btn {
-    position: absolute;
-    top: -1px;
-    right: -1px;
-    width: 22px;
-    height: 22px;
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    background: rgba(211, 84, 0, 0.8);
-    color: white;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    line-height: 1; /* Use flexbox for centering instead */
-    padding: 0;
-    z-index: 210;
-    opacity: 0;
-    visibility: hidden;
-    transform: scale(0.8);
-    transition: all 0.2s ease-in-out;
-    display: flex; /* Modernized centering */
-    justify-content: center;
-    align-items: center;
+  position: absolute;
+  top: -1px; right: -1px;
+  width: 22px; height: 22px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  background: rgba(211, 84, 0, 0.8);
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  z-index: 210;
+  opacity: 0; visibility: hidden;
+  transform: scale(0.8);
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .overlay:hover .delete-overlay-btn {
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1);
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
 }
 
 .delete-overlay-btn:hover {
-    background: rgba(231, 76, 60, 1.0);
-    transform: scale(1.1);
+  background: rgba(231, 76, 60, 1);
+  transform: scale(1.1);
 }
 
-.overlay.vertical-text {
-    justify-content: center;
-    align-items: center;
-}
-
+/* Vertical text overlays */
+.overlay.vertical-text { justify-content: center; align-items: center; }
 .overlay.vertical-text .overlay-text {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    white-space: nowrap;
-    text-align: center;
-    line-height: 1;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1;
 }
 
+/* Saving overlay */
 .saving-indicator {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    font-size: 24px;
-    z-index: 9999;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 24px;
+  z-index: 9999;
 }
 
+/* Print */
 @media print {
-    body { background: none; }
-    header#controls, .saving-indicator, .delete-overlay-btn { display: none; }
-    main#pdf-container { margin: 0; padding: 0; }
-    .page-wrapper { 
-        box-shadow: none; 
-        margin: 0; 
-        break-inside: avoid; 
-    }
-    .page-wrapper + .page-wrapper { break-before: page; }
-    .overlay, canvas {
-        print-color-adjust: exact;
-    }
-    @page {
-        size: auto;
-        margin: 0;
-    }
+  body { background: none; }
+  header#controls, .saving-indicator, .delete-overlay-btn { display: none; }
+  main#pdf-container { margin: 0; padding: 0; }
+  .page-wrapper {
+    box-shadow: none;
+    margin: 0;
+    break-inside: avoid;
+  }
+  .page-wrapper + .page-wrapper { break-before: page; }
+  .overlay, canvas { print-color-adjust: exact; }
+  @page { size: auto; margin: 0; }
 }
+
+/* Coords */
+.coord-input {
+  width: 70px;
+  font-size: 13px;
+  text-align: center;
+  text-transform: uppercase;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.coord-input:focus {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+  border-color: var(--blue);
+}
+
+.coord-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.coord-order-wrapper { gap: 8px; }
