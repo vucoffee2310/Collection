@@ -51,6 +51,8 @@ export class PDFOverlayApp {
             opacityVal: document.getElementById('opacity-value'),
             brightness: document.getElementById('brightness-slider'),
             brightnessVal: document.getElementById('brightness-value'),
+            spacingSlider: document.getElementById('spacing-slider'),
+            spacingValue: document.getElementById('spacing-value'),
         };
     }
     
@@ -59,6 +61,7 @@ export class PDFOverlayApp {
         this.state.setActivePalette(CONFIG.DEFAULT_PALETTE);
         this.updateOpacity();
         this.updateBrightness();
+        this.updateParagraphSpacing();
     }
     
     attachEvents() {
@@ -72,6 +75,7 @@ export class PDFOverlayApp {
             expandBtn: ['click', this.expandAll],
             opacity: ['input', this.updateOpacity],
             brightness: ['input', this.updateBrightness],
+            spacingSlider: ['input', this.updateParagraphSpacing],
         }).forEach(([key, [evt, handler]]) => this.el[key]?.addEventListener(evt, handler.bind(this)));
     }
     
@@ -154,6 +158,20 @@ export class PDFOverlayApp {
         this.ui.updateTextBrightness(parseInt(this.el.brightness.value, 10));
     }
     
+    updateParagraphSpacing() {
+        const val = parseInt(this.el.spacingSlider.value, 10) / 100;
+        this.el.spacingValue.textContent = `${val.toFixed(2)}em`;
+        document.body.style.setProperty('--paragraph-spacing', `${val}em`);
+
+        // FIX: Defer recalculation until after the browser has repainted.
+        // This ensures the measurements are taken on the *new* layout.
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.overlay').forEach(overlay => {
+                this.fontCalc.calculateOptimalSize(overlay);
+            });
+        });
+    }
+
     async processAndLoadData(jsonData) {
         this.state.initialize(jsonData);
         if (this.lastLoadedPdfFile) {

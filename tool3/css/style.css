@@ -19,6 +19,7 @@
     --gray: #7f8c8d;
     --gray-light: #95a5a6;
     --gray-dark: #566573;
+    --paragraph-spacing: 0.4em; /* Default paragraph spacing */
 }
 
 * { box-sizing: border-box; }
@@ -181,7 +182,7 @@ canvas {
     border: 0.1vw solid var(--overlay-border);
     color: var(--overlay-text);
     font-family: 'Bookerly', serif;
-    line-height: 1.25;
+    line-height: 1.15;
     overflow: hidden;
     display: flex;
     white-space: pre-wrap; /* This is essential for respecting '\n' */
@@ -201,7 +202,7 @@ canvas {
 }
 
 .merged-text-block:not(:last-child) {
-    margin-bottom: 0.4em;
+    margin-bottom: var(--paragraph-spacing);
 }
 
 .overlay-text:focus {

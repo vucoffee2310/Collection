@@ -46,7 +46,7 @@ export class HTMLExporter {
         const baseVwInPx = pageWrapper.clientWidth / 100;
         return Array.from(pageWrapper.querySelectorAll('.overlay'))
             .map(overlay => this._overlayToHTML(overlay, baseVwInPx))
-            .join('');
+            .join('\n    ');
     }
 
     _overlayToHTML(overlay, baseVwInPx) {
@@ -69,16 +69,30 @@ export class HTMLExporter {
         };
         const inlineStyles = Object.entries(styles).map(([k,v]) => `${k}:${v}`).join(';');
         
-        // MODIFIED: Use innerHTML to preserve the merged paragraph structure
         const innerHTML = textSpan.innerHTML || '';
-        return `<div class="overlay" style="${inlineStyles}">${innerHTML}</div>`;
+        return `<div class="overlay" style="${inlineStyles}"><div class="overlay-text">${innerHTML}</div></div>`;
     }
 
     _buildFinalHTML(fileName, fontBase64, bodyContent) {
-        const fontFace = fontBase64 ? `@font-face{font-family:'Bookerly';src:url(data:font/ttf;base64,${fontBase64}) format('truetype');}` : '';
+        const fontFace = fontBase64 
+            ? `@font-face{font-family:'Bookerly';src:url(data:font/ttf;base64,${fontBase64}) format('truetype');}`
+            : '';
         
-        // MODIFIED: Added styles for .merged-text-block to match the live preview
-        const styles = `${fontFace}*{box-sizing:border-box}body{margin:0;background:#555}main{margin:0 auto;max-width:100%}.page-wrapper{position:relative;width:100%;height:auto;margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,.3);line-height:0;font-size:1vw}.bg-image{display:block;width:100%;height:auto}.overlay{position:absolute;border:.1vw solid;font-family:'Bookerly',serif;line-height:1.25;overflow:hidden;display:flex;white-space:pre-wrap;word-wrap:break-word;text-align:justify;border-radius:.3vw}.merged-text-block{text-indent:1.5em}.merged-text-block:not(:last-child){margin-bottom:.75em}`;
+        // Dynamically get the current paragraph spacing from the live view
+        const liveMergedBlock = document.querySelector('.merged-text-block');
+        const paragraphSpacing = liveMergedBlock ? getComputedStyle(liveMergedBlock).marginBottom : '0.4em';
+
+        const styles = `
+            ${fontFace}
+            *{box-sizing:border-box}
+            body{margin:0;background:#e9e9e9}
+            main{margin:0 auto;max-width:100%}
+            .page-wrapper{position:relative;width:100%;height:auto;margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,.3);line-height:0;font-size:1vw}
+            .bg-image{display:block;width:100%;height:auto}
+            .overlay{position:absolute;border:.1vw solid;font-family:'Bookerly',serif;line-height:1.15;overflow:hidden;display:flex;white-space:pre-wrap;word-wrap:break-word;border-radius:.3vw}
+            .overlay-text{width:100%;height:100%;text-align:justify}
+            .merged-text-block:not(:last-child){margin-bottom:${paragraphSpacing}}
+        `.replace(/\s*\n\s*/g, ''); // Minify for compactness
 
         return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${fileName} - View</title><style>${styles}</style></head><body><main>${bodyContent}</main></body></html>`;
     }

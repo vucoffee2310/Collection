@@ -5,7 +5,7 @@ const CALIBRATION_MULTIPLIERS = {
     x: 1.0, y: 1.0, w: 1.0, h: 1.0,
     borderWidth: 1.0, borderRadius: 1.0, opacity: 1.0,
     paddingTop: 1.0, paddingLeft: 1.0, paddingRight: 1.0,
-    fontSize: 0.995, baselineMultiplier: 1.15, 
+    fontSize: 0.99, baselineMultiplier: 1.13, 
 };
 // --- END OF CALIBRATION CONFIGURATION ---
 
@@ -53,6 +53,7 @@ export class PDFExporter {
             fontSize: parseFloat(textStyle.fontSize) * C.fontSize,
             fontStyle: this._getFontStyle(textStyle.fontWeight, textStyle.fontStyle),
             textAlign: textStyle.textAlign === 'justify' ? 'justify' : 'left',
+            lineHeightPx: parseFloat(style.lineHeight), // Get computed line-height in pixels
         };
     }
 
@@ -132,14 +133,12 @@ export class PDFExporter {
                             
                             const textLines = pdf.splitTextToSize(blockText, textMaxWidth - indentPt);
                             
-                            // Render text and update Y position
                             pdf.text(textLines, props.x + props.padding.left + indentPt, currentY, {
                                 baseline: 'alphabetic',
-                                lineHeightFactor: parseFloat(blockStyle.lineHeight) / props.fontSize // Use computed line height
+                                lineHeightFactor: props.lineHeightPx / props.fontSize
                             });
 
-                            // Manually calculate the new Y position based on number of lines and line height
-                            const renderedHeight = textLines.length * parseFloat(blockStyle.lineHeight);
+                            const renderedHeight = textLines.length * props.lineHeightPx;
                             currentY += renderedHeight + marginBottomPt;
                         });
 
@@ -148,7 +147,9 @@ export class PDFExporter {
                         const text = textEl.textContent || '';
                         if (text) {
                             pdf.text(text, props.x + props.padding.left, currentY, {
-                                align: props.textAlign, maxWidth: textMaxWidth, lineHeightFactor: 1.25
+                                align: props.textAlign, 
+                                maxWidth: textMaxWidth, 
+                                lineHeightFactor: props.lineHeightPx / props.fontSize
                             });
                         }
                     }
