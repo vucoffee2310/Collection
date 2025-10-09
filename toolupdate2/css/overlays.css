@@ -1,0 +1,102 @@
+/* Overlay Base */
+.overlay {
+  position: absolute;
+  background: var(--overlay-bg);
+  border: 0.1vw solid var(--overlay-border);
+  color: var(--overlay-text);
+  font-family: 'Bookerly', serif;
+  line-height: 1.15;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  transition: all 0.2s;
+  z-index: 10;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.overlay:hover { 
+  box-shadow: 0 0 12px rgba(52, 152, 219, 0.8); 
+  transform: scale(1.01); 
+  z-index: 200; 
+}
+
+/* Overlay Text */
+.overlay-text {
+  width: 100%;
+  text-align: justify;
+  cursor: text;
+  user-select: text;
+}
+
+.overlay-text[contenteditable="true"]:focus {
+  outline: 2px solid var(--blue);
+  box-shadow: 0 0 10px var(--blue);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Layout Variants */
+.overlay.single-line-layout { 
+  justify-content: flex-start; 
+}
+
+.overlay.single-line-layout .overlay-text { 
+  width: auto; 
+  text-align: left; 
+}
+
+/* Merged Text Blocks */
+.merged-text-block:not(:last-child) { 
+  margin-bottom: var(--paragraph-spacing); 
+}
+
+/* Vertical Text */
+.overlay.vertical-text { 
+  justify-content: center; 
+}
+
+.overlay.vertical-text .overlay-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1;
+}
+
+/* Delete Button */
+.delete-overlay-btn {
+  position: absolute;
+  top: -1px; 
+  right: -1px;
+  width: 22px; 
+  height: 22px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  background: rgba(211, 84, 0, 0.8);
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  z-index: 210;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.8);
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay:hover .delete-overlay-btn { 
+  opacity: 1; 
+  visibility: visible; 
+  transform: scale(1); 
+}
+
+.delete-overlay-btn:hover { 
+  background: rgba(231, 76, 60, 1); 
+  transform: scale(1.1); 
+}

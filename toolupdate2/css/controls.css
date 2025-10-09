@@ -1,0 +1,166 @@
+/* Header Controls */
+#controls {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  background: var(--bg-dark);
+  padding: 12px 20px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.control-group { 
+  display: flex;
+  gap: 20px; 
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* File Inputs */
+.file-input-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#pdf-file-name, #json-file-name {
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Buttons */
+.btn {
+  padding: 8px 16px;
+  cursor: pointer;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s;
+  color: white;
+  background-color: var(--blue);
+}
+
+.file-input-wrapper .btn { 
+  background-color: var(--gray); 
+}
+
+.btn-primary { 
+  background-color: var(--blue-dark); 
+}
+
+.btn:hover { 
+  transform: translateY(-1px); 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2); 
+}
+
+.file-input-wrapper .btn:hover { 
+  background-color: var(--gray-light); 
+}
+
+.btn-primary:hover { 
+  background-color: var(--blue); 
+}
+
+.btn-small { 
+  padding: 7px 12px; 
+  font-size: 13px; 
+}
+
+/* Page Info */
+#page-info {
+  font-size: 14px;
+  font-weight: 500;
+  background: rgba(0,0,0,0.2);
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+/* Expand Controls */
+.expand-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#expand-amount {
+  padding: 7px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-dark);
+  background: var(--bg-darker);
+  color: var(--text-light);
+  width: 60px;
+}
+
+/* Sliders */
+.slider-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.slider-wrapper input[type="range"] {
+  width: 80px;
+  border-radius: 6px;
+  accent-color: var(--blue);
+}
+
+.slider-wrapper span {
+  font-variant-numeric: tabular-nums;
+  width: 40px;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+/* Theme Controls */
+.theme-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#palette-container {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.palette-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; 
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.2s, border-color 0.2s;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.palette-swatch:hover, 
+.palette-swatch.active { 
+  transform: scale(1.1); 
+}
+
+.palette-swatch.active { 
+  border-color: var(--blue); 
+}
+
+/* Saving Indicator */
+.saving-indicator {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
