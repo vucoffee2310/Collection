@@ -62,6 +62,15 @@ export const parseCoords = (str, coordOrder = CONFIG.DEFAULT_COORDINATE_ORDER) =
     return cache.get(cacheKey);
 };
 
+// Convert TLBR coordinates to a specific coordinate order
+export const coordinatesToOrder = (tlbr, coordOrder = CONFIG.DEFAULT_COORDINATE_ORDER) => {
+    const [t, l, b, r] = tlbr;
+    const mapping = { T: t, L: l, B: b, R: r };
+    
+    // Return array in the specified order
+    return coordOrder.split('').map(letter => mapping[letter]);
+};
+
 export const checkOverflow = (el, tol = 1) => el.scrollHeight > el.clientHeight + tol || el.scrollWidth > el.clientWidth + tol;
 
 export const calculateOverlayPosition = ({ coords, containerWidth: cw, containerHeight: ch, minHeight = 0, sourceWidth = 1000, sourceHeight = 1000, coordOrder = CONFIG.DEFAULT_COORDINATE_ORDER }) => {

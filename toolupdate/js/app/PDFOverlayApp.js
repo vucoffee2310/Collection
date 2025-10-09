@@ -73,10 +73,24 @@ export class PDFOverlayApp {
         this.el.palette?.addEventListener('click', e => this.changePalette(e));
         this.el.expandBtn?.addEventListener('click', () => this.expandAll());
         
-        // Use debounced handlers for slider inputs
-        this.el.opacity?.addEventListener('input', () => this.debouncedUpdateOpacity());
-        this.el.brightness?.addEventListener('input', () => this.debouncedUpdateBrightness());
-        this.el.spacingSlider?.addEventListener('input', () => this.debouncedUpdateSpacing());
+        // Slider listeners - Allow manual override after palette selection
+        this.el.opacity?.addEventListener('input', () => {
+            this.updateOpacity(); // Update display immediately
+            this.debouncedUpdateOpacity(); // Apply changes with debounce
+        });
+        this.el.brightness?.addEventListener('input', () => {
+            this.updateBrightness(); // Update display immediately
+            this.debouncedUpdateBrightness(); // Apply changes with debounce
+        });
+        this.el.spacingSlider?.addEventListener('input', () => {
+            this.updateSpacing(); // Update display immediately
+            this.debouncedUpdateSpacing(); // Apply changes with debounce
+        });
+        
+        // Listen for reload all pages event
+        document.addEventListener('reloadAllPages', async () => {
+            await this.render();
+        });
         
         this.ui.populatePaletteSwatches(this.el.palette, CONFIG.DEFAULT_PALETTE);
         this.state.setActivePalette(CONFIG.DEFAULT_PALETTE);
@@ -85,29 +99,24 @@ export class PDFOverlayApp {
         this.state.setGlobalCoordinateOrder(CONFIG.DEFAULT_COORDINATE_ORDER);
         this.updateGlobalCoordDisplay(CONFIG.DEFAULT_COORDINATE_ORDER);
         
-        this.updateOpacity();
-        this.updateBrightness();
+        // Sync initial sliders with default palette
+        this.syncOpacityWithPalette(CONFIG.DEFAULT_PALETTE);
+        this.syncBrightnessWithPalette(CONFIG.DEFAULT_PALETTE);
         this.updateSpacing();
         this.processAndLoad(defJson);
     }
     
     addGlobalCoordinate(letter) {
-        // Check if already used
         if (this.currentGlobalCoordOrder.includes(letter)) {
             return;
         }
         
-        // Add to current order
         this.currentGlobalCoordOrder += letter;
-        
-        // Update display
         this.updateGlobalCoordDisplay(this.currentGlobalCoordOrder);
         
-        // Mark button as used
         const btn = Array.from(this.el.coordButtons).find(b => b.dataset.coord === letter);
         if (btn) btn.classList.add('used');
         
-        // If complete (4 letters), auto-apply
         if (this.currentGlobalCoordOrder.length === 4) {
             setTimeout(() => this.applyGlobalCoordinateOrder(), 300);
         }
@@ -133,7 +142,6 @@ export class PDFOverlayApp {
         }
         
         try {
-            // Validate
             const normalized = order.toUpperCase().trim();
             const chars = normalized.split('');
             const required = ['T', 'L', 'B', 'R'];
@@ -150,12 +158,10 @@ export class PDFOverlayApp {
             
             this.state.setGlobalCoordinateOrder(normalized);
             
-            // Re-render all pages
             if (this.lastPdf) {
                 await this.render();
             }
             
-            // Reset for next change
             this.clearGlobalCoordinateOrder();
             this.updateGlobalCoordDisplay(normalized);
             
@@ -208,30 +214,70 @@ export class PDFOverlayApp {
         this.el.palette.querySelector('.active')?.classList.remove('active');
         sw.classList.add('active');
         this.state.setActivePalette(sw.dataset.paletteKey);
-        this.updateOpacity();
-        this.updateBrightness();
+        
+        // Auto-sync both sliders with palette defaults
+        // User can manually adjust afterwards if not satisfied
+        this.syncOpacityWithPalette(sw.dataset.paletteKey);
+        this.syncBrightnessWithPalette(sw.dataset.paletteKey);
+    }
+    
+    syncOpacityWithPalette(paletteKey) {
+        const palette = CONFIG.COLOR_PALETTES[paletteKey];
+        if (!palette || !palette.opacity) return;
+        
+        // Use palette's recommended opacity (1-100 range, no constraints)
+        const opacity = Math.max(1, Math.min(100, palette.opacity));
+        
+        // Update slider (user can still manually adjust after this)
+        if (this.el.opacity) {
+            this.el.opacity.value = opacity;
+            this.el.opacityVal.textContent = `${opacity}%`;
+        }
+        
+        // Apply the opacity
+        this._updateOpacity();
+    }
+    
+    syncBrightnessWithPalette(paletteKey) {
+        const palette = CONFIG.COLOR_PALETTES[paletteKey];
+        if (!palette) return;
+        
+        // Calculate brightness from RGB (using perceived luminance formula)
+        const [r, g, b] = palette.text;
+        const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+        
+        // Convert to slider value (0-100)
+        const sliderValue = Math.round(brightness * 100);
+        
+        // Update slider (user can still manually adjust after this)
+        if (this.el.brightness) {
+            this.el.brightness.value = sliderValue;
+            this.el.brightnessVal.textContent = `${sliderValue}%`;
+        }
+        
+        // Apply the brightness
+        this._updateBrightness();
     }
 
     // Public methods that immediately update display values
+    // These update the display and trigger debounced updates
     updateOpacity() {
         const v = parseInt(this.el.opacity.value, 10);
         this.el.opacityVal.textContent = `${v}%`;
-        this._updateOpacity();
     }
     
     updateBrightness() {
         const v = parseInt(this.el.brightness.value, 10);
         this.el.brightnessVal.textContent = `${v}%`;
-        this._updateBrightness();
     }
     
     updateSpacing() {
         const v = parseInt(this.el.spacingSlider.value, 10) / 100;
         this.el.spacingValue.textContent = `${v.toFixed(2)}em`;
-        this._updateSpacing();
     }
     
     // Private debounced methods for actual updates
+    // These apply the actual CSS changes
     _updateOpacity() {
         const v = parseInt(this.el.opacity.value, 10);
         this.ui.updateOverlayOpacity(this.state.activePalette, v);

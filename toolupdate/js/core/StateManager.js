@@ -41,6 +41,15 @@ export class StateManager {
     clearPageOverride(pageNum) {
         delete this.pageCoordinateOverrides[pageNum];
     }
+    
+    applyCoordinateOrderToAllPages(order) {
+        // Apply the same coordinate order to all pages as an override
+        const pageKeys = Object.keys(this.overlayData);
+        pageKeys.forEach(pk => {
+            const pageNum = pk.replace('page_', '');
+            this.setPageCoordinateOrder(pageNum, order);
+        });
+    }
 
     expandAllOverlays(amt) {
         for (const pk in this.overlayData) {

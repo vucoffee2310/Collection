@@ -35,7 +35,7 @@ body {
 #controls, .control-group, .file-input-wrapper, .theme-wrapper,
 .expand-controls, .slider-wrapper, #palette-container,
 .page-placeholder, .saving-indicator, .palette-swatch, .overlay,
-.coord-buttons, .page-coord-controls { display: flex; align-items: center; }
+.coord-buttons { display: flex; align-items: center; }
 
 .page-placeholder, .saving-indicator { justify-content: center; }
 
@@ -155,7 +155,7 @@ canvas { width: 100%; height: auto; }
 /* Coordinate controls */
 .coord-order-wrapper { gap: 8px; flex-wrap: nowrap; }
 
-.coord-label, .page-coord-label {
+.coord-label {
   font-size: 11px;
   color: var(--text-muted);
   font-weight: 500;
@@ -164,8 +164,6 @@ canvas { width: 100%; height: auto; }
   padding: 8px 0;
   line-height: 1.4;
 }
-
-.page-coord-label { padding: 6px 0; }
 
 .coord-display {
   min-width: 60px;
@@ -204,23 +202,206 @@ canvas { width: 100%; height: auto; }
 .coord-btn.used { background: var(--gray); border-color: var(--gray-dark); opacity: 0.5; cursor: not-allowed; }
 .coord-btn.used:hover { transform: none; background: var(--gray); }
 
-/* Page coordinate controls */
+/* Page coordinate controls - SIMPLE LAYOUT */
 .page-coord-controls {
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 100;
-  gap: 8px;
   background: rgba(44, 62, 80, 0.95);
-  padding: 8px 12px;
+  padding: 10px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  min-width: 180px;
 }
 
-.page-coord-controls .coord-display { min-width: 60px; padding: 7px 8px; font-size: 12px; }
-.page-coord-controls .coord-btn { width: 26px; height: 30px; font-size: 12px; }
-.page-coord-controls .coord-display.overridden { border-color: #e67e22; }
+.page-coord-controls.preview-active {
+  background: rgba(243, 156, 18, 0.95);
+}
+
+/* Simple row layout */
+.coord-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.coord-row:last-child {
+  margin-bottom: 0;
+}
+
+.coord-row-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+  min-width: 30px;
+}
+
+.page-coord-controls.preview-active .coord-row-label {
+  color: white;
+}
+
+.page-coord-controls .coord-display {
+  min-width: 55px;
+  padding: 6px 8px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  flex: 1;
+}
+
+.page-coord-controls .coord-display.overridden {
+  border-color: #e67e22;
+}
+
+.page-coord-controls.preview-active .coord-display {
+  border-color: white;
+  color: white;
+}
+
+/* Reload button */
+.coord-reload-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--blue);
+  border-radius: 6px;
+  background: var(--bg-darker);
+  color: var(--blue);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coord-reload-btn:hover {
+  background: var(--blue);
+  color: white;
+}
+
+.page-coord-controls.preview-active .coord-reload-btn {
+  border-color: white;
+  color: white;
+  background: transparent;
+}
+
+.page-coord-controls.preview-active .coord-reload-btn:hover {
+  background: white;
+  color: #f39c12;
+}
+
+/* Preview text */
+.coord-preview-text {
+  font-size: 10px;
+  color: white;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  text-align: center;
+  margin-bottom: 8px;
+  display: none;
+}
+
+.page-coord-controls.preview-active .coord-preview-text {
+  display: block;
+}
+
+/* Action buttons */
+.coord-action-row {
+  display: none;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.page-coord-controls.preview-active .coord-action-row {
+  display: flex;
+}
+
+.coord-action-btn {
+  flex: 1;
+  padding: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.coord-action-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.coord-action-btn.primary {
+  background: white;
+  color: #f39c12;
+}
+
+.coord-action-btn.primary:hover {
+  background: #ecf0f1;
+}
+
+/* Manual buttons */
+.page-coord-controls .coord-buttons {
+  gap: 4px;
+  justify-content: center;
+}
+
+.page-coord-controls .coord-btn {
+  width: 32px;
+  height: 28px;
+  font-size: 11px;
+}
+
+/* Cancel button */
+.coord-cancel-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e74c3c;
+  border: 2px solid white;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.page-coord-controls.preview-active .coord-cancel-btn {
+  display: flex;
+}
+
+.coord-cancel-btn:hover {
+  background: #c0392b;
+}
+
+/* Preview mode indicator */
+.page-wrapper.preview-mode {
+  outline: 3px solid #f39c12;
+  outline-offset: -3px;
+}
+
+.page-wrapper.preview-mode::before {
+  content: 'PREVIEW';
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #f39c12;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 99;
+  letter-spacing: 1px;
+}
 
 /* Overlays */
 .overlay {

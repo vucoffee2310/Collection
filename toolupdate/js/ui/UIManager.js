@@ -3,7 +3,8 @@ import { CONFIG } from '../config.js';
 export class UIManager {
     constructor() {
         this.container = document.querySelector('#pdf-container');
-        this.pageCoordStates = new Map(); // Track coordinate input state per page
+        this.pageCoordStates = new Map();
+        this.previewStates = new Map();
     }
     
     showLoading(msg) {
@@ -22,6 +23,7 @@ export class UIManager {
     clearContainer() {
         if (this.container) this.container.innerHTML = '';
         this.pageCoordStates.clear();
+        this.previewStates.clear();
     }
     
     createPageWrapper(n, vp) {
@@ -36,11 +38,12 @@ export class UIManager {
     }
     
     addPageCoordControls(wrapper, pageNum, stateManager, renderCallback) {
-        // Initialize state for this page
         this.pageCoordStates.set(pageNum, {
             currentOrder: '',
             appliedOrder: stateManager.getPageCoordinateOrder(pageNum),
-            isOverride: stateManager.hasPageOverride(pageNum)
+            isOverride: stateManager.hasPageOverride(pageNum),
+            currentOrderingIndex: 0,
+            previewOrder: null
         });
         
         const state = this.pageCoordStates.get(pageNum);
@@ -49,114 +52,210 @@ export class UIManager {
         const controls = document.createElement('div');
         controls.className = 'page-coord-controls';
         controls.innerHTML = `
-            <span class="page-coord-label">P${pageNum}</span>
-            <div class="${displayClass}" data-page="${pageNum}" title="${state.isOverride ? 'Page override active' : 'Using global setting'}">${state.appliedOrder}</div>
-            <div class="coord-buttons">
-                <button class="coord-btn" data-coord="T" data-page="${pageNum}" title="Top">T</button>
-                <button class="coord-btn" data-coord="L" data-page="${pageNum}" title="Left">L</button>
-                <button class="coord-btn" data-coord="B" data-page="${pageNum}" title="Bottom">B</button>
-                <button class="coord-btn" data-coord="R" data-page="${pageNum}" title="Right">R</button>
+            <button class="coord-cancel-btn" data-page="${pageNum}">×</button>
+            
+            <div class="coord-row">
+                <span class="coord-row-label">P${pageNum}</span>
+                <div class="${displayClass}" data-page="${pageNum}">${state.appliedOrder}</div>
+                <button class="coord-reload-btn" data-page="${pageNum}">↻</button>
+            </div>
+            
+            <div class="coord-preview-text" data-page="${pageNum}"></div>
+            
+            <div class="coord-action-row">
+                <button class="coord-action-btn primary" data-page="${pageNum}" data-action="current">Apply</button>
+                <button class="coord-action-btn" data-page="${pageNum}" data-action="all">All Pages</button>
+            </div>
+            
+            <div class="coord-row">
+                <span class="coord-row-label">Manual</span>
+                <div class="coord-buttons">
+                    <button class="coord-btn" data-coord="T" data-page="${pageNum}">T</button>
+                    <button class="coord-btn" data-coord="L" data-page="${pageNum}">L</button>
+                    <button class="coord-btn" data-coord="B" data-page="${pageNum}">B</button>
+                    <button class="coord-btn" data-coord="R" data-page="${pageNum}">R</button>
+                </div>
             </div>
         `;
         
-        // Add event listeners to coordinate buttons
         controls.querySelectorAll('.coord-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.handleCoordButtonClick(btn, pageNum, stateManager, renderCallback));
+        });
+        
+        controls.querySelector('.coord-reload-btn')?.addEventListener('click', () => {
+            this.handleReloadCoordOrder(pageNum, stateManager, renderCallback);
+        });
+        
+        controls.querySelector('.coord-cancel-btn')?.addEventListener('click', () => {
+            this.cancelPreview(pageNum, stateManager, renderCallback);
+        });
+        
+        controls.querySelectorAll('.coord-action-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                this.handleCoordButtonClick(btn, pageNum, stateManager, renderCallback);
+                this.handleApplyCoordOrder(btn, pageNum, stateManager, renderCallback);
             });
         });
         
         wrapper.appendChild(controls);
     }
     
+    handleReloadCoordOrder(pageNum, stateManager, renderCallback) {
+        const state = this.pageCoordStates.get(pageNum);
+        if (!state) return;
+        
+        state.currentOrderingIndex = (state.currentOrderingIndex + 1) % CONFIG.COORDINATE_ORDERINGS.length;
+        const ordering = CONFIG.COORDINATE_ORDERINGS[state.currentOrderingIndex];
+        state.previewOrder = ordering.order;
+        
+        this.previewStates.set(pageNum, {
+            order: ordering.order,
+            originalOrder: stateManager.getPageCoordinateOrder(pageNum)
+        });
+        
+        const previewText = document.querySelector(`.coord-preview-text[data-page="${pageNum}"]`);
+        if (previewText) previewText.textContent = ordering.name;
+        
+        const controls = document.querySelector(`#page-wrapper-${pageNum} .page-coord-controls`);
+        if (controls) controls.classList.add('preview-active');
+        
+        const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
+        if (wrapper) wrapper.classList.add('preview-mode');
+        
+        stateManager.setPageCoordinateOrder(pageNum, ordering.order);
+        renderCallback();
+    }
+    
+    cancelPreview(pageNum, stateManager, renderCallback) {
+        const previewState = this.previewStates.get(pageNum);
+        const state = this.pageCoordStates.get(pageNum);
+        
+        if (!previewState || !state) return;
+        
+        if (previewState.originalOrder) {
+            stateManager.setPageCoordinateOrder(pageNum, previewState.originalOrder);
+        }
+        
+        state.previewOrder = null;
+        this.previewStates.delete(pageNum);
+        
+        const controls = document.querySelector(`#page-wrapper-${pageNum} .page-coord-controls`);
+        if (controls) controls.classList.remove('preview-active');
+        
+        const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
+        if (wrapper) wrapper.classList.remove('preview-mode');
+        
+        renderCallback();
+    }
+    
+    handleApplyCoordOrder(btn, pageNum, stateManager, renderCallback) {
+        const action = btn.dataset.action;
+        const state = this.pageCoordStates.get(pageNum);
+        const previewState = this.previewStates.get(pageNum);
+        
+        if (!state || !state.previewOrder || !previewState) return;
+        
+        if (action === 'current') {
+            this.applyPageCoordinateOrder(pageNum, state.previewOrder, stateManager, renderCallback, true);
+            this.clearPreviewUI(pageNum);
+        } else if (action === 'all') {
+            if (confirm(`Apply "${state.previewOrder}" to ALL pages?`)) {
+                stateManager.applyCoordinateOrderToAllPages(state.previewOrder);
+                stateManager.setGlobalCoordinateOrder(state.previewOrder);
+                
+                const globalDisplay = document.getElementById('coord-display');
+                if (globalDisplay) globalDisplay.textContent = state.previewOrder;
+                
+                this.pageCoordStates.forEach((pageState, pNum) => {
+                    pageState.appliedOrder = state.previewOrder;
+                    pageState.isOverride = true;
+                    
+                    const display = document.querySelector(`.coord-display[data-page="${pNum}"]`);
+                    if (display) {
+                        display.textContent = state.previewOrder;
+                        display.classList.add('overridden');
+                    }
+                    
+                    this.clearPreviewUI(pNum);
+                });
+                
+                this.previewStates.clear();
+                document.dispatchEvent(new CustomEvent('reloadAllPages'));
+            }
+        }
+    }
+    
+    clearPreviewUI(pageNum) {
+        const controls = document.querySelector(`#page-wrapper-${pageNum} .page-coord-controls`);
+        if (controls) controls.classList.remove('preview-active');
+        
+        const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
+        if (wrapper) wrapper.classList.remove('preview-mode');
+        
+        const state = this.pageCoordStates.get(pageNum);
+        if (state) state.previewOrder = null;
+    }
+    
     handleCoordButtonClick(btn, pageNum, stateManager, renderCallback) {
         const letter = btn.dataset.coord;
         const state = this.pageCoordStates.get(pageNum);
         
-        if (!state) return;
+        if (!state || state.currentOrder.includes(letter)) return;
         
-        // Check if already used
-        if (state.currentOrder.includes(letter)) {
-            return;
-        }
-        
-        // Add to current order
         state.currentOrder += letter;
         
-        // Update display
         const display = document.querySelector(`.coord-display[data-page="${pageNum}"]`);
         if (display) {
             display.textContent = state.currentOrder || '____';
-            display.style.borderColor = state.currentOrder.length === 4 ? 'var(--blue)' : 'var(--gray-dark)';
         }
         
-        // Mark button as used
         btn.classList.add('used');
         
-        // If complete (4 letters), auto-apply
         if (state.currentOrder.length === 4) {
             setTimeout(() => {
-                this.applyPageCoordinateOrder(pageNum, state.currentOrder, stateManager, renderCallback);
+                this.applyPageCoordinateOrder(pageNum, state.currentOrder, stateManager, renderCallback, false);
             }, 300);
         }
     }
     
-    applyPageCoordinateOrder(pageNum, order, stateManager, renderCallback) {
+    applyPageCoordinateOrder(pageNum, order, stateManager, renderCallback, isFromPreview = false) {
         const state = this.pageCoordStates.get(pageNum);
         if (!state || order.length !== 4) return;
         
         try {
-            // Validate order
             const normalized = order.toUpperCase().trim();
             const chars = normalized.split('');
             const required = ['T', 'L', 'B', 'R'];
             
             for (const req of required) {
-                if (!chars.includes(req)) {
-                    throw new Error(`Coordinate order must contain ${req}`);
-                }
+                if (!chars.includes(req)) throw new Error(`Must contain ${req}`);
             }
             
-            if (new Set(chars).size !== 4) {
-                throw new Error('Coordinate order must not have duplicate letters');
-            }
+            if (new Set(chars).size !== 4) throw new Error('No duplicates');
             
-            // Set the coordinate order override for this page
             stateManager.setPageCoordinateOrder(pageNum, normalized);
             state.appliedOrder = normalized;
             state.isOverride = true;
             
-            // Update display to show it's an override
             const display = document.querySelector(`.coord-display[data-page="${pageNum}"]`);
             if (display) {
                 display.textContent = normalized;
                 display.classList.add('overridden');
-                display.title = 'Page override active (overrides global)';
             }
             
-            // Re-render this page
-            renderCallback();
+            if (!isFromPreview) renderCallback();
             
-            // Reset for next change
             state.currentOrder = '';
-            
-            // Reset buttons
             const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
-            if (wrapper) {
-                wrapper.querySelectorAll('.coord-btn').forEach(btn => btn.classList.remove('used'));
-            }
+            wrapper?.querySelectorAll('.coord-btn').forEach(btn => btn.classList.remove('used'));
             
         } catch (error) {
-            alert(`Invalid coordinate order: ${error.message}`);
+            alert(`Invalid: ${error.message}`);
             state.currentOrder = '';
             const display = document.querySelector(`.coord-display[data-page="${pageNum}"]`);
-            if (display) {
-                display.textContent = state.appliedOrder;
-            }
+            if (display) display.textContent = state.appliedOrder;
+            
             const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
-            if (wrapper) {
-                wrapper.querySelectorAll('.coord-btn').forEach(btn => btn.classList.remove('used'));
-            }
+            wrapper?.querySelectorAll('.coord-btn').forEach(btn => btn.classList.remove('used'));
         }
     }
     
