@@ -11,33 +11,31 @@ export class OverlayRenderer {
         const pd = data[`page_${page}`];
         if (!pd) return;
 
-        // Remove old overlays
-        wrapper.querySelectorAll('.overlay').forEach(el => el.remove());
+        const oldOverlays = wrapper.querySelectorAll('.overlay');
+        oldOverlays.forEach(el => el.remove());
         
         const coordOrder = this.state.getPageCoordinateOrder(page);
+        const entries = Object.entries(pd);
         
-        // Create all overlays in a document fragment (batch DOM operations)
         const frag = document.createDocumentFragment();
         const overlaysToCalculate = [];
         
-        Object.keys(pd).forEach(coords => {
-            const overlay = this._create(coords, pd[coords], page, dims.width, dims.height, coordOrder);
+        entries.forEach(([coords, info]) => {
+            const overlay = this._createFast(coords, info, page, dims.width, dims.height, coordOrder);
             frag.appendChild(overlay);
             overlaysToCalculate.push(overlay);
         });
         
-        // Single DOM append operation
         wrapper.appendChild(frag);
         
-        // Batch font size calculations
-        Utils.batchDOMUpdates(() => {
+        requestAnimationFrame(() => {
             overlaysToCalculate.forEach(overlay => {
                 this.fontCalc.calculateOptimalSize(overlay);
             });
         });
     }
     
-    _create(coords, info, page, W, H, coordOrder) {
+    _createFast(coords, info, page, W, H, coordOrder) {
         if (W <= 0 || H <= 0) return document.createElement('div');
 
         const pos = Utils.calculateOverlayPosition({ 
@@ -53,33 +51,39 @@ export class OverlayRenderer {
         ov.dataset.coords = coords;
         ov.dataset.pageNum = page;
         
-        if (pos.width > 0 && (pos.height / pos.width) > CONFIG.OVERLAY.VERTICAL_THRESHOLD) ov.classList.add('vertical-text');
-        if (!info.text.includes('<div') && !info.text.includes('\n')) ov.classList.add('single-line-layout');
+        const classes = ['overlay'];
+        if (pos.width > 0 && (pos.height / pos.width) > CONFIG.OVERLAY.VERTICAL_THRESHOLD) {
+            classes.push('vertical-text');
+        }
+        if (!info.text.includes('<div') && !info.text.includes('\n')) {
+            classes.push('single-line-layout');
+        }
+        ov.className = classes.join(' ');
 
-        Object.assign(ov.style, {
-            left: Utils.toPercent(pos.left, W),
-            top: Utils.toPercent(pos.top, H),
-            width: Utils.toPercent(pos.width, W),
-            height: Utils.toPercent(pos.height, H)
-        });
+        ov.style.cssText = `
+            left: ${Utils.toPercent(pos.left, W)};
+            top: ${Utils.toPercent(pos.top, H)};
+            width: ${Utils.toPercent(pos.width, W)};
+            height: ${Utils.toPercent(pos.height, H)};
+        `;
         
         const txt = document.createElement('span');
         txt.className = 'overlay-text';
         txt.contentEditable = true;
+        
         if (info.text.includes('<div')) {
             txt.innerHTML = info.text;
         } else {
             txt.textContent = info.text;
         }
         
-        // Debounce text updates
         const debouncedUpdate = Utils.debounce((e) => {
             const o = e.target.closest('.overlay');
             if (!o) return;
             const newTxt = e.target.querySelector('.merged-text-block') ? e.target.innerHTML : e.target.innerText;
             this.state.updateOverlayText(o.dataset.pageNum, o.dataset.coords, newTxt);
             this.fontCalc.calculateOptimalSize(o);
-        }, 300);
+        }, 500);
         
         txt.addEventListener('blur', debouncedUpdate);
 
@@ -89,7 +93,7 @@ export class OverlayRenderer {
         del.title = 'Delete this overlay';
         del.addEventListener('click', (e) => {
             const o = e.target.closest('.overlay');
-            if (!o || !confirm('Are you sure you want to delete this overlay?')) return;
+            if (!o || !confirm('Delete this overlay?')) return;
             this.state.deleteOverlay(o.dataset.pageNum, o.dataset.coords);
             o.remove();
         });

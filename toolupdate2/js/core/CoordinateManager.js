@@ -74,7 +74,6 @@ export class CoordinateManager {
             
             this.state.setGlobalCoordinateOrder(normalized);
             
-            // Trigger re-render
             document.dispatchEvent(new CustomEvent('coordinateOrderChanged'));
             
             this.clearGlobalCoordinateOrder();
@@ -86,7 +85,6 @@ export class CoordinateManager {
         }
     }
     
-    // Methods for page-specific coordinate handling
     validateCoordinateOrder(order) {
         if (order.length !== 4) return false;
         

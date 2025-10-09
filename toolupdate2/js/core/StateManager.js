@@ -6,7 +6,7 @@ export class StateManager {
         this.overlayData = {};
         this.activePalette = CONFIG.DEFAULT_PALETTE;
         this.globalCoordinateOrder = CONFIG.DEFAULT_COORDINATE_ORDER;
-        this.pageCoordinateOverrides = {}; // Store per-page overrides
+        this.pageCoordinateOverrides = {};
     }
     
     initialize(json) {
@@ -26,7 +26,6 @@ export class StateManager {
     }
     
     getPageCoordinateOrder(pageNum) {
-        // Return page-specific override if exists, otherwise return global
         return this.pageCoordinateOverrides[pageNum] || this.globalCoordinateOrder;
     }
     
@@ -43,7 +42,6 @@ export class StateManager {
     }
     
     applyCoordinateOrderToAllPages(order) {
-        // Apply the same coordinate order to all pages as an override
         const pageKeys = Object.keys(this.overlayData);
         pageKeys.forEach(pk => {
             const pageNum = pk.replace('page_', '');

@@ -3,17 +3,19 @@ import { readFile } from '../utils.js';
 export class Exporters {
     constructor(pdf) {
         this.pdf = pdf;
+        this.canvasCache = new Map();
     }
 
-    // HTML Export
     async html(name, pageManager) {
-        const ind = pageManager.showSavingIndicator('Preparing all pages for export...');
+        const ind = pageManager.showSavingIndicator('Processing...');
         try {
             const font = await this.pdf.loadFont();
             const body = await this._genBody(ind, pageManager);
-            ind.textContent = 'Generating HTML file...';
+            ind.textContent = 'Saving...';
             this._download(this._buildHTML(name, font, body), `${name}_view.html`);
+            this.canvasCache.clear();
         } catch (e) {
+            console.error('HTML Export Error:', e);
             alert('Error saving as HTML: ' + e.message);
         } finally {
             pageManager.removeSavingIndicator(ind);
@@ -22,23 +24,48 @@ export class Exporters {
 
     async _genBody(ind, pageManager) {
         const wrappers = Array.from(document.querySelectorAll('.page-wrapper'));
-        return (await Promise.all(wrappers.map(async (w, i) => {
-            ind.textContent = `Processing page ${i + 1}/${wrappers.length}...`;
-            const c = w.querySelector('canvas');
-            if (!c) return '';
-            const bg = await this._canvasToUrl(c);
-            const ovs = this._genOverlays(w);
-            return `<div class="page-wrapper" style="aspect-ratio: ${c.width / c.height};">
-    <img src="${bg}" class="bg-image" alt="PDF Page background">
+        const totalPages = wrappers.length;
+        const batchSize = 5;
+        const results = [];
+        
+        for (let i = 0; i < totalPages; i += batchSize) {
+            const batch = wrappers.slice(i, i + batchSize);
+            
+            const batchResults = await Promise.all(
+                batch.map(async (w, idx) => {
+                    const pageNum = i + idx + 1;
+                    ind.textContent = `Page ${pageNum} / ${totalPages}`;
+                    
+                    const c = w.querySelector('canvas');
+                    if (!c) return '';
+                    
+                    const bg = await this._canvasToUrl(c, pageNum);
+                    const ovs = this._genOverlays(w);
+                    
+                    return `<div class="page-wrapper" style="aspect-ratio: ${c.width / c.height};">
+    <img src="${bg}" class="bg-image" alt="PDF Page ${pageNum}" loading="lazy">
     ${ovs}
 </div>`;
-        }))).join('');
+                })
+            );
+            
+            results.push(...batchResults);
+        }
+        
+        return results.join('');
     }
 
-    async _canvasToUrl(c) {
-        const blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.8));
+    async _canvasToUrl(c, pageNum) {
+        if (this.canvasCache.has(pageNum)) {
+            return this.canvasCache.get(pageNum);
+        }
+
+        const blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.85));
         if (!blob) throw new Error('Canvas to Blob conversion failed.');
-        return readFile(blob, 'readAsDataURL');
+        
+        const url = await readFile(blob, 'readAsDataURL');
+        this.canvasCache.set(pageNum, url);
+        return url;
     }
 
     _genOverlays(w) {
@@ -58,9 +85,14 @@ export class Exporters {
         const fsPct = ((curSize / 100) * baseVw / baseVw) * 100;
 
         const styles = {
-            left: o.style.left, top: o.style.top, width: o.style.width, height: o.style.height,
-            'background-color': cs.backgroundColor, 'border-color': cs.borderColor,
-            color: ts.color, 'font-size': `${fsPct}%`
+            left: o.style.left, 
+            top: o.style.top, 
+            width: o.style.width, 
+            height: o.style.height,
+            'background-color': cs.backgroundColor, 
+            'border-color': cs.borderColor,
+            color: ts.color, 
+            'font-size': `${fsPct}%`
         };
         const inline = Object.entries(styles).map(([k, v]) => `${k}:${v}`).join(';');
         
@@ -85,15 +117,15 @@ export class Exporters {
         URL.revokeObjectURL(a.href);
     }
 
-    // Print Export
     async print(pageManager) {
-        const ind = pageManager.showSavingIndicator('Preparing pages for PDF export...');
+        const ind = pageManager.showSavingIndicator('Processing...');
         try {
             await this.pdf.renderAllQueuedPages();
             await new Promise(r => setTimeout(r, 100));
             window.print();
         } catch (e) {
-            alert('Could not prepare for PDF export. See console for details.');
+            console.error('Print Error:', e);
+            alert('Could not prepare for print. See console for details.');
         } finally {
             pageManager.removeSavingIndicator(ind);
         }
