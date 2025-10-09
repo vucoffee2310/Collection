@@ -181,7 +181,7 @@ export class PDFExporter {
             }
 
             const totalPages = ws.length;
-            const batchSize = 5;
+            const batchSize = 10;
             
             for (let i = 0; i < totalPages; i += batchSize) {
                 const batch = Array.from(ws).slice(i, i + batchSize);
@@ -214,4 +214,5 @@ export class PDFExporter {
             ui.removeSavingIndicator(ind);
         }
     }
+
 }
