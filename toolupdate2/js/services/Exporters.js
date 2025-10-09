@@ -25,7 +25,7 @@ export class Exporters {
     async _genBody(ind, pageManager) {
         const wrappers = Array.from(document.querySelectorAll('.page-wrapper'));
         const totalPages = wrappers.length;
-        const batchSize = 5;
+        const batchSize = 10;
         const results = [];
         
         for (let i = 0; i < totalPages; i += batchSize) {
@@ -130,4 +130,5 @@ export class Exporters {
             pageManager.removeSavingIndicator(ind);
         }
     }
+
 }
