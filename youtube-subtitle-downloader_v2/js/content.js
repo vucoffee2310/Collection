@@ -2,83 +2,36 @@ const $ = s => document.querySelector(s);
 const getVideoId = () => new URL(location.href).searchParams.get('v');
 
 // ====================================================================
-// SECTION 1: CORE TEXT PROCESSING PIPELINE
+// UTILS
 // ====================================================================
 
-function breakIntoParagraphsRandomly(text, minLength = 250, maxLength = 550) {
-  if (!text || typeof text !== 'string') return "";
-
-  // Define an expanded set of punctuation characters for multiple languages.
-  const punctuation = 
-      // Standard English
-      '.?!;' + 
-      // CJK (Chinese, Japanese, Korean) Full-width
-      '。？！；' + // Period, Question Mark, Exclamation Mark
-      // Other
-      '…' +      // Ellipsis
-      // Southeast Asian Scripts
-      '။॥' +     // Burmese Danda and Double Danda (sentence breaks)
-      '។';       // Khmer Khan (sentence terminator)
-  
-  let remainingText = text.replace(/\s\s+/g, ' ').trim();
-  const finalParagraphs = [];
-
-  while (remainingText.length > 0) {
-    if (remainingText.length <= maxLength) {
-      finalParagraphs.push(remainingText);
-      break;
-    }
-
-    const randomTargetLength = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
-    
-    let breakIndex = -1;
-    let fallbackSpaceIndex = -1;
-    let fallbackPunctuationIndex = -1;
-
-    for (let i = Math.min(randomTargetLength, remainingText.length -1) ; i >= minLength; i--) {
-        // Priority 1: Whitespace preceded by punctuation.
-        if (remainingText[i] === ' ' && punctuation.includes(remainingText[i - 1])) {
-            if (isBreakPointValid(remainingText, i)) {
-                breakIndex = i;
-                break; 
-            }
+const copyToClipboard = async (text) => {
+    try {
+        await navigator.clipboard.writeText(text);
+        console.log('✅ Copied to clipboard');
+    } catch (err) {
+        console.error('❌ Failed to copy:', err);
+        // Fallback for older browsers (optional)
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            console.log('✅ Copied via fallback');
+        } catch (e) {
+            alert('Failed to copy text.');
         }
-        
-        // Priority 2: Any whitespace.
-        if (fallbackSpaceIndex === -1 && remainingText[i] === ' ') {
-            if (isBreakPointValid(remainingText, i)) {
-                fallbackSpaceIndex = i;
-            }
-        }
-
-        // Priority 3: Any punctuation mark. Break happens *after* the punctuation.
-        if (fallbackPunctuationIndex === -1 && punctuation.includes(remainingText[i])) {
-            if (isBreakPointValid(remainingText, i + 1)) {
-                fallbackPunctuationIndex = i + 1; 
-            }
-        }
+        document.body.removeChild(textarea);
     }
+};
 
-    if (breakIndex !== -1) {
-        // Use highest priority.
-    } else if (fallbackSpaceIndex !== -1) {
-        breakIndex = fallbackSpaceIndex;
-    } else if (fallbackPunctuationIndex !== -1) {
-        breakIndex = fallbackPunctuationIndex;
-    } else {
-        // Last Resort: Force a break.
-        breakIndex = randomTargetLength;
-    }
+// ====================================================================
+// SECTION 1: CORE TEXT PROCESSING
+// ====================================================================
 
-    const newPara = remainingText.substring(0, breakIndex).trim();
-    finalParagraphs.push(newPara);
-    remainingText = remainingText.substring(breakIndex).trim();
-  }
-
-  return finalParagraphs.join('\n\n');
-}
-
-// Full script for context
 function xmlToSingleParagraph(xml) {
     const characters = ['Q', 'Z', 'P', 'H', 'W', 'D', 'N', 'K', 'T', 'G', 'B', 'Y', 'V', 'S', 'U', 'R', 'J', 'E', 'O', 'M', 'C', 'L', 'X', 'A', 'F', 'I'];
     const utterances = new DOMParser().parseFromString(xml, 'text/xml').getElementsByTagName('text');
@@ -88,135 +41,103 @@ function xmlToSingleParagraph(xml) {
         const text = (el.textContent || '').replace(/[\r\n]+/g, ' ').trim();
         if (!text) return;
 
-        // Check if it's the start of a new group of 5 (i.e., the 0th, 5th, 10th element)
         if (index % 5 === 0) {
             const charToInsert = characters[markerCount % characters.length];
-            result += `(${charToInsert}) `; // Prepend the marker
+            result += `(${charToInsert}) `;
             markerCount++;
         }
 
         result += text + " ";
     });
     return result.trim();
-};
-
-function isBreakPointValid(text, index) {
-  const textBefore = text.substring(0, index).trim();
-  const textAfter = text.substring(index).trim();
-  const isPrecededByMarker = textBefore.match(/\([A-Z]\)$/);
-  const isSucceededByMarker = textAfter.match(/^\([A-Z]\)/);
-  return !isPrecededByMarker && !isSucceededByMarker;
 }
 
 function processSubtitles(xml) {
-    const singleLongParagraph = xmlToSingleParagraph(xml);
-    const formattedParagraphs = breakIntoParagraphsRandomly(singleLongParagraph);
-    return formattedParagraphs;
+    return xmlToSingleParagraph(xml);
 }
 
-function addFrontmatterAndFooter(bodyContent) {
-    const frontmatter = `Translate into Vietnamese\n\n\`\`\`\n---
-title: My Third Blog Post
-author: Astro Learner
-description: "I had some challenges, but asking in the community really helped!"
-image:
-    url: "https://docs.astro.build/assets/rays.webp"
-    alt: "The Astro logo on a dark background with rainbow rays."
-pubDate: 2022-07-15
-tags: ["astro", "learning in public", "setbacks", "community"]
----\n`;
-
-    const footer = `\n---
-Let's keep in touch to stay up to date with the latest updates from Astro. https://github.com/withastro/astro\n\`\`\``;
-    return `${frontmatter}\n${bodyContent}\n${footer}`;
+function buildAIPrompt(bodyContent) {
+    return `Translate into Vietnamese\n\n${bodyContent}`;
 }
 
 // ====================================================================
-// SECTION 2: ACTIONS (SEND TO AI)
+// SECTION 2: SEND TO AI
 // ====================================================================
 
 const sendToAI = (content) => {
-    const API_KEY = "AIzaSyAzddIKNOyH3qWYcdkAWNoKKobVzRa2RXQ"; // WARNING: Hardcoding keys is insecure.
+    const API_KEY = "AIzaSyAzddIKNOyH3qWYcdkAWNoKKobVzRa2RXQ"; // ⚠️ Insecure
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${API_KEY}`;
 
-    const payload = { // <--- Define the payload object here
-        contents: [{
-            role: "user",
-            parts: [{ text: content }]
-        }],
+    const payload = {
+        contents: [{ role: "user", parts: [{ text: content }] }],
         generationConfig: {
             temperature: 1.4,
-            "thinkingConfig": {
-                "thinkingBudget": 600,
-            },
+            thinkingConfig: { thinkingBudget: 600 },
             topP: 0.6,
         }
     };
 
-    console.log("Payload before sending to AI:");
-    console.log(payload); // <--- Console log the payload
-
-    console.log("Sending content to AI. Check console for streaming response...");
+    console.log("Sending to AI...");
     fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload) // <--- Use the stringified payload
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
     })
     .then(response => {
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status} ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
         return response.body.getReader();
     })
     .then(reader => {
-      const decoder = new TextDecoder();
-      let leftover = "";
+        const decoder = new TextDecoder();
+        let leftover = "";
 
-      function read() {
-        reader.read().then(({ value, done }) => {
-          if (done) return console.log("\n--- AI Stream Finished ---");
+        function read() {
+            reader.read().then(({ value, done }) => {
+                if (done) return console.log("\n--- AI Stream Finished ---");
+                const chunk = leftover + decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                leftover = lines.pop();
 
-          const chunk = leftover + decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-          leftover = lines.pop(); 
-
-          for (let line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (textContent) {
-                    console.log(textContent);
+                for (let line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (text) console.log(text);
+                        } catch (e) { /* ignore */ }
+                    }
                 }
-              } catch (e) {
-                // Ignore empty or malformed data chunks
-              }
-            }
-          }
-          read();
-        });
-      }
-      read();
+                read();
+            });
+        }
+        read();
     })
-    .catch(error => console.error('Error sending to AI:', error));
+    .catch(error => console.error('Error:', error));
 };
 
 const getAndProcessSubs = async (track) => {
-    const { pot } = await new Promise(resolve => chrome.runtime.sendMessage({ action: 'getPot' }, resolve)) || {};
+    const { pot } = await new Promise(resolve =>
+        chrome.runtime.sendMessage({ action: 'getPot' }, resolve)
+    ) || {};
     if (!pot) {
         alert('Please enable subtitles and refresh the page');
         return null;
     }
     const xml = await fetch(`${track.baseUrl}&fromExt=true&c=WEB&pot=${pot}`).then(r => r.text());
     const bodyContent = processSubtitles(xml);
-    return addFrontmatterAndFooter(bodyContent);
+    return buildAIPrompt(bodyContent);
 };
 
 // ====================================================================
-// SECTION 3: YOUTUBE PAGE INTERACTION & UI
+// SECTION 3: YOUTUBE UI INTEGRATION
 // ====================================================================
 
-const getLabel = track => track?.name?.simpleText || track?.name?.runs?.map(r => r.text).join('') || track?.languageName?.simpleText || track?.languageCode || 'Unknown';
+const getLabel = track =>
+    track?.name?.simpleText ||
+    track?.name?.runs?.map(r => r.text).join('') ||
+    track?.languageName?.simpleText ||
+    track?.languageCode ||
+    'Unknown';
 
 const createUI = tracks => {
     $('#captionDownloadContainer')?.remove();
@@ -224,24 +145,42 @@ const createUI = tracks => {
         id: 'captionDownloadContainer',
         style: 'padding:10px 5px 10px 0;margin:10px 0;font-size:15px'
     });
+
     if (!tracks?.length) {
         div.textContent = 'No subtitles found';
     } else {
         div.append('Actions: ');
         tracks.forEach(track => {
-            div.append(Object.assign(document.createElement('a'), {
-                textContent: `[Process & Send ${getLabel(track)} to AI]`,
-                title: 'Send formatted text to the AI for processing',
+            const label = getLabel(track);
+
+            // Process & Send Button
+            const sendBtn = Object.assign(document.createElement('a'), {
+                textContent: `[Process & Send ${label} to AI]`,
                 href: '#',
                 style: 'margin-left:10px;cursor:pointer;color:mediumpurple;font-weight:bold;text-decoration:underline',
-                onclick: async (event) => { 
-                    event.preventDefault();
+                onclick: async (e) => {
+                    e.preventDefault();
                     const content = await getAndProcessSubs(track);
-                    if(content) sendToAI(content);
+                    if (content) sendToAI(content);
                 }
-            }));
+            });
+
+            // Copy Button
+            const copyBtn = Object.assign(document.createElement('a'), {
+                textContent: `[Copy]`,
+                href: '#',
+                style: 'margin-left:8px;cursor:pointer;color:teal;font-weight:bold;text-decoration:underline',
+                onclick: async (e) => {
+                    e.preventDefault();
+                    const content = await getAndProcessSubs(track);
+                    if (content) copyToClipboard(content);
+                }
+            });
+
+            div.append(sendBtn, copyBtn);
         });
     }
+
     const target = $('#bottom-row') || $('#meta #meta-contents #container #top-row');
     target?.parentNode?.insertBefore(div, target);
 };
