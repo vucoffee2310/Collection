@@ -2,9 +2,7 @@ import { Parser } from './parser.js';
 import { Mapper } from './mapper.js';
 import { AIStream } from './stream.js';
 import { Logger } from './logger.js';
-// START: RELEVANT CHANGE
 import { debounce } from './utils.js';
-// END: RELEVANT CHANGE
 
 // --- DOM Element Lookups (Composition Root) ---
 const elements = {
@@ -14,7 +12,10 @@ const elements = {
     mapDisplay: document.getElementById('display'),
     requestDetails: document.getElementById('request-details'),
     requestData: document.getElementById('request-data'),
-    responseDetails: document.getElementById('response-details'),
+    // START: RELEVANT CHANGE
+    networkResponseDetails: document.getElementById('network-response-details'),
+    generationSummary: document.getElementById('generation-summary'),
+    // END: RELEVANT CHANGE
     responseDataStream: document.getElementById('response-data-stream')
 };
 
@@ -29,7 +30,10 @@ const streamDependencies = {
     buttonElement: elements.startButton,
     requestDetailsEl: elements.requestDetails,
     requestDataEl: elements.requestData,
-    responseDetailsEl: elements.responseDetails,
+    // START: RELEVANT CHANGE
+    networkResponseDetailsEl: elements.networkResponseDetails,
+    generationSummaryEl: elements.generationSummary,
+    // END: RELEVANT CHANGE
     responseDataStreamEl: elements.responseDataStream
 };
 const stream = new AIStream(streamDependencies);
@@ -53,9 +57,5 @@ window.addEventListener('load', () => {
     autoParseSource();
 });
 
-// START: RELEVANT CHANGE
-// The autoParseSource function is now debounced by 300ms.
 elements.sourceInput.addEventListener('input', debounce(autoParseSource, 300));
-// END: RELEVANT CHANGE
-
 elements.startButton.addEventListener('click', () => stream.toggle());

@@ -1,6 +1,4 @@
-// START: RELEVANT CHANGE
 import { throttle } from './utils.js';
-// END: RELEVANT CHANGE
 
 export class Mapper {
     constructor(displayElement) {
@@ -8,15 +6,9 @@ export class Mapper {
         this.target = [];
         this.targetPartial = null;
         this.displayElement = displayElement;
-
-        // START: RELEVANT CHANGE
-        // Create a throttled version of the draw method to be called at most once per 100ms.
-        // .bind(this) is crucial to maintain the correct 'this' context inside the throttled function.
         this.throttledDraw = throttle(this.draw.bind(this), 100);
-        // END: RELEVANT CHANGE
     }
     
-    // These methods are called for immediate, important UI changes
     setSource(segments) { 
         this.source = segments; 
         this.draw(); 
@@ -28,8 +20,6 @@ export class Mapper {
         this.draw(); 
     }
 
-    // START: RELEVANT CHANGE
-    // These methods are called frequently during streaming and now use the throttled function.
     addTargetBatch(segments) { 
         this.target.push(...segments); 
         this.throttledDraw(); 
@@ -39,7 +29,6 @@ export class Mapper {
         this.targetPartial = partial; 
         this.throttledDraw(); 
     }
-    // END: RELEVANT CHANGE
 
     draw() {
         if(!this.displayElement) return;
@@ -52,15 +41,34 @@ export class Mapper {
             this.displayElement.innerHTML = '<div class="empty">Click "Generate & Map" to process</div>';
             return;
         }
+
         const sourceMap = {}; this.source.forEach(s => sourceMap[s.marker] = s);
         const targetMap = {}; this.target.forEach(t => targetMap[t.marker] = t);
+        
         let currentBatch = [];
         let batchNum = 0;
         const batchSize = 3;
+
+        // --- START: REVISED LOGIC ---
+        // The main loop now handles all segment types (matched, partial, and gap).
         for (let i = 0; i < this.source.length; i++) {
             const sourceSeg = this.source[i];
-            const targetSeg = targetMap[sourceSeg.marker];
-            currentBatch.push({ type: targetSeg ? 'matched' : 'gap', source: sourceSeg, target: targetSeg });
+            const matchedSeg = targetMap[sourceSeg.marker];
+            let item;
+
+            if (matchedSeg) {
+                // This segment has a fully completed target match.
+                item = { type: 'matched', source: sourceSeg, target: matchedSeg };
+            } else if (this.targetPartial && this.targetPartial.marker === sourceSeg.marker) {
+                // This is the currently streaming partial segment.
+                item = { type: 'partial', source: sourceSeg, target: this.targetPartial };
+            } else {
+                // No completed or partial match found, so it's a gap.
+                item = { type: 'gap', source: sourceSeg, target: null };
+            }
+            
+            currentBatch.push(item);
+
             if (currentBatch.length === batchSize || i === this.source.length - 1) {
                 if (currentBatch.length > 0) {
                     this.renderBatch(currentBatch, ++batchNum);
@@ -68,14 +76,20 @@ export class Mapper {
                 }
             }
         }
-        if (this.targetPartial) {
-            this.renderBatch([{ type: 'partial', source: sourceMap[this.targetPartial.marker] || null, target: this.targetPartial }], 'STREAMING');
-        }
+        // --- END: REVISED LOGIC ---
+
+
+        // --- START: REMOVED CODE BLOCK ---
+        // The block that created "BATCH #STREAMING" has been deleted from here.
+        // --- END: REMOVED CODE BLOCK ---
+
+
         const orphans = this.target.filter(t => !sourceMap[t.marker]);
         if (orphans.length > 0) {
             this.renderBatch(orphans.map(t => ({ type: 'orphan', source: null, target: t })), 'ORPHAN');
         }
     }
+
     renderBatch(items, batchNum) {
         const batchDiv = document.createElement('div');
         batchDiv.className = 'batch';
