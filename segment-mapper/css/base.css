@@ -1,0 +1,22 @@
+* { box-sizing: border-box; }
+
+body { 
+    font-family: Arial, sans-serif; 
+    margin: 0;
+    padding: 20px;
+    background: #f4f4f4;
+    overflow-x: hidden;
+}
+
+h2, h3 { 
+    margin: 0 0 10px 0; 
+    color: #333; 
+}
+
+h2 { font-size: 18px; }
+
+h3 { 
+    font-size: 16px; 
+    border-bottom: 1px solid #eee; 
+    padding-bottom: 8px;
+}

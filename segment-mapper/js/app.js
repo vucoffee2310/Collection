@@ -1,20 +1,42 @@
 import { Parser } from './parser.js';
 import { Mapper } from './mapper.js';
 import { AIStream } from './stream.js';
-import { DebugLogger } from './debugLogger.js'; // Import the new logger
+import { Logger } from './logger.js';
+// START: RELEVANT CHANGE
+import { debounce } from './utils.js';
+// END: RELEVANT CHANGE
 
-// --- DOM Elements ---
-const sourceInputElement = document.getElementById('sourceInput');
-const startButton = document.getElementById('btn');
+// --- DOM Element Lookups (Composition Root) ---
+const elements = {
+    logDisplay: document.getElementById('log-display'),
+    sourceInput: document.getElementById('sourceInput'),
+    startButton: document.getElementById('btn'),
+    mapDisplay: document.getElementById('display'),
+    requestDetails: document.getElementById('request-details'),
+    requestData: document.getElementById('request-data'),
+    responseDetails: document.getElementById('response-details'),
+    responseDataStream: document.getElementById('response-data-stream')
+};
 
-// --- Initialization ---
-const mapper = new Mapper();
-const logger = new DebugLogger(); // Create an instance of the logger
-const stream = new AIStream(mapper, sourceInputElement, logger); // Pass it to the stream handler
+// --- Class Instantiation & Dependency Injection ---
+const logger = new Logger(elements.logDisplay);
+const mapper = new Mapper(elements.mapDisplay);
+
+const streamDependencies = {
+    mapper: mapper,
+    logger: logger,
+    sourceInputElement: elements.sourceInput,
+    buttonElement: elements.startButton,
+    requestDetailsEl: elements.requestDetails,
+    requestDataEl: elements.requestData,
+    responseDetailsEl: elements.responseDetails,
+    responseDataStreamEl: elements.responseDataStream
+};
+const stream = new AIStream(streamDependencies);
 
 // --- Functions ---
 function autoParseSource() {
-    const fullText = sourceInputElement.value;
+    const fullText = elements.sourceInput.value;
     const contentForMapping = Parser.extractContentForMapping(fullText);
     
     if (!contentForMapping) {
@@ -26,6 +48,14 @@ function autoParseSource() {
 }
 
 // --- Event Listeners ---
-sourceInputElement.addEventListener('input', autoParseSource);
-window.addEventListener('load', autoParseSource);
-startButton.addEventListener('click', () => stream.toggle());
+window.addEventListener('load', () => {
+    logger.log("Application initialized.");
+    autoParseSource();
+});
+
+// START: RELEVANT CHANGE
+// The autoParseSource function is now debounced by 300ms.
+elements.sourceInput.addEventListener('input', debounce(autoParseSource, 300));
+// END: RELEVANT CHANGE
+
+elements.startButton.addEventListener('click', () => stream.toggle());
