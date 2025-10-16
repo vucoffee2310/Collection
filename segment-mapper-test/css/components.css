@@ -1,0 +1,118 @@
+/* =================================
+   MAIN LAYOUT STRUCTURE
+   ================================= */
+
+* { 
+    box-sizing: border-box; 
+}
+
+body { 
+    font-family: Arial, sans-serif; 
+    margin: 0;
+    padding: 0;
+    background: #f4f4f4;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header Section */
+.header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: #fff;
+    border-bottom: 2px solid #ddd;
+    z-index: 10;
+}
+
+.header h1 { 
+    margin: 0; 
+    font-size: 24px; 
+}
+
+/* Main Container Grid */
+.main-container {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0;
+    overflow: hidden;
+    height: 100%;
+}
+
+/* Column Layout */
+.content-column, 
+.sidebar-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+}
+
+.content-column {
+    background: #f4f4f4;
+    border-right: 2px solid #ddd;
+}
+
+.sidebar-column {
+    background: #fafafa;
+}
+
+/* Custom Scrollbars */
+.content-column::-webkit-scrollbar,
+.sidebar-column::-webkit-scrollbar {
+    width: 10px;
+}
+
+.content-column::-webkit-scrollbar-track,
+.sidebar-column::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.content-column::-webkit-scrollbar-thumb,
+.sidebar-column::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 5px;
+}
+
+.content-column::-webkit-scrollbar-thumb:hover,
+.sidebar-column::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .main-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .content-column {
+        border-right: none;
+        border-bottom: 2px solid #ddd;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 10px 15px;
+    }
+    
+    .header h1 {
+        font-size: 20px;
+    }
+    
+    .content-column, 
+    .sidebar-column {
+        padding: 15px;
+        gap: 15px;
+    }
+}

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Debug - AI Segment Mapper</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { min-height: 100vh; overflow-x: hidden; }
+        
+        .debug-container { max-width: 1600px; margin: 0 auto; padding: 10px 20px 60px; }
+        .header { margin-bottom: 10px; padding-top: 10px; }
+        
+        .controls-bar {
+            background: white; padding: 8px 12px; margin-bottom: 10px;
+            border: 1px solid #ddd; border-radius: 4px;
+            display: flex; gap: 8px; align-items: center;
+        }
+        
+        .controls-bar button {
+            padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;
+            cursor: pointer; background: #f8f9fa; color: #333;
+            font-size: 13px; font-weight: 500; transition: all 0.2s;
+        }
+        
+        .controls-bar button:hover { background: #e2e6ea; border-color: #adb5bd; color: #000; }
+        .controls-bar button:active { transform: translateY(1px); }
+        .controls-bar .auto-scroll-btn.active { background: #28a745; border-color: #28a745; color: white; }
+        .controls-bar .auto-scroll-btn.active:hover { background: #218838; border-color: #1e7e34; color: white; }
+        .controls-info { margin-left: auto; color: #666; font-size: 12px; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 15px; }
+        
+        .stat-box {
+            background: white; padding: 10px; border: 1px solid #ddd;
+            border-radius: 4px; text-align: center;
+        }
+        
+        .stat-box.matched { border-left: 3px solid #28a745; }
+        .stat-box.orphan { border-left: 3px solid #dc3545; }
+        .stat-box.gap { border-left: 3px solid #ffc107; }
+        .stat-box.info { border-left: 3px solid #17a2b8; }
+        
+        .stat-number { font-size: 24px; font-weight: bold; margin-bottom: 3px; }
+        .stat-label { font-size: 11px; color: #666; text-transform: uppercase; }
+        .stat-sublabel { font-size: 10px; color: #999; margin-top: 2px; }
+        
+        .timeline-header {
+            background: white; padding: 10px 15px; margin-bottom: 15px;
+            border: 1px solid #ddd; border-radius: 4px; font-weight: 600; font-size: 14px;
+        }
+        
+        #timeline { height: auto !important; max-height: none !important; overflow: visible !important; }
+        
+        .timeline-empty {
+            text-align: center; padding: 60px 20px; color: #999; font-style: italic;
+            background: white; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 20px;
+        }
+        
+        .event {
+            background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;
+            padding: 15px; margin-bottom: 15px; position: relative;
+        }
+        
+        .event.matched { border-left: 4px solid #28a745; background: #f8fff9; }
+        .event.orphan { border-left: 4px solid #dc3545; background: #fff8f8; }
+        
+        .event-number {
+            position: absolute; top: -8px; left: 10px; background: #333; color: white;
+            padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;
+        }
+        
+        .event-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ddd;
+        }
+        
+        .event-time { font-family: monospace; font-size: 12px; color: #666; }
+        
+        .event-badge {
+            padding: 4px 10px; border-radius: 3px; font-size: 11px;
+            font-weight: bold; text-transform: uppercase;
+        }
+        .event-badge.matched { background: #28a745; color: white; }
+        .event-badge.orphan { background: #dc3545; color: white; }
+        
+        .event-summary { background: white; border: 1px solid #e0e0e0; border-radius: 4px; padding: 12px; }
+        
+        .summary-json, .json-display {
+            background: #2d2d2d; color: #f8f8f8; padding: 12px; border-radius: 4px;
+            font-family: monospace; font-size: 12px; line-height: 1.6; overflow-x: auto;
+        }
+        
+        .summary-json { margin-bottom: 10px; }
+        .json-display { margin-top: 8px; }
+        
+        .json-key { color: #9cdcfe; }
+        .json-string { color: #ce9178; }
+        .json-null { color: #569cd6; }
+        .json-marker { color: #c586c0; font-weight: bold; }
+        
+        .summary-status {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+        }
+        
+        .status-text { font-weight: 600; font-size: 13px; }
+        .status-text.matched { color: #28a745; }
+        .status-text.orphan { color: #dc3545; }
+        
+        .expand-btn {
+            background: #007bff; color: white; border: none; padding: 6px 14px;
+            border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;
+            display: flex; align-items: center; gap: 6px; transition: background 0.2s;
+        }
+        .expand-btn:hover { background: #0056b3; }
+        .expand-btn .icon { transition: transform 0.3s; }
+        .expand-btn.expanded .icon { transform: rotate(180deg); }
+        
+        .event-details {
+            display: none; margin-top: 15px; border-top: 2px solid #dee2e6; padding-top: 15px;
+        }
+        .event-details.visible { display: block; }
+        
+        .details-title {
+            font-size: 12px; font-weight: 600; color: #666;
+            text-transform: uppercase; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        
+        .step {
+            background: white; border: 1px solid #e0e0e0; border-radius: 4px;
+            padding: 12px; margin-bottom: 10px;
+        }
+        
+        .step-title {
+            font-weight: 600; margin-bottom: 8px; font-size: 13px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        
+        .step-number {
+            background: #6c757d; color: white; width: 22px; height: 22px;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 11px; flex-shrink: 0;
+        }
+        
+        .step-content { font-size: 13px; line-height: 1.6; color: #333; }
+        
+        .code-box {
+            background: #f4f4f4; border: 1px solid #ddd; padding: 10px;
+            border-radius: 3px; font-family: monospace; font-size: 12px;
+            margin-top: 8px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; color: #333;
+        }
+        
+        .data-table {
+            width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px;
+        }
+        
+        .data-table th {
+            background: #f0f0f0; padding: 8px; text-align: left;
+            border: 1px solid #ddd; font-weight: 600; color: #333;
+        }
+        
+        .data-table td { padding: 8px; border: 1px solid #ddd; color: #333; }
+        .data-table .mono { font-family: monospace; background: #f9f9f9; }
+        
+        .comparison-grid {
+            display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; margin-top: 10px;
+        }
+        
+        .comparison-item {
+            background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 4px;
+        }
+        
+        .comparison-label {
+            font-size: 11px; font-weight: 600; color: #666;
+            text-transform: uppercase; margin-bottom: 6px;
+        }
+        
+        .comparison-text { font-size: 12px; line-height: 1.4; color: #333; }
+        .comparison-arrow { font-size: 20px; align-self: center; color: #28a745; }
+        
+        .alert {
+            padding: 10px 12px; border-radius: 4px; margin-top: 8px;
+            font-size: 12px; line-height: 1.5;
+        }
+        .alert.success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .alert.error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .alert.warning { background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
+        
+        .marker-tag {
+            background: #495057; color: white; padding: 2px 6px; border-radius: 3px;
+            font-family: monospace; font-size: 11px; font-weight: bold;
+        }
+        
+        .process-flow {
+            background: #f8f9fa; border: 1px solid #dee2e6;
+            border-radius: 4px; padding: 10px; margin-top: 8px;
+        }
+        
+        .flow-item {
+            display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; color: #333;
+        }
+        
+        .flow-icon {
+            width: 24px; height: 24px; background: #6c757d; color: white;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 12px; flex-shrink: 0;
+        }
+        .flow-icon.success { background: #28a745; }
+        .flow-icon.error { background: #dc3545; }
+        .flow-icon.warning { background: #ffc107; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <div class="header">
+            <h1>🔬 Process Debug - Real-Time Mapping Analysis</h1>
+        </div>
+
+        <div class="controls-bar">
+            <button id="clearBtn">Clear Events</button>
+            <button class="auto-scroll-btn" id="autoScrollBtn">Auto-Scroll: OFF</button>
+            <button id="expandAllBtn">Expand All</button>
+            <button id="collapseAllBtn">Collapse All</button>
+            <button id="scrollToTopBtn">↑ Top</button>
+            <button id="scrollToBottomBtn">↓ Bottom</button>
+            <span class="controls-info">Events: <strong id="eventCounter">0</strong></span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box info">
+                <div class="stat-number" id="sourceCount">0</div>
+                <div class="stat-label">📋 Sources</div>
+                <div class="stat-sublabel">Total input segments</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="totalEvents">0</div>
+                <div class="stat-label">AI Responses</div>
+                <div class="stat-sublabel">Target segments received</div>
+            </div>
+            <div class="stat-box matched">
+                <div class="stat-number" id="matchedCount">0</div>
+                <div class="stat-label">✓ Matched</div>
+                <div class="stat-sublabel">Successfully paired</div>
+            </div>
+            <div class="stat-box orphan">
+                <div class="stat-number" id="orphanCount">0</div>
+                <div class="stat-label">⚠ Orphans</div>
+                <div class="stat-sublabel">AI invented (no source)</div>
+            </div>
+            <div class="stat-box gap">
+                <div class="stat-number" id="gapCount">0</div>
+                <div class="stat-label">⏳ Waiting</div>
+                <div class="stat-sublabel">Sources awaiting AI</div>
+            </div>
+        </div>
+
+        <div class="timeline-header">
+            ⏱️ Timeline: Detailed Segment Processing Events (Click to Expand Details)
+        </div>
+
+        <div id="timeline">
+            <div class="timeline-empty">
+                No events yet. Start generation from the main page to see the detailed process here.
+                <br><br>
+                <small>Events will accumulate here without limit. Click on any event to see step-by-step details.</small>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        class ProcessDebugger {
+            constructor() {
+                this.timeline = document.getElementById('timeline');
+                this.eventCounter = document.getElementById('eventCounter');
+                this.autoScroll = false;
+                this.eventCount = 0;
+                this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
+                this.sourceSegments = [];
+                this.init();
+            }
+
+            init() {
+                document.getElementById('clearBtn').onclick = () => this.clearTimeline();
+                document.getElementById('autoScrollBtn').onclick = (e) => {
+                    this.autoScroll = !this.autoScroll;
+                    e.target.textContent = this.autoScroll ? 'Auto-Scroll: ON' : 'Auto-Scroll: OFF';
+                    e.target.classList.toggle('active', this.autoScroll);
+                };
+                document.getElementById('expandAllBtn').onclick = () => this.expandAll();
+                document.getElementById('collapseAllBtn').onclick = () => this.collapseAll();
+                document.getElementById('scrollToTopBtn').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+                document.getElementById('scrollToBottomBtn').onclick = () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+
+                window.addEventListener('message', (e) => {
+                    if (e.data.type === 'SOURCE_SEGMENTS') {
+                        this.sourceSegments = e.data.segments;
+                        document.getElementById('sourceCount').textContent = this.sourceSegments.length;
+                        this.updateGapStats();
+                    } else if (e.data.type === 'TARGET_SEGMENT') {
+                        this.processSegment(e.data.segment);
+                    } else if (e.data.type === 'RESET') {
+                        this.clearTimeline();
+                    }
+                });
+
+                if (window.opener) window.opener.postMessage({ type: 'DEBUG_READY' }, '*');
+            }
+
+            expandAll() {
+                document.querySelectorAll('.event-details').forEach(d => d.classList.add('visible'));
+                document.querySelectorAll('.expand-btn').forEach(b => {
+                    b.classList.add('expanded');
+                    b.innerHTML = '<span class="icon">▼</span> Hide Details';
+                });
+            }
+
+            collapseAll() {
+                document.querySelectorAll('.event-details').forEach(d => d.classList.remove('visible'));
+                document.querySelectorAll('.expand-btn').forEach(b => {
+                    b.classList.remove('expanded');
+                    b.innerHTML = '<span class="icon">▼</span> Show Details';
+                });
+            }
+
+            clearTimeline() {
+                this.timeline.innerHTML = `<div class="timeline-empty">Timeline cleared. New events will appear here.<br><br><small>Events will accumulate without limit. Click on any event to see step-by-step details.</small></div>`;
+                this.eventCount = 0;
+                this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
+                this.updateStatsDisplay();
+                this.eventCounter.textContent = 0;
+            }
+
+            processSegment(segment) {
+                if (this.timeline.querySelector('.timeline-empty')) this.timeline.innerHTML = '';
+
+                this.eventCount++;
+                this.stats.total++;
+
+                const timestamp = new Date().toLocaleTimeString();
+                const sourceMatch = this.sourceSegments.find(s => s.marker === segment.marker);
+
+                let eventData;
+                if (sourceMatch) {
+                    this.stats.matched++;
+                    eventData = this.createMatchedEvent(segment, sourceMatch, timestamp);
+                } else {
+                    this.stats.orphan++;
+                    eventData = this.createOrphanEvent(segment, timestamp);
+                }
+
+                this.updateGapStats();
+                this.renderEvent(eventData);
+                this.updateStatsDisplay();
+                this.eventCounter.textContent = this.eventCount;
+
+                if (this.autoScroll) {
+                    requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+                }
+            }
+
+            createMatchedEvent(target, source, timestamp) {
+                const baseMarker = target.marker.split('-')[0];
+                const index = parseInt(target.marker.split('-')[1]);
+                const jsonPair = { marker: target.marker, source: source.text, target: target.text };
+
+                return {
+                    type: 'matched',
+                    number: this.eventCount,
+                    timestamp,
+                    marker: target.marker,
+                    jsonPair,
+                    statusText: '✅ Status: MATCHED',
+                    steps: [
+                        { title: '📥 Step 1: Received Raw Segment from AI Stream', content: 'A new segment has been parsed from the AI response stream.', data: { 'Raw Marker': target.marker, 'Text Length': `${target.text.length} characters`, 'Timestamp': timestamp } },
+                        { title: '🔍 Step 2: Parse Marker Components', content: 'Breaking down the marker into base letter and index number.', data: { 'Full Marker': target.marker, 'Base Marker': baseMarker, 'Index Number': index, 'Pattern': `(${baseMarker}) → ${baseMarker}-${index}` } },
+                        { title: '📋 Step 3: Display Target Segment Text', content: 'The actual text content received from AI:', code: target.text },
+                        { title: '🗂️ Step 4: Search Source Map', content: `Looking up marker <span class="marker-tag">${target.marker}</span> in source segments map.`, flow: [ { icon: '📊', text: `Total source segments: ${this.sourceSegments.length}`, type: 'info' }, { icon: '🔑', text: `Searching for key: "${target.marker}"`, type: 'info' }, { icon: '✅', text: 'Match found in source map!', type: 'success' } ] },
+                        { title: '📄 Step 5: Retrieved Source Segment', content: 'Found matching source segment with same marker:', data: { 'Source Marker': source.marker, 'Source Text': source.text.substring(0, 100) + (source.text.length > 100 ? '...' : ''), 'Text Length': `${source.text.length} characters` } },
+                        { title: '🔄 Step 6: Compare Source and Target', content: 'Side-by-side comparison of matched segments:', comparison: { source: source.text, target: target.text } },
+                        { title: '🏗️ Step 7: Initialize JSON Pair Object', content: 'Creating empty pair object structure:', code: '{}' },
+                        { title: '🔧 Step 8: Add "marker" Field', content: 'Setting the marker field:', code: `{\n  "marker": "${target.marker}"\n}` },
+                        { title: '🔧 Step 9: Add "source" Field', content: 'Adding source text to the pair:', code: `{\n  "marker": "${target.marker}",\n  "source": "${this.truncate(source.text, 50)}"\n}` },
+                        { title: '🔧 Step 10: Add "target" Field', content: 'Adding target text to complete the pair:', code: `{\n  "marker": "${target.marker}",\n  "source": "${this.truncate(source.text, 50)}",\n  "target": "${this.truncate(target.text, 50)}"\n}` },
+                        { title: '📦 Step 11: Final JSON Pair Object', content: 'Complete pair object ready for mapping:', json: jsonPair },
+                        { title: '✅ Step 12: Classification Result', content: 'Determining final status based on matching result:', flow: [ { icon: '✓', text: 'Source exists: YES', type: 'success' }, { icon: '✓', text: 'Markers match: YES', type: 'success' }, { icon: '✓', text: 'Status: MATCHED', type: 'success' } ] },
+                        { title: '🎯 Step 13: Add to Mapper', content: 'This pair will be added to the main mapping display.', alert: { type: 'success', message: '✅ SUCCESS: This segment is MATCHED. The JSON pair will be displayed in the main view with both source and target text properly mapped.' } }
+                    ]
+                };
+            }
+
+            createOrphanEvent(target, timestamp) {
+                const baseMarker = target.marker.split('-')[0];
+                const index = parseInt(target.marker.split('-')[1]);
+                const sourceWithBase = this.sourceSegments.filter(s => s.marker.startsWith(baseMarker + '-'));
+
+                let reason, gapDetails, searchResult;
+                if (sourceWithBase.length === 0) {
+                    reason = `No source segments with base marker (${baseMarker}) exist`;
+                    gapDetails = `The AI generated a (${baseMarker}) marker, but your source input doesn't contain ANY (${baseMarker}) markers.`;
+                    searchResult = [ { icon: '❌', text: `No (${baseMarker}) markers in source`, type: 'error' }, { icon: '📊', text: `Source has 0 segments with base "${baseMarker}"`, type: 'error' } ];
+                } else {
+                    const available = sourceWithBase.map(s => s.marker).join(', ');
+                    reason = `Source has (${baseMarker}) markers, but not index ${index}`;
+                    gapDetails = `Source contains ${sourceWithBase.length} segment(s) with base marker (${baseMarker}): ${available}\n\nBut the AI generated ${target.marker}, which doesn't exist in source.`;
+                    searchResult = [ { icon: '✓', text: `Found ${sourceWithBase.length} source segment(s) with base "${baseMarker}"`, type: 'warning' }, { icon: '❌', text: `But index ${index} not found (looking for "${target.marker}")`, type: 'error' }, { icon: '📋', text: `Available: ${available}`, type: 'warning' } ];
+                }
+
+                const jsonPair = { marker: target.marker, source: null, target: target.text };
+
+                return {
+                    type: 'orphan',
+                    number: this.eventCount,
+                    timestamp,
+                    marker: target.marker,
+                    jsonPair,
+                    statusText: '⚠️ Status: ORPHAN - ' + reason,
+                    steps: [
+                        { title: '📥 Step 1: Received Raw Segment from AI Stream', content: 'A new segment has been parsed from the AI response stream.', data: { 'Raw Marker': target.marker, 'Text Length': `${target.text.length} characters`, 'Timestamp': timestamp } },
+                        { title: '🔍 Step 2: Parse Marker Components', content: 'Breaking down the marker into base letter and index number.', data: { 'Full Marker': target.marker, 'Base Marker': baseMarker, 'Index Number': index, 'Pattern': `(${baseMarker}) → ${baseMarker}-${index}` } },
+                        { title: '📋 Step 3: Display Target Segment Text', content: 'The actual text content received from AI:', code: target.text },
+                        { title: '🗂️ Step 4: Search Source Map', content: `Looking up marker <span class="marker-tag">${target.marker}</span> in source segments map.`, flow: [ { icon: '📊', text: `Total source segments: ${this.sourceSegments.length}`, type: 'info' }, { icon: '🔑', text: `Searching for key: "${target.marker}"`, type: 'info' }, { icon: '❌', text: 'No match found in source map!', type: 'error' } ] },
+                        { title: '🔍 Step 5: Detailed Search Analysis', content: `Analyzing why <span class="marker-tag">${target.marker}</span> was not found:`, flow: searchResult },
+                        { title: '❌ Step 6: Match Result', content: reason, alert: { type: 'error', message: gapDetails } },
+                        { title: '📊 Step 7: Source Segments Overview', content: 'Current state of source segments by base marker:', data: this.getSourceMarkerSummary() },
+                        { title: '🏗️ Step 8: Initialize JSON Pair Object', content: 'Creating empty pair object structure:', code: '{}' },
+                        { title: '🔧 Step 9: Add "marker" Field', content: 'Setting the marker field:', code: `{\n  "marker": "${target.marker}"\n}` },
+                        { title: '🔧 Step 10: Add "source" Field (NULL)', content: 'Source is set to NULL because no match exists:', code: `{\n  "marker": "${target.marker}",\n  "source": null\n}` },
+                        { title: '🔧 Step 11: Add "target" Field', content: 'Adding target text to complete the pair:', code: `{\n  "marker": "${target.marker}",\n  "source": null,\n  "target": "${this.truncate(target.text, 50)}"\n}` },
+                        { title: '📦 Step 12: Final JSON Pair Object (Orphan)', content: 'Complete orphan pair with NULL source:', json: jsonPair },
+                        { title: '⚠️ Step 13: Classification Result', content: 'Determining final status based on matching result:', flow: [ { icon: '✗', text: 'Source exists: NO', type: 'error' }, { icon: '✗', text: 'Markers match: NO', type: 'error' }, { icon: '⚠', text: 'Status: ORPHAN', type: 'warning' } ] },
+                        { title: '🎯 Step 14: Add to Mapper as Orphan', content: 'This orphan pair will be flagged in the main mapping display.', alert: { type: 'warning', message: `⚠️ ORPHAN DETECTED: The AI generated marker "${target.marker}" which doesn't exist in your source.\n\nPossible causes:\n1. AI hallucination (invented a marker)\n2. AI returned different count of (${baseMarker}) markers than source\n3. Index mismatch between source and AI response\n\nAction: Review your prompt to ensure AI preserves all markers correctly.` } }
+                    ]
+                };
+            }
+
+            getSourceMarkerSummary() {
+                const summary = {};
+                this.sourceSegments.forEach(seg => {
+                    const base = seg.marker.split('-')[0];
+                    if (!summary[base]) summary[base] = [];
+                    summary[base].push(seg.marker);
+                });
+
+                const result = {};
+                Object.keys(summary).sort().forEach(base => {
+                    result[`(${base}) count`] = summary[base].length;
+                    result[`(${base}) markers`] = summary[base].join(', ');
+                });
+                return result;
+            }
+
+            updateGapStats() {
+                const matchedMarkers = new Set();
+                this.timeline.querySelectorAll('.event.matched').forEach(e => {
+                    if (e.dataset.marker) matchedMarkers.add(e.dataset.marker);
+                });
+                this.stats.gap = this.sourceSegments.filter(s => !matchedMarkers.has(s.marker)).length;
+            }
+
+            renderEvent(eventData) {
+                const detailsId = `details-${this.eventCount}`;
+                const div = document.createElement('div');
+                div.className = `event ${eventData.type}`;
+                div.dataset.marker = eventData.marker;
+                
+                let html = `
+                    <div class="event-number">#${eventData.number}</div>
+                    <div class="event-header">
+                        <span class="event-time">${eventData.timestamp}</span>
+                        <span class="event-badge ${eventData.type}">${eventData.type}</span>
+                    </div>
+                    <div class="event-summary">
+                        ${this.renderSummaryJSON(eventData.jsonPair)}
+                        <div class="summary-status">
+                            <div class="status-text ${eventData.type}">${eventData.statusText}</div>
+                            <button class="expand-btn" onclick="toggleDetails('${detailsId}', this)">
+                                <span class="icon">▼</span> Show Details
+                            </button>
+                        </div>
+                    </div>
+                    <div class="event-details" id="${detailsId}">
+                        <div class="details-title">🔍 Step-by-Step Processing Details</div>
+                `;
+
+                eventData.steps.forEach((step, i) => {
+                    html += `<div class="step">
+                        <div class="step-title">
+                            <span class="step-number">${i + 1}</span>
+                            ${step.title}
+                        </div>
+                        <div class="step-content">
+                            ${step.content}
+                            ${step.code ? `<div class="code-box">${this.escapeHtml(step.code)}</div>` : ''}
+                            ${step.data ? this.renderDataTable(step.data) : ''}
+                            ${step.flow ? this.renderFlow(step.flow) : ''}
+                            ${step.comparison ? this.renderComparison(step.comparison) : ''}
+                            ${step.json ? this.renderJSONInSteps(step.json) : ''}
+                            ${step.alert ? this.renderAlert(step.alert) : ''}
+                        </div>
+                    </div>`;
+                });
+
+                html += `</div>`;
+                div.innerHTML = html;
+                this.timeline.appendChild(div);
+            }
+
+            renderDataTable(data) {
+                let html = '<table class="data-table">';
+                Object.keys(data).forEach(key => {
+                    html += `<tr><th>${key}</th><td class="mono">${this.escapeHtml(String(data[key]))}</td></tr>`;
+                });
+                return html + '</table>';
+            }
+
+            renderFlow(items) {
+                let html = '<div class="process-flow">';
+                items.forEach(item => {
+                    html += `<div class="flow-item"><span class="flow-icon ${item.type}">${item.icon}</span><span>${item.text}</span></div>`;
+                });
+                return html + '</div>';
+            }
+
+            renderComparison(comparison) {
+                return `<div class="comparison-grid">
+                    <div class="comparison-item">
+                        <div class="comparison-label">Source Text</div>
+                        <div class="comparison-text">${this.escapeHtml(comparison.source)}</div>
+                    </div>
+                    <div class="comparison-arrow">➜</div>
+                    <div class="comparison-item">
+                        <div class="comparison-label">Target Text</div>
+                        <div class="comparison-text">${this.escapeHtml(comparison.target)}</div>
+                    </div>
+                </div>`;
+            }
+
+            formatJSON(obj) {
+                return JSON.stringify(obj, null, 2)
+                    .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+                    .replace(/: "([^"]+)"/g, (m, p) => `: <span class="json-string">"${this.escapeHtml(p)}"</span>`)
+                    .replace(/: null/g, ': <span class="json-null">null</span>')
+                    .replace(/"([a-z]-\d+)"/g, '<span class="json-marker">"$1"</span>');
+            }
+
+            renderSummaryJSON(obj) {
+                return `<div class="summary-json">${this.formatJSON(obj)}</div>`;
+            }
+
+            renderJSONInSteps(obj) {
+                return `<div class="json-display">${this.formatJSON(obj)}</div>`;
+            }
+
+            renderAlert(alert) {
+                return `<div class="alert ${alert.type}">${alert.message.replace(/\n/g, '<br>')}</div>`;
+            }
+
+            updateStatsDisplay() {
+                document.getElementById('totalEvents').textContent = this.stats.total;
+                document.getElementById('matchedCount').textContent = this.stats.matched;
+                document.getElementById('orphanCount').textContent = this.stats.orphan;
+                document.getElementById('gapCount').textContent = this.stats.gap;
+            }
+
+            truncate(str, len) {
+                return str.length > len ? str.substring(0, len) + '...' : str;
+            }
+
+            escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+        }
+
+        window.toggleDetails = function(detailsId, button) {
+            const details = document.getElementById(detailsId);
+            details.classList.toggle('visible');
+            button.classList.toggle('expanded');
+            button.innerHTML = details.classList.contains('visible') 
+                ? '<span class="icon">▼</span> Hide Details' 
+                : '<span class="icon">▼</span> Show Details';
+        };
+
+        new ProcessDebugger();
+    </script>
+</body>
+</html>

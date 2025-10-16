@@ -1,0 +1,51 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: #fff;
+    border-bottom: 2px solid #ddd;
+}
+
+.header h1 { 
+    margin: 0; 
+    font-size: 24px; 
+}
+
+button {
+    padding: 12px 30px; 
+    border: none; 
+    background: #333; 
+    color: white;
+    cursor: pointer; 
+    font-size: 14px; 
+    border-radius: 4px; 
+    white-space: nowrap;
+}
+
+button:hover { background: #555; }
+
+.panel { 
+    border: 1px solid #ccc; 
+    padding: 15px;
+    background: #fff; 
+    border-radius: 5px;
+}
+
+.input-area { 
+    width: 100%; 
+    min-height: 250px; 
+    max-height: 500px;
+    padding: 8px; 
+    border: 1px solid #999;
+    font-family: monospace; 
+    font-size: 11px; 
+    resize: vertical;
+}
+
+.input-group { 
+    display: flex; 
+    flex-direction: column; 
+}
