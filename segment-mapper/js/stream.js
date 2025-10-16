@@ -172,6 +172,7 @@ export class AIStream {
             this.mapper.addTargetBatch(final);
         }
         this.mapper.setTargetPartial(null);
+        this.mapper.finalize();
     }
     
     finalizeSummary(status, errorMessage) {

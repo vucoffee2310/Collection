@@ -30,6 +30,12 @@ export class Mapper {
         this.throttledDraw(); 
     }
 
+    finalize() {
+        if (this.throttledDraw.pending()) {
+            this.throttledDraw.flush();
+        }
+    }
+
     draw() {
         if(!this.displayElement) return;
         this.displayElement.innerHTML = '';
@@ -46,24 +52,20 @@ export class Mapper {
         const targetMap = {}; this.target.forEach(t => targetMap[t.marker] = t);
         
         let currentBatch = [];
-        let batchNum = 0;
+        let allBatches = [];
         const batchSize = 3;
 
-        // --- START: REVISED LOGIC ---
-        // The main loop now handles all segment types (matched, partial, and gap).
+        // Build all batches
         for (let i = 0; i < this.source.length; i++) {
             const sourceSeg = this.source[i];
             const matchedSeg = targetMap[sourceSeg.marker];
             let item;
 
             if (matchedSeg) {
-                // This segment has a fully completed target match.
                 item = { type: 'matched', source: sourceSeg, target: matchedSeg };
             } else if (this.targetPartial && this.targetPartial.marker === sourceSeg.marker) {
-                // This is the currently streaming partial segment.
                 item = { type: 'partial', source: sourceSeg, target: this.targetPartial };
             } else {
-                // No completed or partial match found, so it's a gap.
                 item = { type: 'gap', source: sourceSeg, target: null };
             }
             
@@ -71,23 +73,55 @@ export class Mapper {
 
             if (currentBatch.length === batchSize || i === this.source.length - 1) {
                 if (currentBatch.length > 0) {
-                    this.renderBatch(currentBatch, ++batchNum);
+                    allBatches.push(currentBatch);
                     currentBatch = [];
                 }
             }
         }
-        // --- END: REVISED LOGIC ---
 
+        // Group batches: first group has 1 batch, rest have 10 batches each
+        let groupNum = 1;
+        let batchIndex = 0;
+        
+        while (batchIndex < allBatches.length) {
+            const batchesPerGroup = groupNum === 1 ? 1 : 10;
+            const batchesInThisGroup = allBatches.slice(batchIndex, batchIndex + batchesPerGroup);
+            
+            if (batchesInThisGroup.length > 0) {
+                this.renderGroup(batchesInThisGroup, groupNum, batchIndex);
+                batchIndex += batchesInThisGroup.length;
+                groupNum++;
+            }
+        }
 
-        // --- START: REMOVED CODE BLOCK ---
-        // The block that created "BATCH #STREAMING" has been deleted from here.
-        // --- END: REMOVED CODE BLOCK ---
-
-
+        // Handle orphans
         const orphans = this.target.filter(t => !sourceMap[t.marker]);
         if (orphans.length > 0) {
-            this.renderBatch(orphans.map(t => ({ type: 'orphan', source: null, target: t })), 'ORPHAN');
+            const orphanBatch = [orphans.map(t => ({ type: 'orphan', source: null, target: t }))];
+            this.renderGroup(orphanBatch, 'ORPHAN', 0);
         }
+    }
+
+    renderGroup(batches, groupNum, startBatchIndex) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'batch-group';
+        
+        const totalSegments = batches.reduce((sum, batch) => sum + batch.length, 0);
+        const batchCount = batches.length;
+        
+        groupDiv.innerHTML = `<div class="group-header">GROUP #${groupNum} (${batchCount} batch${batchCount > 1 ? 'es' : ''}, ${totalSegments} segments)</div>`;
+        
+        const groupContent = document.createElement('div');
+        groupContent.className = 'group-content';
+        
+        batches.forEach((batchItems, index) => {
+            const batchNum = groupNum === 'ORPHAN' ? 'ORPHAN' : (startBatchIndex + index + 1);
+            const batchDiv = this.renderBatch(batchItems, batchNum);
+            groupContent.appendChild(batchDiv);
+        });
+        
+        groupDiv.appendChild(groupContent);
+        this.displayElement.appendChild(groupDiv);
     }
 
     renderBatch(items, batchNum) {
@@ -105,8 +139,9 @@ export class Mapper {
             pairDiv.innerHTML = `<div class="json">${this.formatJSON(jsonObj)}</div><div class="meta">Status: ${item.type.toUpperCase()}</div>`;
             batchDiv.appendChild(pairDiv);
         });
-        this.displayElement.appendChild(batchDiv);
+        return batchDiv;
     }
+    
     _escapeHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
     _formatValue(value, indentLevel) {
         const indent = '&nbsp;'.repeat(indentLevel * 2);
