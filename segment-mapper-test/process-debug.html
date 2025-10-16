@@ -14,7 +14,7 @@
         .controls-bar {
             background: white; padding: 8px 12px; margin-bottom: 10px;
             border: 1px solid #ddd; border-radius: 4px;
-            display: flex; gap: 8px; align-items: center;
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
         }
         
         .controls-bar button {
@@ -23,13 +23,13 @@
             font-size: 13px; font-weight: 500; transition: all 0.2s;
         }
         
-        .controls-bar button:hover { background: #e2e6ea; border-color: #adb5bd; color: #000; }
+        .controls-bar button:hover { background: #e2e6ea; border-color: #adb5bd; }
         .controls-bar button:active { transform: translateY(1px); }
-        .controls-bar .auto-scroll-btn.active { background: #28a745; border-color: #28a745; color: white; }
-        .controls-bar .auto-scroll-btn.active:hover { background: #218838; border-color: #1e7e34; color: white; }
-        .controls-info { margin-left: auto; color: #666; font-size: 12px; }
+        .controls-bar .active { background: #28a745; border-color: #28a745; color: white; }
+        .controls-bar .active:hover { background: #218838; border-color: #1e7e34; }
+        .controls-info { margin-left: auto; color: #666; font-size: 12px; white-space: nowrap; }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 15px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 15px; }
         
         .stat-box {
             background: white; padding: 10px; border: 1px solid #ddd;
@@ -45,12 +45,86 @@
         .stat-label { font-size: 11px; color: #666; text-transform: uppercase; }
         .stat-sublabel { font-size: 10px; color: #999; margin-top: 2px; }
         
+        .breakdown-section {
+            background: white; border: 1px solid #ddd; border-radius: 4px;
+            padding: 12px; margin-bottom: 15px;
+        }
+
+        .breakdown-header {
+            font-weight: 600; font-size: 14px; padding: 8px;
+            background: #f8f9fa; border-radius: 4px;
+            cursor: pointer; user-select: none;
+        }
+
+        .breakdown-header:hover { background: #e9ecef; }
+
+        .breakdown-controls {
+            display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
+            padding: 10px 0; border-bottom: 1px solid #eee; margin-bottom: 10px;
+        }
+
+        .mini-btn {
+            padding: 5px 12px; font-size: 12px; border: 1px solid #ddd;
+            background: #f8f9fa; border-radius: 3px; cursor: pointer;
+        }
+
+        .mini-btn:hover { background: #e2e6ea; border-color: #adb5bd; }
+
+        .checkbox-label {
+            font-size: 13px; display: flex; align-items: center;
+            gap: 6px; cursor: pointer;
+        }
+
+        .breakdown-table {
+            width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0;
+        }
+
+        .breakdown-table th {
+            background: #495057; color: white; padding: 8px; text-align: left;
+            font-weight: 600; border: 1px solid #343a40; position: sticky; top: 0; z-index: 1;
+        }
+
+        .breakdown-table td {
+            padding: 6px 8px; border: 1px solid #dee2e6; font-family: monospace;
+        }
+
+        .breakdown-table tbody tr:nth-child(even) { background: #f8f9fa; }
+        .breakdown-table tbody tr:hover { background: #e9ecef; }
+
+        .status-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 3px;
+            font-size: 11px; font-weight: bold; font-family: Arial, sans-serif;
+        }
+
+        .status-matched { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-waiting { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .status-orphan { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .breakdown-empty {
+            text-align: center; padding: 30px; color: #999; font-style: italic;
+        }
+
+        .breakdown-footer {
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;
+            font-size: 11px; color: #666;
+        }
+
+        .legend-item { margin-left: 10px; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
+
+        .waiting-list {
+            margin-top: 5px; padding: 8px; background: #fffbf0;
+            border-left: 3px solid #ffc107; font-size: 11px;
+        }
+
+        .waiting-list strong { color: #856404; }
+        .waiting-markers { margin-top: 5px; font-family: monospace; color: #333; }
+        
         .timeline-header {
             background: white; padding: 10px 15px; margin-bottom: 15px;
             border: 1px solid #ddd; border-radius: 4px; font-weight: 600; font-size: 14px;
         }
         
-        #timeline { height: auto !important; max-height: none !important; overflow: visible !important; }
+        #timeline { position: relative; }
         
         .timeline-empty {
             text-align: center; padding: 60px 20px; color: #999; font-style: italic;
@@ -110,10 +184,10 @@
         .expand-btn {
             background: #007bff; color: white; border: none; padding: 6px 14px;
             border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;
-            display: flex; align-items: center; gap: 6px; transition: background 0.2s;
+            display: inline-flex; align-items: center; gap: 6px;
         }
         .expand-btn:hover { background: #0056b3; }
-        .expand-btn .icon { transition: transform 0.3s; }
+        .expand-btn .icon { display: inline-block; transition: transform 0.2s; }
         .expand-btn.expanded .icon { transform: rotate(180deg); }
         
         .event-details {
@@ -124,7 +198,6 @@
         .details-title {
             font-size: 12px; font-weight: 600; color: #666;
             text-transform: uppercase; margin-bottom: 12px;
-            display: flex; align-items: center; gap: 6px;
         }
         
         .step {
@@ -139,7 +212,7 @@
         
         .step-number {
             background: #6c757d; color: white; width: 22px; height: 22px;
-            border-radius: 50%; display: flex; align-items: center;
+            border-radius: 50%; display: inline-flex; align-items: center;
             justify-content: center; font-size: 11px; flex-shrink: 0;
         }
         
@@ -148,12 +221,11 @@
         .code-box {
             background: #f4f4f4; border: 1px solid #ddd; padding: 10px;
             border-radius: 3px; font-family: monospace; font-size: 12px;
-            margin-top: 8px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; color: #333;
+            margin-top: 8px; overflow-x: auto; white-space: pre-wrap; 
+            word-break: break-word; color: #333;
         }
         
-        .data-table {
-            width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px;
-        }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
         
         .data-table th {
             background: #f0f0f0; padding: 8px; text-align: left;
@@ -203,12 +275,20 @@
         
         .flow-icon {
             width: 24px; height: 24px; background: #6c757d; color: white;
-            border-radius: 50%; display: flex; align-items: center;
+            border-radius: 50%; display: inline-flex; align-items: center;
             justify-content: center; font-size: 12px; flex-shrink: 0;
         }
         .flow-icon.success { background: #28a745; }
         .flow-icon.error { background: #dc3545; }
         .flow-icon.warning { background: #ffc107; color: #333; }
+
+        .perf-indicator {
+            font-size: 11px; color: #666; padding: 4px 8px;
+            background: #f0f0f0; border-radius: 3px; font-family: monospace;
+        }
+
+        .perf-indicator.warning { background: #fff3cd; color: #856404; }
+        .perf-indicator.error { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
@@ -219,12 +299,15 @@
 
         <div class="controls-bar">
             <button id="clearBtn">Clear Events</button>
-            <button class="auto-scroll-btn" id="autoScrollBtn">Auto-Scroll: OFF</button>
+            <button id="autoScrollBtn">Auto-Scroll: OFF</button>
             <button id="expandAllBtn">Expand All</button>
             <button id="collapseAllBtn">Collapse All</button>
             <button id="scrollToTopBtn">↑ Top</button>
             <button id="scrollToBottomBtn">↓ Bottom</button>
-            <span class="controls-info">Events: <strong id="eventCounter">0</strong></span>
+            <span class="controls-info">
+                Events: <strong id="eventCounter">0</strong>
+                <span id="perfIndicator" class="perf-indicator" style="margin-left: 10px;"></span>
+            </span>
         </div>
 
         <div class="stats-grid">
@@ -255,6 +338,31 @@
             </div>
         </div>
 
+        <details class="breakdown-section" open>
+            <summary class="breakdown-header">🔍 Detailed Marker Breakdown (Click to collapse)</summary>
+            
+            <div class="breakdown-controls">
+                <button id="refreshBreakdownBtn" class="mini-btn">🔄 Refresh Now</button>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="autoRefreshCheckbox" checked>
+                    Auto-refresh on events
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="limitEventsCheckbox" checked>
+                    Limit events (max 100)
+                </label>
+            </div>
+            
+            <div id="markerBreakdownTable"></div>
+            
+            <div class="breakdown-footer">
+                <strong>Legend:</strong> 
+                <span class="legend-item status-matched">✅ Matched</span>
+                <span class="legend-item status-waiting">⏳ Waiting</span>
+                <span class="legend-item status-orphan">⚠️ Orphan</span>
+            </div>
+        </details>
+
         <div class="timeline-header">
             ⏱️ Timeline: Detailed Segment Processing Events (Click to Expand Details)
         </div>
@@ -263,20 +371,47 @@
             <div class="timeline-empty">
                 No events yet. Start generation from the main page to see the detailed process here.
                 <br><br>
-                <small>Events will accumulate here without limit. Click on any event to see step-by-step details.</small>
+                <small>Events will accumulate here. Enable "Limit events" to prevent performance issues.</small>
             </div>
         </div>
     </div>
 
     <script type="module">
+        // Performance utilities
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
         class ProcessDebugger {
             constructor() {
                 this.timeline = document.getElementById('timeline');
                 this.eventCounter = document.getElementById('eventCounter');
+                this.perfIndicator = document.getElementById('perfIndicator');
                 this.autoScroll = false;
+                this.autoRefreshBreakdown = true;
+                this.limitEvents = true;
+                this.maxEvents = 100;
                 this.eventCount = 0;
                 this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
                 this.sourceSegments = [];
+                this.targetSegments = [];
+                
+                // Performance tracking
+                this.renderTimes = [];
+                this.maxRenderTimeTracked = 20;
+                
+                // Debounced functions for performance
+                this.debouncedBreakdownRender = debounce(() => this.renderMarkerBreakdown(), 300);
+                this.debouncedStatsUpdate = debounce(() => this.updateStatsDisplay(), 100);
+                
                 this.init();
             }
 
@@ -291,13 +426,23 @@
                 document.getElementById('collapseAllBtn').onclick = () => this.collapseAll();
                 document.getElementById('scrollToTopBtn').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
                 document.getElementById('scrollToBottomBtn').onclick = () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+                
+                document.getElementById('refreshBreakdownBtn').onclick = () => this.renderMarkerBreakdown();
+                document.getElementById('autoRefreshCheckbox').onchange = (e) => {
+                    this.autoRefreshBreakdown = e.target.checked;
+                };
+                document.getElementById('limitEventsCheckbox').onchange = (e) => {
+                    this.limitEvents = e.target.checked;
+                };
 
                 window.addEventListener('message', (e) => {
                     if (e.data.type === 'SOURCE_SEGMENTS') {
                         this.sourceSegments = e.data.segments;
+                        this.targetSegments = [];
                         document.getElementById('sourceCount').textContent = this.sourceSegments.length;
-                        this.updateGapStats();
+                        this.renderMarkerBreakdown();
                     } else if (e.data.type === 'TARGET_SEGMENT') {
+                        this.targetSegments.push(e.data.segment);
                         this.processSegment(e.data.segment);
                     } else if (e.data.type === 'RESET') {
                         this.clearTimeline();
@@ -305,6 +450,9 @@
                 });
 
                 if (window.opener) window.opener.postMessage({ type: 'DEBUG_READY' }, '*');
+                
+                this.renderMarkerBreakdown();
+                this.updatePerfIndicator();
             }
 
             expandAll() {
@@ -324,17 +472,112 @@
             }
 
             clearTimeline() {
-                this.timeline.innerHTML = `<div class="timeline-empty">Timeline cleared. New events will appear here.<br><br><small>Events will accumulate without limit. Click on any event to see step-by-step details.</small></div>`;
+                this.timeline.innerHTML = `<div class="timeline-empty">Timeline cleared. New events will appear here.<br><br><small>Events will accumulate here. Enable "Limit events" to prevent performance issues.</small></div>`;
                 this.eventCount = 0;
                 this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
+                this.targetSegments = [];
+                this.renderTimes = [];
                 this.updateStatsDisplay();
                 this.eventCounter.textContent = 0;
+                this.renderMarkerBreakdown();
+                this.updatePerfIndicator();
+            }
+
+            renderMarkerBreakdown() {
+                const startTime = performance.now();
+                const container = document.getElementById('markerBreakdownTable');
+                
+                if (this.sourceSegments.length === 0) {
+                    container.innerHTML = '<div class="breakdown-empty">No source segments loaded yet. Start from the main page.</div>';
+                    return;
+                }
+
+                const targetMap = new Map();
+                this.targetSegments.forEach(t => targetMap.set(t.marker, t));
+
+                const rows = [];
+                const orphanRows = [];
+                const waitingMarkers = [];
+
+                // Build source rows
+                this.sourceSegments.forEach(source => {
+                    const target = targetMap.get(source.marker);
+                    const hasTarget = !!target;
+                    const status = hasTarget ? 'matched' : 'waiting';
+                    
+                    if (!hasTarget) waitingMarkers.push(source.marker);
+                    
+                    rows.push({
+                        marker: source.marker,
+                        status: status,
+                        statusText: hasTarget ? '✅ Matched' : '⏳ Waiting',
+                        sourcePreview: this.truncate(source.text, 40),
+                        targetPreview: hasTarget ? this.truncate(target.text, 40) : '—'
+                    });
+                });
+
+                // Build orphan rows
+                this.targetSegments.forEach(target => {
+                    if (!this.sourceSegments.find(s => s.marker === target.marker)) {
+                        orphanRows.push({
+                            marker: target.marker,
+                            status: 'orphan',
+                            statusText: '⚠️ Orphan',
+                            sourcePreview: '—',
+                            targetPreview: this.truncate(target.text, 40)
+                        });
+                    }
+                });
+
+                this.stats.gap = waitingMarkers.length;
+                this.debouncedStatsUpdate();
+
+                // Build table HTML (optimized)
+                const allRows = [...rows, ...orphanRows];
+                let html = '<table class="breakdown-table"><thead><tr>';
+                html += '<th style="width: 80px;">Marker</th>';
+                html += '<th style="width: 100px;">Status</th>';
+                html += '<th style="width: 45%;">Source Preview</th>';
+                html += '<th style="width: 45%;">Target Preview</th>';
+                html += '</tr></thead><tbody>';
+
+                allRows.forEach(row => {
+                    html += `<tr><td><strong>${row.marker}</strong></td>`;
+                    html += `<td><span class="status-badge status-${row.status}">${row.statusText}</span></td>`;
+                    html += `<td>${this.escapeHtml(row.sourcePreview)}</td>`;
+                    html += `<td>${this.escapeHtml(row.targetPreview)}</td></tr>`;
+                });
+
+                html += '</tbody></table>';
+
+                if (waitingMarkers.length > 0) {
+                    html += `<div class="waiting-list">`;
+                    html += `<strong>⏳ ${waitingMarkers.length} marker(s) still waiting for AI response:</strong>`;
+                    html += `<div class="waiting-markers">${waitingMarkers.join(', ')}</div>`;
+                    html += `</div>`;
+                }
+
+                container.innerHTML = html;
+                
+                const renderTime = performance.now() - startTime;
+                this.trackRenderTime(renderTime);
             }
 
             processSegment(segment) {
-                if (this.timeline.querySelector('.timeline-empty')) this.timeline.innerHTML = '';
+                const startTime = performance.now();
+                
+                if (this.timeline.querySelector('.timeline-empty')) {
+                    this.timeline.innerHTML = '';
+                }
 
-                this.eventCount++;
+                // Enforce event limit
+                if (this.limitEvents && this.eventCount >= this.maxEvents) {
+                    const firstEvent = this.timeline.querySelector('.event');
+                    if (firstEvent) firstEvent.remove();
+                } else {
+                    this.eventCount++;
+                }
+
                 this.stats.total++;
 
                 const timestamp = new Date().toLocaleTimeString();
@@ -349,13 +592,48 @@
                     eventData = this.createOrphanEvent(segment, timestamp);
                 }
 
-                this.updateGapStats();
                 this.renderEvent(eventData);
-                this.updateStatsDisplay();
+                this.debouncedStatsUpdate();
                 this.eventCounter.textContent = this.eventCount;
 
+                if (this.autoRefreshBreakdown) {
+                    this.debouncedBreakdownRender();
+                }
+
                 if (this.autoScroll) {
-                    requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+                    requestAnimationFrame(() => {
+                        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+                    });
+                }
+
+                const renderTime = performance.now() - startTime;
+                this.trackRenderTime(renderTime);
+            }
+
+            trackRenderTime(time) {
+                this.renderTimes.push(time);
+                if (this.renderTimes.length > this.maxRenderTimeTracked) {
+                    this.renderTimes.shift();
+                }
+                this.updatePerfIndicator();
+            }
+
+            updatePerfIndicator() {
+                if (this.renderTimes.length === 0) {
+                    this.perfIndicator.textContent = '';
+                    this.perfIndicator.className = 'perf-indicator';
+                    return;
+                }
+
+                const avgTime = this.renderTimes.reduce((a, b) => a + b, 0) / this.renderTimes.length;
+                this.perfIndicator.textContent = `Avg: ${avgTime.toFixed(1)}ms`;
+                
+                if (avgTime > 50) {
+                    this.perfIndicator.className = 'perf-indicator error';
+                } else if (avgTime > 20) {
+                    this.perfIndicator.className = 'perf-indicator warning';
+                } else {
+                    this.perfIndicator.className = 'perf-indicator';
                 }
             }
 
@@ -450,14 +728,6 @@
                 return result;
             }
 
-            updateGapStats() {
-                const matchedMarkers = new Set();
-                this.timeline.querySelectorAll('.event.matched').forEach(e => {
-                    if (e.dataset.marker) matchedMarkers.add(e.dataset.marker);
-                });
-                this.stats.gap = this.sourceSegments.filter(s => !matchedMarkers.has(s.marker)).length;
-            }
-
             renderEvent(eventData) {
                 const detailsId = `details-${this.eventCount}`;
                 const div = document.createElement('div');
@@ -474,7 +744,7 @@
                         ${this.renderSummaryJSON(eventData.jsonPair)}
                         <div class="summary-status">
                             <div class="status-text ${eventData.type}">${eventData.statusText}</div>
-                            <button class="expand-btn" onclick="toggleDetails('${detailsId}', this)">
+                            <button class="expand-btn" data-target="${detailsId}">
                                 <span class="icon">▼</span> Show Details
                             </button>
                         </div>
@@ -503,7 +773,21 @@
 
                 html += `</div>`;
                 div.innerHTML = html;
+                
+                // Event delegation for expand button
+                const expandBtn = div.querySelector('.expand-btn');
+                expandBtn.addEventListener('click', () => this.toggleDetails(detailsId, expandBtn));
+                
                 this.timeline.appendChild(div);
+            }
+
+            toggleDetails(detailsId, button) {
+                const details = document.getElementById(detailsId);
+                details.classList.toggle('visible');
+                button.classList.toggle('expanded');
+                button.innerHTML = details.classList.contains('visible') 
+                    ? '<span class="icon">▼</span> Hide Details' 
+                    : '<span class="icon">▼</span> Show Details';
             }
 
             renderDataTable(data) {
@@ -573,15 +857,6 @@
                 return div.innerHTML;
             }
         }
-
-        window.toggleDetails = function(detailsId, button) {
-            const details = document.getElementById(detailsId);
-            details.classList.toggle('visible');
-            button.classList.toggle('expanded');
-            button.innerHTML = details.classList.contains('visible') 
-                ? '<span class="icon">▼</span> Hide Details' 
-                : '<span class="icon">▼</span> Show Details';
-        };
 
         new ProcessDebugger();
     </script>
