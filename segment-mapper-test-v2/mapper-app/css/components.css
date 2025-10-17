@@ -54,33 +54,3 @@ summary::-webkit-details-marker {
 .details-pre.stream-data {
     white-space: pre-line;
 }
-
-/* Badge Component */
-.badge {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-
-.badge.success {
-    background: #d4edda;
-    color: #155724;
-}
-
-.badge.error {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.badge.warning {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.badge.info {
-    background: #d1ecf1;
-    color: #0c5460;
-}

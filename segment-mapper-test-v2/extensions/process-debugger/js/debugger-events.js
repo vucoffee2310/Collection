@@ -1,6 +1,5 @@
 /**
- * Debugger Events
- * Event creation logic using reusable templates
+ * Debugger Events - Updated for streamlined templates
  */
 
 import { getSourceMarkerSummary } from './debugger-utils.js';
@@ -11,7 +10,6 @@ export function createWaitingEvent(source, debugContext) {
     const index = parseInt(source.marker.split('-')[1]);
     const timestamp = new Date().toLocaleTimeString();
 
-    // Calculate metrics
     const waitTime = debugContext.generationStartTime 
         ? Math.floor((Date.now() - debugContext.generationStartTime) / 1000) 
         : 0;
@@ -23,30 +21,18 @@ export function createWaitingEvent(source, debugContext) {
     const progressPercent = Math.floor((matchedCount / totalSources) * 100);
 
     const sourceIndex = debugContext.sourceSegments.findIndex(s => s.marker === source.marker);
-    const isSkipped = matchedCount > 0 && sourceIndex < matchedCount;
 
-    // Determine severity
-    let severity, severityReason;
-    if (waitTime > 60) {
-        severity = 'warning';
-        severityReason = 'Long wait time (>60s)';
-    } else if (isSkipped) {
-        severity = 'warning';
-        severityReason = 'AI skipped this segment';
-    } else {
-        severity = 'info';
-        severityReason = 'Normal - awaiting AI response';
-    }
+    let severity = waitTime > 60 || (matchedCount > 0 && sourceIndex < matchedCount) 
+        ? 'warning' 
+        : 'info';
 
     const jsonPair = { marker: source.marker, source: source.text, target: '⏳ PENDING...' };
 
-    // Get same base marker segments
     const sameBaseSegments = debugContext.sourceSegments.filter(s => s.marker.startsWith(baseMarker + '-'));
     const sameBaseMatched = sameBaseSegments.filter(s =>
         debugContext.targetSegments.find(t => t.marker === s.marker)
     ).length;
 
-    // Build steps using templates
     const steps = [
         WaitingStepTemplates.sourceLoaded(
             source.marker,
@@ -68,34 +54,18 @@ export function createWaitingEvent(source, debugContext) {
             index,
             sameBaseSegments.map(s => s.marker).join(', ')
         ),
-        WaitingStepTemplates.positionAnalysis(sourceIndex + 1, matchedCount, isSkipped),
-        WaitingStepTemplates.prepareJsonStructure(source.marker, source.text),
-        WaitingStepTemplates.expectedBehavior(baseMarker, source.marker),
-        WaitingStepTemplates.diagnosticChecklist(
-            progressPercent,
-            sourceIndex + 1,
-            totalSources,
-            sameBaseMatched,
-            sameBaseSegments.length,
-            baseMarker,
-            waitTime,
-            sourceIndex >= matchedCount
-        ),
         WaitingStepTemplates.currentJsonState(jsonPair),
-        WaitingStepTemplates.whenMatched(),
-        WaitingStepTemplates.possibleOutcomes(source.marker, baseMarker, waitTime),
-        WaitingStepTemplates.recommendations(severity, waitTime, progressPercent, sourceIndex + 1, totalSources)
+        WaitingStepTemplates.recommendations(severity, waitTime, progressPercent)
     ];
 
     return {
         type: 'waiting',
-        severity: severity,
+        severity,
         number: debugContext.eventCount + 1,
         timestamp,
         marker: source.marker,
         jsonPair,
-        severityLabel: severity === 'warning' ? '⚠ WARNING' : 'ℹ INFO',
-        statusText: `Status: WAITING - ${severityReason}`,
+        statusText: `Status: WAITING - ${severity === 'warning' ? 'Long wait or skipped' : 'Normal'}`,
         statusIcon: '⏳',
         steps
     };
@@ -106,7 +76,6 @@ export function createMatchedEvent(target, source, timestamp, debugContext) {
     const index = parseInt(target.marker.split('-')[1]);
     const jsonPair = { marker: target.marker, source: source.text, target: target.text };
 
-    // Build steps using templates
     const steps = [
         MatchedStepTemplates.receivedSegment(target.marker, target.text.length, timestamp),
         MatchedStepTemplates.parseMarker(target.marker, baseMarker, index),
@@ -114,10 +83,6 @@ export function createMatchedEvent(target, source, timestamp, debugContext) {
         MatchedStepTemplates.searchSourceMap(target.marker, debugContext.sourceSegments.length),
         MatchedStepTemplates.retrievedSource(source.marker, source.text, source.text.length),
         MatchedStepTemplates.compareSourceTarget(source.text, target.text),
-        MatchedStepTemplates.initializeJson(),
-        MatchedStepTemplates.addMarkerField(target.marker),
-        MatchedStepTemplates.addSourceField(target.marker, source.text),
-        MatchedStepTemplates.addTargetField(target.marker, source.text, target.text),
         MatchedStepTemplates.finalJsonPair(jsonPair),
         MatchedStepTemplates.classificationResult(),
         MatchedStepTemplates.addToMapper()
@@ -130,8 +95,7 @@ export function createMatchedEvent(target, source, timestamp, debugContext) {
         timestamp,
         marker: target.marker,
         jsonPair,
-        severityLabel: '✓ SUCCESS',
-        statusText: '', // Set to empty string to prevent the redundant summary text
+        statusText: '',
         statusIcon: '✅',
         steps
     };
@@ -145,47 +109,40 @@ export function createOrphanEvent(target, timestamp, debugContext) {
     let reason, gapDetails, searchResult, severity, diagnostics;
 
     if (sourceWithBase.length === 0) {
-        // CRITICAL: Base marker doesn't exist at all
         severity = 'critical';
         reason = `AI hallucinated base marker (${baseMarker})`;
-        gapDetails = `🔴 CRITICAL ISSUE: The AI generated a marker with base "(${baseMarker})", but your source input doesn't contain ANY segments with this base marker.\n\nThis means the AI completely invented this marker category.`;
+        gapDetails = `🔴 CRITICAL: AI generated (${baseMarker}) but source has NO segments with this base marker.`;
         searchResult = [
-            { icon: '🔍', text: `Searching for base marker: (${baseMarker})`, type: 'info' },
-            { icon: '❌', text: `NO (${baseMarker}) markers found in source`, type: 'error' },
-            { icon: '📊', text: `Source has 0 segments with base "${baseMarker}"`, type: 'error' },
-            { icon: '💥', text: 'AI HALLUCINATION DETECTED', type: 'error' }
+            { icon: '🔍', text: `Searching: (${baseMarker})`, type: 'info' },
+            { icon: '❌', text: `NO (${baseMarker}) in source`, type: 'error' },
+            { icon: '💥', text: 'AI HALLUCINATION', type: 'error' }
         ];
         diagnostics = [
-            'The AI invented a completely new marker category',
-            `Your source does not use (${baseMarker}) markers at all`,
-            'The AI was not following the source marker pattern',
-            'This indicates poor prompt adherence or AI confusion'
+            'AI invented new marker category',
+            `Source doesn't use (${baseMarker})`,
+            'Poor prompt adherence'
         ];
     } else {
-        // WARNING: Base marker exists but wrong index
         severity = 'warning';
         const available = sourceWithBase.map(s => s.marker).join(', ');
         const maxIndex = Math.max(...sourceWithBase.map(s => parseInt(s.marker.split('-')[1])));
-        reason = `Index mismatch for base marker (${baseMarker})`;
-        gapDetails = `⚠️ INDEX MISMATCH: Source contains ${sourceWithBase.length} segment(s) with base marker (${baseMarker}), but the AI generated index ${index} which doesn't exist.\n\nAvailable markers: ${available}`;
+        reason = `Index mismatch for (${baseMarker})`;
+        gapDetails = `⚠️ INDEX MISMATCH: Source has ${sourceWithBase.length} (${baseMarker}) segment(s), but AI generated index ${index}.\n\nAvailable: ${available}`;
         searchResult = [
-            { icon: '🔍', text: `Searching for: ${target.marker}`, type: 'info' },
-            { icon: '✓', text: `Found ${sourceWithBase.length} source segment(s) with base "${baseMarker}"`, type: 'success' },
-            { icon: '📋', text: `Available: ${available}`, type: 'info' },
-            { icon: '❌', text: `Index ${index} NOT found (max index is ${maxIndex})`, type: 'error' },
+            { icon: '🔍', text: `Searching: ${target.marker}`, type: 'info' },
+            { icon: '✔', text: `Found ${sourceWithBase.length} (${baseMarker})`, type: 'success' },
+            { icon: '❌', text: `Index ${index} NOT found (max: ${maxIndex})`, type: 'error' },
             { icon: '⚠️', text: 'INDEX OUT OF RANGE', type: 'warning' }
         ];
         diagnostics = [
             `AI generated too many (${baseMarker}) segments`,
-            `Source has ${sourceWithBase.length} (${baseMarker}) marker(s), AI generated at least ${index + 1}`,
-            `Index ${index} exceeds available range (0-${maxIndex})`,
-            'This could indicate AI duplication or incorrect segment counting'
+            `Source: ${sourceWithBase.length}, AI: ${index + 1}+`,
+            'Possible duplication'
         ];
     }
 
     const jsonPair = { marker: target.marker, source: null, target: target.text };
 
-    // Build steps using templates
     const steps = [
         OrphanStepTemplates.receivedOrphan(target.marker, target.text.length, timestamp, baseMarker, index),
         OrphanStepTemplates.parseOrphanMarker(target.marker, baseMarker, index),
@@ -194,17 +151,6 @@ export function createOrphanEvent(target, timestamp, debugContext) {
         OrphanStepTemplates.deepDiagnostic(target.marker, searchResult, severity),
         OrphanStepTemplates.rootCause(reason, gapDetails, diagnostics),
         OrphanStepTemplates.sourceInventory(getSourceMarkerSummary(debugContext.sourceSegments)),
-        OrphanStepTemplates.compareExpectedActual(
-            `Should match one of: ${sourceWithBase.length > 0 ? sourceWithBase.map(s => s.marker).join(', ') : 'N/A (no source markers with this base)'}`,
-            target.marker,
-            severity === 'critical' ? 'HALLUCINATED BASE MARKER' : 'INDEX OUT OF RANGE',
-            `${sourceWithBase.length} segment(s) with base (${baseMarker})`,
-            `Index ${index} (doesn't exist in source)`
-        ),
-        OrphanStepTemplates.initializeOrphanJson(),
-        OrphanStepTemplates.addOrphanMarker(target.marker),
-        OrphanStepTemplates.setSourceNull(target.marker),
-        OrphanStepTemplates.addOrphanTarget(target.marker, target.text),
         OrphanStepTemplates.finalOrphanJson(jsonPair),
         OrphanStepTemplates.severityAssessment(severity),
         OrphanStepTemplates.addOrphanToMapper(target.marker, severity, reason, diagnostics)
@@ -212,13 +158,12 @@ export function createOrphanEvent(target, timestamp, debugContext) {
 
     return {
         type: 'orphan',
-        severity: severity,
+        severity,
         number: debugContext.eventCount,
         timestamp,
         marker: target.marker,
         jsonPair,
-        severityLabel: severity === 'critical' ? '✖ CRITICAL' : '⚠ WARNING',
-        statusText: 'Status: ORPHAN - ' + reason,
+        statusText: `Status: ORPHAN - ${reason}`,
         statusIcon: severity === 'critical' ? '🔴' : '⚠️',
         steps
     };
