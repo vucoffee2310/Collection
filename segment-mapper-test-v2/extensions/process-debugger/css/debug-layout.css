@@ -1,18 +1,22 @@
 /**
- * Debug Layout - Compact, full width/height
+ * Debug Layout - Right-aligned header
  */
 
 html {
-    height: 100%;
-    overflow-y: auto;
+    box-sizing: border-box;
+    scroll-behavior: smooth;
+}
+
+*, *::before, *::after {
+    box-sizing: inherit;
 }
 
 body {
-    min-height: 100%;
-    overflow-y: auto;
+    min-height: 100vh;
     background: #f4f4f4;
     margin: 0;
     padding: 0;
+    overflow-y: auto; /* Ensure vertical scrollbar appears when content overflows */
 }
 
 .debug-container {
@@ -20,7 +24,6 @@ body {
     max-width: 100%;
     margin: 0;
     padding: 0 10px 60px;
-    min-height: 100vh;
 }
 
 /* Compact sticky header */
@@ -29,71 +32,52 @@ body {
     top: 0;
     background: #fff;
     z-index: 100;
-    padding: 10px;
-    margin-bottom: 10px;
+    padding: 12px;
+    margin-bottom: 15px;
     border-bottom: 2px solid #667eea;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.header-content {
+/* Main flex container for all header items */
+.header-main-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 15px;
+    justify-content: flex-end; /* Align all content to the right */
     flex-wrap: wrap;
+    gap: 20px;
 }
 
 .header h1 {
-    margin: 0;
+    margin: 0; /* REMOVED margin-right: auto */
     color: #333;
     font-size: 20px;
     font-weight: 600;
+    white-space: nowrap;
 }
 
-.header-stats {
-    display: flex;
-    gap: 15px;
-    align-items: center;
-    font-size: 13px;
-    color: #666;
-}
-
-.header-stats strong {
-    color: #333;
-}
-
-/* Top section: controls + stats combined */
-.top-section {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 10px;
-    margin-bottom: 10px;
-}
-
-.controls-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-}
-
+.controls-row,
 .stats-row {
     display: flex;
+    align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
+}
+
+/* On smaller screens, center the groups */
+@media (max-width: 1024px) {
+    .header-main-row {
+        justify-content: center;
+    }
+    .header h1 {
+        text-align: center;
+    }
 }
 
 @media (max-width: 768px) {
-    .debug-container {
-        padding: 0 5px 40px;
+    .header {
+        padding: 10px;
     }
     
     .header h1 {
         font-size: 18px;
-    }
-    
-    .header-stats {
-        font-size: 12px;
     }
 }

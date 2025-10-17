@@ -1,10 +1,10 @@
 /**
- * Debug Controls - Compact design
+ * Debug Controls - Compact design with circle stats
  */
 
 /* Compact buttons */
 .controls-row button {
-    padding: 8px 16px;
+    padding: 8px 12px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
@@ -13,6 +13,7 @@
     font-size: 12px;
     font-weight: 500;
     transition: background 0.15s;
+    white-space: nowrap;
 }
 
 .controls-row button:hover {
@@ -37,42 +38,62 @@
     background: #e0a800;
 }
 
-/* Compact stats */
+/* Stats as circles */
 .stat-item {
+    position: relative;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 8px 12px;
-    background: #f8f9fa;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    justify-content: center;
     cursor: pointer;
-    transition: border-color 0.15s;
-    min-width: 80px;
+    min-width: 50px;
+    height: 50px; /* Provide space for hover effect */
 }
-
-.stat-item:hover {
-    border-color: #999;
-}
-
-.stat-item.matched { border-left: 3px solid #28a745; }
-.stat-item.orphan { border-left: 3px solid #dc3545; }
-.stat-item.gap { border-left: 3px solid #ffc107; }
-.stat-item.info { border-left: 3px solid #17a2b8; }
 
 .stat-number {
-    font-size: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
     font-weight: 700;
-    color: #333;
-    line-height: 1;
-    margin-bottom: 4px;
+    background: #6c757d; /* Default color for AI Responses */
+    color: white;
+    transition: transform 0.2s ease-in-out;
 }
 
+.stat-item:hover .stat-number {
+    transform: scale(1.1);
+}
+
+/* Color overrides for specific stats */
+.stat-item.info .stat-number { background-color: #17a2b8; }
+.stat-item.matched .stat-number { background-color: #28a745; }
+.stat-item.orphan .stat-number { background-color: #dc3545; }
+.stat-item.gap .stat-number { background-color: #ffc107; color: #333; }
+
 .stat-label {
-    font-size: 11px;
-    color: #666;
-    text-transform: uppercase;
+    position: absolute;
+    bottom: -5px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-5px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    background-color: #333;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
     font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap;
+    z-index: 10;
+}
+
+.stat-item:hover .stat-label {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
 }
 
 /* Performance indicator */
@@ -83,6 +104,7 @@
     background: #f0f0f0;
     border-radius: 3px;
     font-family: 'Courier New', monospace;
+    white-space: nowrap;
 }
 
 .perf-indicator.warning {
@@ -93,15 +115,4 @@
 .perf-indicator.error {
     background: #f8d7da;
     color: #721c24;
-}
-
-@media (max-width: 768px) {
-    .stat-number {
-        font-size: 20px;
-    }
-    
-    .stat-item {
-        min-width: 70px;
-        padding: 6px 10px;
-    }
 }

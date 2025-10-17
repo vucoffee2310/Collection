@@ -23,7 +23,6 @@ class ProcessDebugger {
         this.eventsByMarker = new Map();
         this.eventCount = 0;
         this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
-        this.severityCounts = { success: 0, info: 0, warning: 0, critical: 0 };
         
         // Source/target segments
         this.sourceSegments = [];
@@ -31,21 +30,12 @@ class ProcessDebugger {
         this.generationStartTime = null;
 
         // DOM elements
-        this.detailsPanel = document.getElementById('eventDetailsPanel');
-        this.panelTitle = document.getElementById('panelTitle');
-        this.panelBody = document.getElementById('panelBody');
-        this.panelClose = document.getElementById('panelClose');
-        this.eventCounter = document.getElementById('eventCounter');
-        this.perfIndicator = document.getElementById('perfIndicator');
+        this.timelineContainer = document.getElementById('timeline-container');
         this.breakdownSection = document.getElementById('breakdownSection');
         
         // Auto-scroll state
         this.autoScrollEnabled = false;
         this.userScrolledAway = false;
-        
-        // Performance tracking
-        this.renderTimes = [];
-        this.maxRenderTimeTracked = 20;
         
         // Batch processing
         this.eventQueue = [];
@@ -54,9 +44,6 @@ class ProcessDebugger {
         // Debounced functions
         this.debouncedBreakdownRender = debounce(() => this.renderMarkerBreakdown(), 1000);
         this.throttledStatsUpdate = throttle(() => this.updateStatsDisplay(), 200);
-        this.throttledEventCounter = throttle(() => {
-            this.eventCounter.textContent = this.eventCount;
-        }, 100);
 
         this.init();
     }
@@ -65,10 +52,8 @@ class ProcessDebugger {
         console.log('[Process Debugger] Initializing...');
         this.setupEventListeners();
         this.setupMessageListener();
-        this.setupPanelListeners();
         this.setupScrollDetection();
         this.renderMarkerBreakdown();
-        this.updatePerfIndicator();
         
         this.notifyParent('DEBUG_READY');
         console.log('[Process Debugger] Initialization complete');
@@ -104,21 +89,17 @@ class ProcessDebugger {
             }
         };
         
-        // Expand/Collapse all
-        document.getElementById('expandAllBtn').onclick = () => this.expandAll();
-        document.getElementById('collapseAllBtn').onclick = () => this.collapseAll();
-    }
-
-    setupPanelListeners() {
-        // Close panel
-        this.panelClose.onclick = () => this.closePanel();
-        
-        // Close on ESC
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.detailsPanel.style.display !== 'none') {
-                this.closePanel();
+        // Combined Expand/Collapse toggle
+        const toggleExpandBtn = document.getElementById('toggleExpandBtn');
+        toggleExpandBtn.onclick = () => {
+            if (this.breakdownSection.open) {
+                this.collapseAll();
+                toggleExpandBtn.textContent = 'Expand All';
+            } else {
+                this.expandAll();
+                toggleExpandBtn.textContent = 'Collapse All';
             }
-        });
+        };
     }
 
     setupScrollDetection() {
@@ -197,12 +178,8 @@ class ProcessDebugger {
 
         if (processedCount > 0) {
             this.throttledStatsUpdate();
-            this.throttledEventCounter();
             this.debouncedBreakdownRender();
 
-            const renderTime = performance.now() - startTime;
-            this.trackRenderTime(renderTime);
-            
             // Auto-scroll to bottom if enabled and user hasn't scrolled away
             if (this.autoScrollEnabled && !this.userScrolledAway) {
                 this.scrollToBottom();
@@ -229,20 +206,14 @@ class ProcessDebugger {
     expandAll() {
         // Expand breakdown section
         this.breakdownSection.open = true;
-        
-        // If panel is open, could expand any nested elements
         console.log('[Debug] Expanded all sections');
     }
 
     collapseAll() {
         // Collapse breakdown section
         this.breakdownSection.open = false;
-        
-        // Close panel if open
-        if (this.detailsPanel.style.display !== 'none') {
-            this.closePanel();
-        }
-        
+        // Clear timeline view when collapsing
+        this.timelineContainer.innerHTML = '';
         console.log('[Debug] Collapsed all sections');
     }
 
@@ -251,9 +222,6 @@ class ProcessDebugger {
             this.eventsByMarker.set(marker, []);
         }
         this.eventsByMarker.get(marker).push(eventData);
-        
-        this.severityCounts[eventData.severity]++;
-        this.updateSeverityDisplay();
     }
 
     analyzeWaitingSegments() {
@@ -268,12 +236,9 @@ class ProcessDebugger {
             const eventData = createWaitingEvent(segment, this);
             this.storeEvent(segment.marker, eventData);
             this.eventCount++;
-            this.severityCounts[eventData.severity]++;
         });
 
-        this.updateSeverityDisplay();
         this.throttledStatsUpdate();
-        this.eventCounter.textContent = this.eventCount;
         this.renderMarkerBreakdown();
         
         alert(`Added ${waitingSegments.length} waiting segment analysis. Click cards to view full details.`);
@@ -289,21 +254,15 @@ class ProcessDebugger {
         this.eventsByMarker.clear();
         this.eventCount = 0;
         this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
-        this.severityCounts = { success: 0, info: 0, warning: 0, critical: 0 };
         this.targetSegments = [];
         this.eventQueue = [];
-        this.renderTimes = [];
         this.updateStatsDisplay();
-        this.updateSeverityDisplay();
-        this.eventCounter.textContent = 0;
         this.renderMarkerBreakdown();
-        this.updatePerfIndicator();
-        this.closePanel();
+        this.timelineContainer.innerHTML = '';
         console.log('[Process Debugger] Events cleared');
     }
 
     renderMarkerBreakdown() {
-        const startTime = performance.now();
         const container = document.getElementById('markerBreakdownTable');
 
         if (this.sourceSegments.length === 0) {
@@ -357,26 +316,23 @@ class ProcessDebugger {
             if (!card) return;
 
             const marker = card.dataset.marker;
-            this.showEventPanel(marker);
+            this.showTimelineForMarker(marker);
         };
-
-        const renderTime = performance.now() - startTime;
-        this.trackRenderTime(renderTime);
     }
 
-    showEventPanel(marker) {
+    showTimelineForMarker(marker) {
         const events = this.eventsByMarker.get(marker) || [];
         
-        if (events.length === 0) {
-            this.panelTitle.textContent = `No Events for ${marker}`;
-            this.panelBody.innerHTML = '<p style="text-align: center; padding: 40px; color: #999;">No events recorded for this marker yet.</p>';
-        } else {
-            this.panelTitle.textContent = `${marker} Timeline (${events.length} event${events.length > 1 ? 's' : ''})`;
-            this.panelBody.innerHTML = this.renderEventsTimeline(events);
+        let headerHtml = `<h2 class="timeline-header">No Events for ${marker}</h2>`;
+        let bodyHtml = '<p class="timeline-empty">No events recorded for this marker yet.</p>';
+
+        if (events.length > 0) {
+            headerHtml = `<h2 class="timeline-header">${marker} Timeline <span class="timeline-event-count">(${events.length} event${events.length > 1 ? 's' : ''})</span></h2>`;
+            bodyHtml = this.renderEventsTimeline(events);
         }
         
-        this.detailsPanel.style.display = 'block';
-        this.detailsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        this.timelineContainer.innerHTML = headerHtml + bodyHtml;
+        this.timelineContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     renderEventsTimeline(events) {
@@ -448,49 +404,11 @@ class ProcessDebugger {
         }).join('\n');
     }
 
-    closePanel() {
-        this.detailsPanel.style.display = 'none';
-    }
-
-    trackRenderTime(time) {
-        this.renderTimes.push(time);
-        if (this.renderTimes.length > this.maxRenderTimeTracked) {
-            this.renderTimes.shift();
-        }
-        this.updatePerfIndicator();
-    }
-
-    updatePerfIndicator() {
-        if (this.renderTimes.length === 0) {
-            this.perfIndicator.textContent = '';
-            this.perfIndicator.className = 'perf-indicator';
-            return;
-        }
-
-        const avgTime = this.renderTimes.reduce((a, b) => a + b, 0) / this.renderTimes.length;
-        this.perfIndicator.textContent = `${avgTime.toFixed(1)}ms`;
-
-        if (avgTime > 50) {
-            this.perfIndicator.className = 'perf-indicator error';
-        } else if (avgTime > 20) {
-            this.perfIndicator.className = 'perf-indicator warning';
-        } else {
-            this.perfIndicator.className = 'perf-indicator';
-        }
-    }
-
     updateStatsDisplay() {
         document.getElementById('totalEvents').textContent = this.stats.total;
         document.getElementById('matchedCount').textContent = this.stats.matched;
         document.getElementById('orphanCount').textContent = this.stats.orphan;
         document.getElementById('gapCount').textContent = this.stats.gap;
-    }
-
-    updateSeverityDisplay() {
-        document.getElementById('countSuccess').textContent = `${this.severityCounts.success} Success`;
-        document.getElementById('countInfo').textContent = `${this.severityCounts.info} Info`;
-        document.getElementById('countWarning').textContent = `${this.severityCounts.warning} Warning`;
-        document.getElementById('countCritical').textContent = `${this.severityCounts.critical} Critical`;
     }
 }
 

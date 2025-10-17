@@ -44,49 +44,39 @@
     </script>
 
     <div class="debug-container">
-        <!-- Compact Header -->
+        <!-- Compact Header with all content aligned right -->
         <div class="header">
-            <div class="header-content">
+            <div class="header-main-row">
                 <h1>🔬 Process Debug</h1>
-                <div class="header-stats">
-                    <span>Events: <strong id="eventCounter">0</strong></span>
-                    <span id="perfIndicator" class="perf-indicator"></span>
-                </div>
-            </div>
-        </div>
 
-        <!-- Compact Controls & Stats Combined -->
-        <div class="top-section">
-            <!-- Controls Row -->
-            <div class="controls-row">
-                <button id="clearBtn">Clear</button>
-                <button id="analyzeWaitingBtn" class="analyze-waiting">🔍 Analyze Waiting</button>
-                <button id="autoScrollBtn" class="btn-toggle">Auto-Scroll: OFF</button>
-                <button id="expandAllBtn">Expand All</button>
-                <button id="collapseAllBtn">Collapse All</button>
-            </div>
+                <div class="stats-row">
+                    <div class="stat-item info">
+                        <div class="stat-number" id="sourceCount">0</div>
+                        <div class="stat-label">Sources</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalEvents">0</div>
+                        <div class="stat-label">Responses</div>
+                    </div>
+                    <div class="stat-item matched">
+                        <div class="stat-number" id="matchedCount">0</div>
+                        <div class="stat-label">Matched</div>
+                    </div>
+                    <div class="stat-item orphan">
+                        <div class="stat-number" id="orphanCount">0</div>
+                        <div class="stat-label">Orphans</div>
+                    </div>
+                    <div class="stat-item gap" id="gapStatBox">
+                        <div class="stat-number" id="gapCount">0</div>
+                        <div class="stat-label">Waiting</div>
+                    </div>
+                </div>
 
-            <!-- Stats Row -->
-            <div class="stats-row">
-                <div class="stat-item info">
-                    <span class="stat-number" id="sourceCount">0</span>
-                    <span class="stat-label">Sources</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="totalEvents">0</span>
-                    <span class="stat-label">AI Responses</span>
-                </div>
-                <div class="stat-item matched">
-                    <span class="stat-number" id="matchedCount">0</span>
-                    <span class="stat-label">Matched</span>
-                </div>
-                <div class="stat-item orphan">
-                    <span class="stat-number" id="orphanCount">0</span>
-                    <span class="stat-label">Orphans</span>
-                </div>
-                <div class="stat-item gap" id="gapStatBox" title="Click to analyze">
-                    <span class="stat-number" id="gapCount">0</span>
-                    <span class="stat-label">Waiting</span>
+                <div class="controls-row">
+                    <button id="clearBtn">Clear</button>
+                    <button id="analyzeWaitingBtn" class="analyze-waiting">🔍 Analyze</button>
+                    <button id="autoScrollBtn" class="btn-toggle">Auto-Scroll: OFF</button>
+                    <button id="toggleExpandBtn">Collapse All</button>
                 </div>
             </div>
         </div>
@@ -99,37 +89,11 @@
             
             <div id="markerBreakdownTable"></div>
             
-            <!-- Unified Legend -->
-            <div class="breakdown-footer">
-                <div class="unified-legend">
-                    <strong>Legend:</strong>
-                    <span class="legend-badge success">✓ Success</span>
-                    <span class="legend-badge matched">✅ Matched</span>
-                    <span class="legend-badge info">ℹ Info</span>
-                    <span class="legend-badge waiting">⏳ Waiting</span>
-                    <span class="legend-badge warning">⚠ Warning</span>
-                    <span class="legend-badge orphan">⚠️ Orphan</span>
-                    <span class="legend-badge critical">✗ Critical</span>
-                </div>
-                <div class="legend-counts">
-                    <span id="countSuccess">0 Success</span>
-                    <span id="countInfo">0 Info</span>
-                    <span id="countWarning">0 Warning</span>
-                    <span id="countCritical">0 Critical</span>
-                </div>
-            </div>
         </details>
 
-        <!-- Event Details Panel (Full Info, No Expand/Collapse) -->
-        <div id="eventDetailsPanel" class="event-details-panel" style="display: none;">
-            <div class="panel-header">
-                <h2 id="panelTitle">Event Details</h2>
-                <button id="panelClose" class="panel-close">✕ Close</button>
-            </div>
-            <div id="panelBody" class="panel-body">
-                <!-- Full event details rendered here -->
-            </div>
-        </div>
+        <!-- Container for Event Timelines -->
+        <div id="timeline-container"></div>
+        
     </div>
 
     <!-- JavaScript Modules -->
