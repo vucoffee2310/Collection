@@ -1,0 +1,150 @@
+/* =================================
+   MAIN LAYOUT STRUCTURE
+   ================================= */
+
+/* Header Section */
+.header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: #fff;
+    border-bottom: 2px solid #ddd;
+    z-index: 10;
+}
+
+/* Main Container Grid */
+.main-container {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0;
+    overflow: hidden;
+    min-height: 0; /* Important for proper flex behavior */
+}
+
+/* Column Layout */
+.content-column, 
+.sidebar-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0; /* Important for proper flex behavior */
+}
+
+.content-column {
+    background: #f4f4f4;
+    border-right: 2px solid #ddd;
+}
+
+.sidebar-column {
+    background: #fafafa;
+}
+
+/* Custom Scrollbars */
+.content-column::-webkit-scrollbar,
+.sidebar-column::-webkit-scrollbar,
+.log-panel::-webkit-scrollbar,
+.details-pre::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.content-column::-webkit-scrollbar-track,
+.sidebar-column::-webkit-scrollbar-track,
+.log-panel::-webkit-scrollbar-track,
+.details-pre::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.content-column::-webkit-scrollbar-thumb,
+.sidebar-column::-webkit-scrollbar-thumb,
+.log-panel::-webkit-scrollbar-thumb,
+.details-pre::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 5px;
+}
+
+.content-column::-webkit-scrollbar-thumb:hover,
+.sidebar-column::-webkit-scrollbar-thumb:hover,
+.log-panel::-webkit-scrollbar-thumb:hover,
+.details-pre::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Panel Component */
+.panel { 
+    border: 1px solid #ccc; 
+    padding: 15px;
+    background: #fff; 
+    border-radius: 5px;
+    flex-shrink: 0; /* Prevent panels from shrinking */
+}
+
+/* Input Group */
+.input-group { 
+    display: flex; 
+    flex-direction: column; 
+}
+
+.input-area { 
+    width: 100%; 
+    min-height: 250px; 
+    max-height: 500px;
+    padding: 8px; 
+    border: 1px solid #999;
+    font-family: monospace; 
+    font-size: 11px; 
+    resize: vertical;
+    border-radius: 3px;
+}
+
+.input-area:focus {
+    outline: none;
+    border-color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .main-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+    }
+    
+    .content-column {
+        border-right: none;
+        border-bottom: 2px solid #ddd;
+        max-height: 50vh;
+    }
+    
+    .sidebar-column {
+        max-height: 50vh;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 10px 15px;
+    }
+    
+    .header h1 {
+        font-size: 20px;
+    }
+    
+    .content-column, 
+    .sidebar-column {
+        padding: 15px;
+        gap: 15px;
+    }
+    
+    button {
+        padding: 10px 20px;
+        font-size: 13px;
+    }
+}

@@ -1,0 +1,181 @@
+/* =================================
+   SEGMENT MAPPING DISPLAY
+   ================================= */
+
+/* Batch Groups */
+.batch-group {
+    border: 3px solid #1a1a1a;
+    padding: 15px;
+    margin: 20px 0;
+    background: #e8e8e8;
+    border-radius: 8px;
+}
+
+.batch-group:first-child {
+    margin-top: 0;
+}
+
+.batch-group:last-child {
+    margin-bottom: 0;
+}
+
+.group-header {
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 15px;
+    padding: 10px 12px;
+    background: #1a1a1a;
+    color: #fff;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Batches */
+.batch { 
+    border: 2px solid #555;
+    padding: 10px; 
+    background: #f5f5f5; 
+    border-radius: 4px;
+}
+
+.batch-header { 
+    font-weight: bold; 
+    font-size: 13px;
+    margin-bottom: 10px; 
+    padding: 6px 10px;
+    border-bottom: 2px solid #999;
+    background: #e0e0e0;
+    border-radius: 3px;
+}
+
+/* Segment Pairs */
+.pair { 
+    border-left: 4px solid #ccc; 
+    padding: 10px; 
+    margin: 8px 0;
+    background: #fff; 
+    border-radius: 2px;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.pair:hover {
+    transform: translateX(2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pair.matched { 
+    border-left-color: #28a745; 
+    background: #f0fff4;
+}
+
+.pair.gap { 
+    border-left-color: #dc3545; 
+    background: #fff5f5; 
+}
+
+.pair.partial { 
+    border-left-color: #007bff; 
+    background: #f0f8ff; 
+}
+
+.pair.orphan { 
+    border-left-color: #ffc107; 
+    background: #fffbf0; 
+}
+
+/* JSON Display */
+.json { 
+    font-family: 'Courier New', monospace; 
+    font-size: 12px; 
+    background: #f9f9f9;
+    border: 1px solid #ddd; 
+    padding: 12px; 
+    margin: 5px 0; 
+    white-space: pre-wrap;
+    word-wrap: break-word; 
+    line-height: 1.6; 
+    overflow-wrap: break-word;
+    border-radius: 3px;
+}
+
+/* JSON Syntax Highlighting */
+.json-key { 
+    color: #881391; 
+    font-weight: bold; 
+}
+
+.json-string { 
+    color: #1a1aa6; 
+}
+
+.json-null { 
+    color: #999; 
+    font-style: italic; 
+}
+
+.json-number { 
+    color: #d19a66; 
+}
+
+.json-boolean { 
+    color: #56b6c2; 
+    font-style: italic; 
+}
+
+/* Metadata */
+.meta { 
+    font-size: 11px; 
+    color: #666; 
+    margin-top: 8px;
+    padding-top: 8px; 
+    border-top: 1px solid #eee;
+    font-weight: 500;
+}
+
+/* Display Area */
+#display {
+    min-height: 200px;
+}
+
+/* =================================
+   PERFORMANCE OPTIMIZATIONS
+   ================================= */
+
+/* Contain layout to prevent reflows */
+#display {
+    contain: layout style;
+}
+
+.batch-group {
+    contain: layout;
+}
+
+.batch {
+    contain: layout;
+}
+
+.pair {
+    contain: layout style paint;
+    will-change: auto; /* Only set will-change when needed */
+}
+
+/* Optimize hover only for devices that support it */
+@media (hover: hover) and (pointer: fine) {
+    .pair:hover {
+        will-change: transform, box-shadow;
+    }
+}
+
+/* Reduce animations on preference */
+@media (prefers-reduced-motion: reduce) {
+    .pair {
+        transition: none;
+    }
+}

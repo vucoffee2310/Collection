@@ -1,0 +1,57 @@
+/* =================================
+   BASE RESET & GLOBAL STYLES
+   ================================= */
+
+* { 
+    box-sizing: border-box; 
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    height: 100%;
+}
+
+body { 
+    font-family: Arial, sans-serif; 
+    background: #f4f4f4;
+    height: 100%;
+    overflow: hidden; /* Prevent body scroll - columns will scroll instead */
+    display: flex;
+    flex-direction: column;
+}
+
+h1, h2, h3 { 
+    margin: 0;
+    color: #333; 
+}
+
+h1 { font-size: 24px; }
+h2 { font-size: 18px; margin-bottom: 10px; }
+h3 { 
+    font-size: 16px; 
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee; 
+    padding-bottom: 8px;
+}
+
+button {
+    padding: 12px 30px; 
+    border: none; 
+    background: #333; 
+    color: white;
+    cursor: pointer; 
+    font-size: 14px; 
+    border-radius: 4px; 
+    white-space: nowrap;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+button:hover { 
+    background: #555; 
+}
+
+button:active {
+    transform: translateY(1px);
+}
