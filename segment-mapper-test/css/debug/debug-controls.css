@@ -1,0 +1,166 @@
+/**
+ * Debug Controls - Control bar, buttons, and stats
+ */
+
+/* Controls Bar */
+.controls-bar {
+    background: white;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.controls-bar button {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #f8f9fa;
+    color: #333;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.controls-bar button:hover {
+    background: #e2e6ea;
+    border-color: #adb5bd;
+}
+
+.controls-bar button:active {
+    transform: translateY(1px);
+}
+
+.controls-bar .active {
+    background: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.controls-bar .active:hover {
+    background: #218838;
+    border-color: #1e7e34;
+}
+
+.controls-bar button.analyze-waiting {
+    background: #ffc107;
+    color: #333;
+    border-color: #ffc107;
+}
+
+.controls-bar button.analyze-waiting:hover {
+    background: #e0a800;
+    border-color: #d39e00;
+}
+
+.controls-info {
+    margin-left: auto;
+    color: #666;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.stat-box {
+    background: white;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.stat-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-box.matched {
+    border-left: 3px solid #28a745;
+}
+
+.stat-box.orphan {
+    border-left: 3px solid #dc3545;
+}
+
+.stat-box.gap {
+    border-left: 3px solid #ffc107;
+}
+
+.stat-box.info {
+    border-left: 3px solid #17a2b8;
+}
+
+.stat-number {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.stat-sublabel {
+    font-size: 10px;
+    color: #999;
+    margin-top: 2px;
+}
+
+/* Mini Buttons */
+.mini-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.mini-btn:hover {
+    background: #e2e6ea;
+    border-color: #adb5bd;
+}
+
+.checkbox-label {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+/* Performance Indicator */
+.perf-indicator {
+    font-size: 11px;
+    color: #666;
+    padding: 4px 8px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.perf-indicator.warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.perf-indicator.error {
+    background: #f8d7da;
+    color: #721c24;
+}

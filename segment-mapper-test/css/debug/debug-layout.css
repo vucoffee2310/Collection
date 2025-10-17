@@ -1,0 +1,39 @@
+/**
+ * Debug Layout - Container and main layout structure
+ */
+
+.debug-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 10px 20px 60px;
+}
+
+.header {
+    margin-bottom: 10px;
+    padding-top: 10px;
+}
+
+#timeline {
+    position: relative;
+}
+
+.timeline-header {
+    background: white;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.timeline-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+    font-style: italic;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
