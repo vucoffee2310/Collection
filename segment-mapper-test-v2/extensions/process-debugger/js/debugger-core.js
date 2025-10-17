@@ -1,5 +1,5 @@
 /**
- * Process Debugger Core - With auto-scroll and expand/collapse
+ * Process Debugger Core - With improved historical sync handling
  */
 
 import { debounce, throttle, escapeHtml } from './debugger-utils.js';
@@ -37,9 +37,10 @@ class ProcessDebugger {
         this.autoScrollEnabled = false;
         this.userScrolledAway = false;
         
-        // Batch processing
+        // Batch processing with larger buffer for historical sync
         this.eventQueue = [];
         this.processingQueue = false;
+        this.isSyncingHistorical = false; // Flag to indicate historical sync
 
         // Debounced functions
         this.debouncedBreakdownRender = debounce(() => this.renderMarkerBreakdown(), 1000);
@@ -56,7 +57,7 @@ class ProcessDebugger {
         this.renderMarkerBreakdown();
         
         this.notifyParent('DEBUG_READY');
-        console.log('[Process Debugger] Initialization complete');
+        console.log('[Process Debugger] Initialization complete - sent DEBUG_READY signal');
     }
 
     notifyParent(type, data = {}) {
@@ -123,18 +124,29 @@ class ProcessDebugger {
             console.log('[Process Debugger] Received message:', e.data.type);
             
             if (e.data.type === 'SOURCE_SEGMENTS') {
-                console.log('[Process Debugger] Received source segments:', e.data.segments.length);
+                console.log('[Process Debugger] 📥 Received source segments:', e.data.segments.length);
                 this.sourceSegments = e.data.segments;
                 this.targetSegments = [];
                 this.generationStartTime = Date.now();
                 document.getElementById('sourceCount').textContent = this.sourceSegments.length;
                 this.renderMarkerBreakdown();
+                console.log('[Process Debugger] ✅ Source segments loaded and rendered');
+                
             } else if (e.data.type === 'TARGET_SEGMENT') {
-                console.log('[Process Debugger] Received target segment:', e.data.segment.marker);
-                this.targetSegments.push(e.data.segment);
-                this.queueSegment(e.data.segment);
+                const segment = e.data.segment;
+                console.log('[Process Debugger] 📥 Received target segment:', segment.marker);
+                
+                // Check if this is likely a historical sync (many segments arriving quickly)
+                if (!this.isSyncingHistorical && this.eventQueue.length === 0) {
+                    // First segment might be start of historical sync
+                    console.log('[Process Debugger] 🔄 Potentially starting historical sync...');
+                }
+                
+                this.targetSegments.push(segment);
+                this.queueSegment(segment);
+                
             } else if (e.data.type === 'RESET') {
-                console.log('[Process Debugger] Received reset command');
+                console.log('[Process Debugger] 🔄 Received reset command');
                 this.clearEvents();
             }
         });
@@ -143,15 +155,34 @@ class ProcessDebugger {
     queueSegment(segment) {
         this.eventQueue.push(segment);
         
+        // Use larger batches during historical sync
+        if (this.eventQueue.length > 20) {
+            this.isSyncingHistorical = true;
+            console.log('[Process Debugger] 📦 Historical sync detected - buffering segments:', this.eventQueue.length);
+        }
+        
         if (!this.processingQueue) {
             this.processingQueue = true;
-            requestAnimationFrame(() => this.processQueue());
+            
+            // Delay processing if we're receiving many segments (historical sync)
+            const delay = this.isSyncingHistorical ? 500 : 0;
+            setTimeout(() => {
+                requestAnimationFrame(() => this.processQueue());
+            }, delay);
         }
     }
 
     processQueue() {
+        if (this.eventQueue.length === 0) {
+            this.processingQueue = false;
+            this.isSyncingHistorical = false;
+            console.log('[Process Debugger] ✅ Queue processing complete');
+            return;
+        }
+        
         const startTime = performance.now();
-        const maxProcessingTime = 16;
+        const maxProcessingTime = this.isSyncingHistorical ? 50 : 16; // Longer processing time for historical sync
+        const batchSize = this.isSyncingHistorical ? 10 : 1; // Larger batches for historical sync
         let processedCount = 0;
 
         while (this.eventQueue.length > 0 && (performance.now() - startTime) < maxProcessingTime) {
@@ -177,19 +208,38 @@ class ProcessDebugger {
         }
 
         if (processedCount > 0) {
+            console.log('[Process Debugger] 📊 Processed batch:', processedCount, 'segments, Remaining:', this.eventQueue.length);
             this.throttledStatsUpdate();
-            this.debouncedBreakdownRender();
+            
+            // Only update breakdown if not syncing or if queue is getting small
+            if (!this.isSyncingHistorical || this.eventQueue.length < 10) {
+                this.debouncedBreakdownRender();
+            }
 
             // Auto-scroll to bottom if enabled and user hasn't scrolled away
-            if (this.autoScrollEnabled && !this.userScrolledAway) {
+            if (this.autoScrollEnabled && !this.userScrolledAway && !this.isSyncingHistorical) {
                 this.scrollToBottom();
             }
         }
 
         if (this.eventQueue.length > 0) {
-            requestAnimationFrame(() => this.processQueue());
+            // Continue processing
+            const delay = this.isSyncingHistorical && this.eventQueue.length > 50 ? 100 : 0;
+            setTimeout(() => {
+                requestAnimationFrame(() => this.processQueue());
+            }, delay);
         } else {
+            // Queue empty - finalize
             this.processingQueue = false;
+            
+            if (this.isSyncingHistorical) {
+                console.log('[Process Debugger] ✅ Historical sync complete - processed', this.eventCount, 'total events');
+                this.isSyncingHistorical = false;
+                
+                // Force final render after historical sync
+                this.renderMarkerBreakdown();
+                this.updateStatsDisplay();
+            }
         }
     }
 
@@ -256,6 +306,7 @@ class ProcessDebugger {
         this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
         this.targetSegments = [];
         this.eventQueue = [];
+        this.isSyncingHistorical = false;
         this.updateStatsDisplay();
         this.renderMarkerBreakdown();
         this.timelineContainer.innerHTML = '';

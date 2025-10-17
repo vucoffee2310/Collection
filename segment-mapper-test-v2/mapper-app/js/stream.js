@@ -10,6 +10,11 @@ export class AIStream {
         this.sourceInputElement = dependencies.sourceInputElement;
         this.sendToDebugWindow = dependencies.sendToDebugWindow;
         
+        // State tracking callbacks
+        this.onGenerationStart = dependencies.onGenerationStart;
+        this.onGenerationEnd = dependencies.onGenerationEnd;
+        this.onTargetSegment = dependencies.onTargetSegment;
+        
         this.buttonElement = dependencies.buttonElement;
         this.reportDisplayEl = dependencies.reportDisplayEl;
         
@@ -58,8 +63,10 @@ export class AIStream {
         this.logger.clear();
         this.logger.info('Starting generation process...');
         
-        // Notify debug window to reset
-        this.sendToDebugWindow('RESET', {});
+        // Notify state change: generation starting
+        if (this.onGenerationStart) {
+            this.onGenerationStart();
+        }
         
         this.startTime = performance.now();
         this.report.summary = { 
@@ -156,6 +163,11 @@ export class AIStream {
 
         this.finalizeSummary(finalStatus, errorMessage);
         this.updateReport();
+        
+        // Notify state change: generation ended
+        if (this.onGenerationEnd) {
+            this.onGenerationEnd();
+        }
     }
 
     async processStream(reader) {
@@ -256,8 +268,14 @@ export class AIStream {
         this.report.summary.segmentsParsed += batch.length;
         this.mapper.addTargetBatch(batch);
         
-        // Send to debug window (batched)
+        // Send to debug window AND call state tracking callback
         batch.forEach(segment => {
+            // Track in main app state (for historical sync)
+            if (this.onTargetSegment) {
+                this.onTargetSegment(segment);
+            }
+            
+            // Send to debug window (real-time)
             this.sendToDebugWindow('TARGET_SEGMENT', { segment });
         });
         

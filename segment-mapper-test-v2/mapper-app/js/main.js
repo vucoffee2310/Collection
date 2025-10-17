@@ -30,8 +30,10 @@ const DEBUG_EXTENSION_PATH = '../extensions/process-debugger/debug.html';
 
 console.log('[Main App] Debug extension path:', DEBUG_EXTENSION_PATH);
 
-// Store current segments for when debug window connects
+// Store current segments for synchronization
 let currentSourceSegments = [];
+let currentTargetSegments = []; // Store ALL target segments for historical sync
+let isGenerationRunning = false;
 
 const streamDependencies = {
     mapper: mapper,
@@ -39,21 +41,26 @@ const streamDependencies = {
     sourceInputElement: elements.sourceInput,
     buttonElement: elements.startButton,
     reportDisplayEl: elements.reportDisplay,
+    
+    // Callbacks to track state changes
+    onGenerationStart: () => {
+        isGenerationRunning = true;
+        currentTargetSegments = []; // Clear on new generation
+        sendToDebugWindow('RESET', {});
+    },
+    
+    onGenerationEnd: () => {
+        isGenerationRunning = false;
+    },
+    
+    onTargetSegment: (segment) => {
+        // Store every target segment for historical sync
+        currentTargetSegments.push(segment);
+    },
+    
     // Debug window communication (optional extension)
     sendToDebugWindow: (type, data) => {
-        if (debugWindow && !debugWindow.closed) {
-            if (debugWindowReady) {
-                try {
-                    debugWindow.postMessage({ type, ...data }, '*');
-                    console.log('[Main App] ✅ Sent to debug window:', type);
-                } catch (e) {
-                    console.error('[Main App] ❌ Failed to send message:', e);
-                }
-            } else {
-                console.log('[Main App] 📦 Queueing message (window not ready):', type);
-                debugMessageQueue.push({ type, ...data });
-            }
-        }
+        sendToDebugWindow(type, data);
     }
 };
 
@@ -62,6 +69,90 @@ const stream = new AIStream(streamDependencies);
 console.log('[Main App] Stream initialized');
 
 // --- Functions ---
+function sendToDebugWindow(type, data) {
+    if (debugWindow && !debugWindow.closed) {
+        if (debugWindowReady) {
+            try {
+                debugWindow.postMessage({ type, ...data }, '*');
+                console.log('[Main App] ✅ Sent to debug window:', type);
+            } catch (e) {
+                console.error('[Main App] ❌ Failed to send message:', e);
+            }
+        } else {
+            console.log('[Main App] 📦 Queueing message (window not ready):', type);
+            debugMessageQueue.push({ type, ...data });
+        }
+    }
+}
+
+function syncDebugWindowState() {
+    if (!debugWindow || debugWindow.closed || !debugWindowReady) {
+        return;
+    }
+    
+    console.log('[Main App] 🔄 Syncing complete state to debug window...');
+    
+    // Step 1: Send source segments
+    if (currentSourceSegments.length > 0) {
+        try {
+            debugWindow.postMessage({ 
+                type: 'SOURCE_SEGMENTS', 
+                segments: currentSourceSegments 
+            }, '*');
+            console.log('[Main App] ✅ Sent source segments:', currentSourceSegments.length);
+            logger.info(`[Debug Extension] Synced ${currentSourceSegments.length} source segments`);
+        } catch (e) {
+            console.error('[Main App] ❌ Failed to send source segments:', e);
+            return;
+        }
+    }
+    
+    // Step 2: Send ALL historical target segments (for late-joining debug window)
+    if (currentTargetSegments.length > 0) {
+        console.log('[Main App] 📤 Sending historical target segments:', currentTargetSegments.length);
+        
+        // Send in batches to avoid overwhelming the debug window
+        const batchSize = 10;
+        let sentCount = 0;
+        
+        for (let i = 0; i < currentTargetSegments.length; i += batchSize) {
+            const batch = currentTargetSegments.slice(i, i + batchSize);
+            
+            // Use setTimeout to space out messages
+            setTimeout(() => {
+                batch.forEach(segment => {
+                    try {
+                        debugWindow.postMessage({ 
+                            type: 'TARGET_SEGMENT', 
+                            segment: segment 
+                        }, '*');
+                        sentCount++;
+                    } catch (e) {
+                        console.error('[Main App] ❌ Failed to send target segment:', e);
+                    }
+                });
+                
+                console.log('[Main App] 📊 Sent batch progress:', sentCount, '/', currentTargetSegments.length);
+                
+                // Log completion
+                if (sentCount >= currentTargetSegments.length) {
+                    logger.info(`[Debug Extension] Synced ${currentTargetSegments.length} historical target segments`);
+                    console.log('[Main App] ✅ Completed historical sync');
+                }
+            }, i / batchSize * 100); // Delay each batch by 100ms
+        }
+    }
+    
+    // Step 3: Notify about generation state
+    if (isGenerationRunning) {
+        logger.info('[Debug Extension] Generation is currently RUNNING - new segments will appear in real-time');
+        console.log('[Main App] ⚠️ Generation is running - debug will receive new segments live');
+    } else {
+        logger.info('[Debug Extension] Generation is IDLE - showing all historical data');
+        console.log('[Main App] ✅ Sync complete - generation is idle');
+    }
+}
+
 function autoParseSource() {
     const fullText = elements.sourceInput.value;
     const contentForMapping = Parser.extractContentForMapping(fullText);
@@ -79,6 +170,7 @@ function autoParseSource() {
     currentSourceSegments = segments;
     console.log('[Main App] ✅ Parsed source segments:', segments.length);
     
+    // Send to debug window if it's open and ready
     if (debugWindow && !debugWindow.closed && debugWindowReady) {
         try {
             debugWindow.postMessage({ 
@@ -98,20 +190,13 @@ function openDebugWindow() {
     console.log('[Main App] Current location:', window.location.href);
     
     if (debugWindow && !debugWindow.closed) {
-        console.log('[Main App] Debug window already open, focusing...');
+        console.log('[Main App] Debug window already open, focusing and re-syncing...');
         debugWindow.focus();
-        logger.info('[Debug Extension] Debug window already open, focusing...');
+        logger.info('[Debug Extension] Debug window already open, re-syncing state...');
         
-        if (debugWindowReady && currentSourceSegments.length > 0) {
-            try {
-                debugWindow.postMessage({ 
-                    type: 'SOURCE_SEGMENTS', 
-                    segments: currentSourceSegments 
-                }, '*');
-                console.log('[Main App] ✅ Re-sent source segments to existing debug window');
-            } catch (e) {
-                console.error('[Main App] ❌ Failed to resend segments:', e);
-            }
+        // Re-sync state even if window was already open
+        if (debugWindowReady) {
+            syncDebugWindowState();
         }
         return;
     }
@@ -126,7 +211,7 @@ function openDebugWindow() {
     );
 
     if (debugWindow) {
-        logger.info('[Debug Extension] Process debug window opened');
+        logger.info('[Debug Extension] Process debug window opened - waiting for initialization...');
         console.log('[Main App] ✅ Debug window opened successfully');
         
         setTimeout(() => {
@@ -150,9 +235,10 @@ window.addEventListener('message', (event) => {
     
     if (event.data.type === 'DEBUG_READY') {
         debugWindowReady = true;
-        logger.info('[Debug Extension] Debug window ready to receive data');
+        logger.info('[Debug Extension] Debug window ready - beginning state synchronization...');
         console.log('[Main App] ✅ Debug window is ready!');
         
+        // Send any queued messages first
         if (debugMessageQueue.length > 0) {
             console.log('[Main App] 📦 Sending', debugMessageQueue.length, 'queued messages');
             debugMessageQueue.forEach(msg => {
@@ -166,21 +252,8 @@ window.addEventListener('message', (event) => {
             debugMessageQueue = [];
         }
         
-        if (currentSourceSegments.length > 0) {
-            try {
-                debugWindow.postMessage({ 
-                    type: 'SOURCE_SEGMENTS', 
-                    segments: currentSourceSegments 
-                }, '*');
-                console.log('[Main App] ✅ Sent current source segments:', currentSourceSegments.length);
-                logger.info(`[Debug Extension] Sent ${currentSourceSegments.length} source segments`);
-            } catch (e) {
-                console.error('[Main App] ❌ Failed to send initial segments:', e);
-            }
-        } else {
-            console.log('[Main App] ⚠️ No source segments to send yet');
-            logger.info('[Debug Extension] No source segments loaded yet');
-        }
+        // Perform complete state sync
+        syncDebugWindowState();
     }
 });
 
