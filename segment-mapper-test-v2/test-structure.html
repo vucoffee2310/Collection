@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Structure Test - AI Segment Mapper</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f0f0f0; }
+        .test { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; font-size: 14px; cursor: pointer; margin: 5px; }
+        h1 { color: #333; }
+        code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Structure Test - AI Segment Mapper</h1>
+    <p>This page tests if your folder structure is correct.</p>
+    
+    <p><strong>Current location:</strong> <code id="currentLocation"></code></p>
+    <p><strong>Protocol:</strong> <code id="currentProtocol"></code></p>
+    
+    <h2>File Structure Tests:</h2>
+    <div id="results"></div>
+    
+    <h2>Window Opening Test:</h2>
+    <button onclick="testDebugWindow()">🔬 Test Open Debug Window</button>
+    <button onclick="testMainApp()">📄 Open Main App</button>
+    <div id="windowTest"></div>
+
+    <script>
+        document.getElementById('currentLocation').textContent = window.location.href;
+        document.getElementById('currentProtocol').textContent = window.location.protocol;
+        
+        if (window.location.protocol === 'file:') {
+            const warning = document.createElement('div');
+            warning.style.cssText = 'background: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px;';
+            warning.innerHTML = '<strong>⚠️ Warning:</strong> You are running from file:// protocol. Please use a web server:<br><code>python -m http.server 8000</code><br>Then open: <code>http://localhost:8000/test-structure.html</code>';
+            document.body.insertBefore(warning, document.body.firstChild);
+        }
+        
+        const tests = [
+            { path: 'mapper-app/index.html', name: 'Main App HTML' },
+            { path: 'mapper-app/css/base.css', name: 'Main App CSS' },
+            { path: 'mapper-app/js/main.js', name: 'Main App JS (renamed from app.js)' },
+            { path: 'mapper-app/js/mapper.js', name: 'Mapper Module' },
+            { path: 'extensions/process-debugger/debug.html', name: 'Debug Extension HTML' },
+            { path: 'extensions/process-debugger/css/debug-layout.css', name: 'Debug Extension CSS' },
+            { path: 'extensions/process-debugger/js/debugger-core.js', name: 'Debug Extension JS' }
+        ];
+
+        const results = document.getElementById('results');
+
+        tests.forEach(test => {
+            fetch(test.path)
+                .then(response => {
+                    const div = document.createElement('div');
+                    div.className = 'test ' + (response.ok ? 'pass' : 'fail');
+                    div.textContent = `${response.ok ? '✅' : '❌'} ${test.name}: ${test.path}`;
+                    results.appendChild(div);
+                })
+                .catch(error => {
+                    const div = document.createElement('div');
+                    div.className = 'test fail';
+                    div.textContent = `❌ ${test.name}: ${test.path} - ${error.message}`;
+                    results.appendChild(div);
+                });
+        });
+
+        function testDebugWindow() {
+            const windowTest = document.getElementById('windowTest');
+            windowTest.innerHTML = '<p>Attempting to open debug window...</p>';
+            
+            const debugWindow = window.open(
+                'extensions/process-debugger/debug.html',
+                'DebugTest',
+                'width=1000,height=700'
+            );
+
+            if (debugWindow) {
+                windowTest.innerHTML += '<p style="color: green;">✅ Window opened successfully!</p>';
+                windowTest.innerHTML += '<p>Check if the debug window loaded correctly (not blank).</p>';
+                
+                setTimeout(() => {
+                    if (debugWindow.closed) {
+                        windowTest.innerHTML += '<p style="color: red;">❌ Window was closed (may have failed to load)</p>';
+                    } else {
+                        windowTest.innerHTML += '<p style="color: green;">✅ Window is still open and should show debug interface</p>';
+                    }
+                }, 2000);
+            } else {
+                windowTest.innerHTML += '<p style="color: red;">❌ Failed to open window (popups blocked?)</p>';
+            }
+        }
+        
+        function testMainApp() {
+            window.open('mapper-app/index.html', '_blank');
+        }
+    </script>
+</body>
+</html>
