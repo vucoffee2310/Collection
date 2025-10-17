@@ -3,7 +3,7 @@
  * Rendering functions for debug UI components
  */
 
-import { escapeHtml, formatJSON } from '../debugger-utils.js';
+import { escapeHtml, formatJSON } from './debugger-utils.js';
 
 export function renderDataTable(data) {
     let html = '<table class="data-table">';

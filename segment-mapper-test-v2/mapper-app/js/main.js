@@ -198,16 +198,6 @@ window.addEventListener('message', (event) => {
             console.log('[Main App] ⚠️ No source segments to send yet');
             logger.info('[Debug Extension] No source segments loaded yet');
         }
-    } else if (event.data.type === 'DEBUG_REQUEST_DATA') {
-        console.log('[Main App] 📨 Debug window requesting data');
-        if (currentSourceSegments.length > 0 && debugWindow && !debugWindow.closed) {
-            debugWindow.postMessage({ 
-                type: 'SOURCE_SEGMENTS', 
-                segments: currentSourceSegments 
-            }, '*');
-            logger.info('[Debug Extension] Re-sent source segments on request');
-            console.log('[Main App] ✅ Re-sent source segments on request');
-        }
     }
 });
 

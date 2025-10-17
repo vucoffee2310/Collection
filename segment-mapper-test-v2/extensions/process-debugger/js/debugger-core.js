@@ -59,20 +59,20 @@ class ProcessDebugger {
         this.updatePerfIndicator();
         
         // Notify parent window that debugger is ready
-        this.notifyParentReady();
+        this.notifyParent('DEBUG_READY');
         console.log('[Process Debugger] Initialization complete');
     }
 
-    notifyParentReady() {
+    notifyParent(type, data = {}) {
         if (window.opener) {
             try {
-                window.opener.postMessage({ type: 'DEBUG_READY' }, '*');
-                console.log('[Process Debugger] Sent DEBUG_READY to parent window');
+                window.opener.postMessage({ type, ...data }, '*');
+                console.log(`[Process Debugger] Sent ${type} to parent window`);
             } catch (e) {
-                console.error('[Process Debugger] Failed to notify parent:', e);
+                console.error(`[Process Debugger] Failed to notify parent with ${type}:`, e);
             }
         } else {
-            console.warn('[Process Debugger] No opener window found - debugger opened directly?');
+            console.warn(`[Process Debugger] No opener window found for ${type} - debugger opened directly?`);
         }
     }
 
@@ -298,66 +298,67 @@ class ProcessDebugger {
         const targetMap = new Map();
         this.targetSegments.forEach(t => targetMap.set(t.marker, t));
 
-        const rows = [];
-        const orphanRows = [];
+        const allMarkers = [];
         const waitingMarkers = [];
 
+        // Process source segments
         this.sourceSegments.forEach(source => {
-            const target = targetMap.get(source.marker);
-            const hasTarget = !!target;
+            const hasTarget = targetMap.has(source.marker);
             const status = hasTarget ? 'matched' : 'waiting';
-
             if (!hasTarget) waitingMarkers.push(source.marker);
-
-            rows.push({
-                marker: source.marker,
-                status: status,
-                statusText: hasTarget ? '✅ Matched' : '⏳ Waiting',
-                sourcePreview: truncate(source.text, 40),
-                targetPreview: hasTarget ? truncate(target.text, 40) : '—'
-            });
+            allMarkers.push({ marker: source.marker, status });
         });
 
+        // Process orphan segments
+        const sourceMarkerSet = new Set(this.sourceSegments.map(s => s.marker));
         this.targetSegments.forEach(target => {
-            if (!this.sourceSegments.find(s => s.marker === target.marker)) {
-                orphanRows.push({
-                    marker: target.marker,
-                    status: 'orphan',
-                    statusText: '⚠️ Orphan',
-                    sourcePreview: '—',
-                    targetPreview: truncate(target.text, 40)
-                });
+            if (!sourceMarkerSet.has(target.marker)) {
+                allMarkers.push({ marker: target.marker, status: 'orphan' });
             }
         });
 
         this.stats.gap = waitingMarkers.length;
         this.throttledStatsUpdate();
 
-        const allRows = [...rows, ...orphanRows];
+        // Build the grid of cards
+        const gridHtml = `<div class="breakdown-grid">${
+            allMarkers.map(item => 
+                `<div class="breakdown-card status-${item.status}" data-marker="${item.marker}" title="Click to find '${item.marker}' in timeline">
+                    ${item.marker}
+                </div>`
+            ).join('')
+        }</div>`;
         
-        // Use array join for better performance
-        const tableRows = allRows.map(row => 
-            `<tr><td><strong>${row.marker}</strong></td>` +
-            `<td><span class="status-badge status-${row.status}">${row.statusText}</span></td>` +
-            `<td>${escapeHtml(row.sourcePreview)}</td>` +
-            `<td>${escapeHtml(row.targetPreview)}</td></tr>`
-        ).join('');
-
-        let html = `<table class="breakdown-table"><thead><tr>
-            <th style="width: 80px;">Marker</th>
-            <th style="width: 100px;">Status</th>
-            <th style="width: 45%;">Source Preview</th>
-            <th style="width: 45%;">Target Preview</th>
-            </tr></thead><tbody>${tableRows}</tbody></table>`;
-
+        let waitingListHtml = '';
         if (waitingMarkers.length > 0) {
-            html += `<div class="waiting-list">`;
-            html += `<strong>⏳ ${waitingMarkers.length} marker(s) still waiting for AI response:</strong>`;
-            html += `<div class="waiting-markers">${waitingMarkers.join(', ')}</div>`;
-            html += `</div>`;
+            waitingListHtml = `<div class="waiting-list">
+                <strong>⏳ ${waitingMarkers.length} marker(s) still waiting for AI response:</strong>
+                <div class="waiting-markers">${waitingMarkers.join(', ')}</div>
+            </div>`;
         }
+        
+        container.innerHTML = gridHtml + waitingListHtml;
 
-        container.innerHTML = html;
+        // Add a single event listener to the container for efficiency
+        container.onclick = (event) => {
+            const card = event.target.closest('.breakdown-card');
+            if (!card) return;
+
+            const marker = card.dataset.marker;
+            // Find the *first* event with this marker, as there could be multiple (e.g., waiting then matched)
+            const eventElement = document.querySelector(`.event[data-marker="${marker}"]`);
+
+            if (eventElement) {
+                eventElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add a temporary highlight for user feedback
+                eventElement.style.transition = 'background-color 0.2s ease-in-out';
+                eventElement.style.backgroundColor = '#fff9c4'; // Light yellow
+                setTimeout(() => {
+                    eventElement.style.backgroundColor = '';
+                }, 1500);
+            }
+        };
 
         const renderTime = performance.now() - startTime;
         this.trackRenderTime(renderTime);
@@ -369,49 +370,57 @@ class ProcessDebugger {
         div.className = `event severity-${eventData.severity}`;
         div.dataset.marker = eventData.marker;
 
-        // Build HTML more efficiently
+        // Create cleaner HTML source by joining with newlines
         const stepsHtml = eventData.steps.map((step, i) => {
             const stepSeverity = step.severity || 'info';
             const severityClass = `step-${stepSeverity}`;
             const numberClass = stepSeverity;
 
+            const contentHtml = `<div class="step-content">${step.content}${
+                step.code ? `<div class="code-box">${escapeHtml(step.code)}</div>` : ''
+            }${
+                step.data ? renderDataTable(step.data) : ''
+            }${
+                step.flow ? renderFlow(step.flow) : ''
+            }${
+                step.comparison ? renderComparison(step.comparison) : ''
+            }${
+                step.json ? renderJSONInSteps(step.json) : ''
+            }${
+                step.diagnostic ? renderDiagnostics(step.diagnostic) : ''
+            }${
+                step.progress ? renderProgress(step.progress) : ''
+            }${
+                step.alert ? renderAlert(step.alert) : ''
+            }</div>`;
+
             return `<div class="step ${severityClass}">
                 <div class="step-title">
                     <span class="step-number ${numberClass}">${i + 1}</span>
                     <span style="flex: 1;">${step.title}</span>
-                    <span class="step-severity-label ${stepSeverity}">${stepSeverity.toUpperCase()}</span>
                 </div>
-                <div class="step-content">
-                    ${step.content}
-                    ${step.code ? `<div class="code-box">${escapeHtml(step.code)}</div>` : ''}
-                    ${step.data ? renderDataTable(step.data) : ''}
-                    ${step.flow ? renderFlow(step.flow) : ''}
-                    ${step.comparison ? renderComparison(step.comparison) : ''}
-                    ${step.json ? renderJSONInSteps(step.json) : ''}
-                    ${step.diagnostic ? renderDiagnostics(step.diagnostic) : ''}
-                    ${step.progress ? renderProgress(step.progress) : ''}
-                    ${step.alert ? renderAlert(step.alert) : ''}
-                </div>
+                ${contentHtml}
             </div>`;
-        }).join('');
+        }).join('\n');
+
+        // Conditionally render the status text div
+        const statusTextHtml = eventData.statusText 
+            ? `<div class="status-text"><strong>${eventData.statusText.replace('Status: ', '')}</strong></div>`
+            : '';
 
         div.innerHTML = `
             <div class="event-number">#${eventData.number}</div>
             <div class="event-header">
                 <span class="event-time">${eventData.timestamp}</span>
                 <span class="severity-badge ${eventData.severity}">
-                    <span class="severity-icon">${eventData.severity === 'success' ? '✓' : eventData.severity === 'info' ? 'ℹ' : eventData.severity === 'warning' ? '⚠' : '✖'}</span>
-                    ${eventData.severityLabel}
+                    <span class="severity-icon">${eventData.statusIcon}</span>
+                    ${eventData.type.toUpperCase()}
                 </span>
-                <span class="type-badge ${eventData.type}">${eventData.type.toUpperCase()}</span>
             </div>
             <div class="event-summary">
                 ${renderSummaryJSON(eventData.jsonPair)}
                 <div class="summary-status">
-                    <div class="status-text">
-                        <span class="status-icon">${eventData.statusIcon}</span>
-                        ${eventData.statusText}
-                    </div>
+                    ${statusTextHtml}
                     <button class="expand-btn" data-target="${detailsId}">
                         <span class="icon">▼</span> Show ${eventData.steps.length} Debug Steps
                     </button>

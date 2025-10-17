@@ -3,8 +3,8 @@
  * Event creation logic using reusable templates
  */
 
-import { getSourceMarkerSummary } from '../debugger-utils.js';
-import { MatchedStepTemplates, WaitingStepTemplates, OrphanStepTemplates } from '../debugger-templates.js';
+import { getSourceMarkerSummary } from './debugger-utils.js';
+import { MatchedStepTemplates, WaitingStepTemplates, OrphanStepTemplates } from './debugger-templates.js';
 
 export function createWaitingEvent(source, debugContext) {
     const baseMarker = source.marker.split('-')[0];
@@ -131,7 +131,7 @@ export function createMatchedEvent(target, source, timestamp, debugContext) {
         marker: target.marker,
         jsonPair,
         severityLabel: '✓ SUCCESS',
-        statusText: 'Status: MATCHED',
+        statusText: '', // Set to empty string to prevent the redundant summary text
         statusIcon: '✅',
         steps
     };

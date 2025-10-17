@@ -3,7 +3,7 @@
  * Reusable step templates for event generation
  */
 
-import { truncate } from '../debugger-utils.js';
+import { truncate } from './debugger-utils.js';
 
 /**
  * Template builder for common step types
