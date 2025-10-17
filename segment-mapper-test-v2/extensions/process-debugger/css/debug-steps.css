@@ -1,78 +1,79 @@
 /**
- * Debug Steps - Step-by-step detail cards
+ * Debug Steps - Simple, clean step cards
  */
 
 .step {
-    background: white;
+    background: #fff;
     border: 1px solid #e0e0e0;
     border-radius: 4px;
-    padding: 12px;
-    margin-bottom: 10px;
-    position: relative;
+    padding: 15px;
+    margin-bottom: 12px;
 }
 
-/* Step Severity Styling */
+.step:last-child {
+    margin-bottom: 0;
+}
+
+/* Simple colored left border */
 .step.step-success {
-    border-left: 3px solid #28a745;
-    background: linear-gradient(to right, #f0fff4 0%, white 10%);
+    border-left: 4px solid #28a745;
 }
 
 .step.step-info {
-    border-left: 3px solid #17a2b8;
-    background: linear-gradient(to right, #e7f7f9 0%, white 10%);
+    border-left: 4px solid #17a2b8;
 }
 
 .step.step-warning {
-    border-left: 3px solid #ffc107;
-    background: linear-gradient(to right, #fffbf0 0%, white 10%);
+    border-left: 4px solid #ffc107;
 }
 
 .step.step-error {
-    border-left: 3px solid #dc3545;
-    background: linear-gradient(to right, #fff5f5 0%, white 10%);
+    border-left: 4px solid #dc3545;
 }
 
 .step-title {
     font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 13px;
+    margin-bottom: 10px;
+    font-size: 14px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    color: #333;
 }
 
 .step-number {
     background: #6c757d;
     color: white;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: bold;
     flex-shrink: 0;
 }
 
-.step-number.success {
-    background: #28a745;
-}
-
-.step-number.info {
-    background: #17a2b8;
-}
-
-.step-number.warning {
-    background: #ffc107;
-    color: #333;
-}
-
-.step-number.error {
-    background: #dc3545;
-}
+.step-number.success { background: #28a745; }
+.step-number.info { background: #17a2b8; }
+.step-number.warning { background: #ffc107; color: #333; }
+.step-number.error { background: #dc3545; }
 
 .step-content {
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.7;
     color: #333;
+}
+
+@media (max-width: 768px) {
+    .step {
+        padding: 12px;
+    }
+    
+    .step-number {
+        width: 26px;
+        height: 26px;
+        font-size: 11px;
+    }
 }

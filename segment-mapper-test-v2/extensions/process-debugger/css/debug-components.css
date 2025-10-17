@@ -1,33 +1,35 @@
 /**
- * Debug Components - Reusable UI components
+ * Debug Components - Simple, functional components
  */
 
-/* Code Box */
+/* Code box */
 .code-box {
-    background: #f4f4f4;
+    background: #f9f9f9;
     border: 1px solid #ddd;
-    padding: 10px;
-    border-radius: 3px;
-    font-family: monospace;
+    padding: 12px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
     font-size: 12px;
-    margin-top: 8px;
+    margin-top: 10px;
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-word;
     color: #333;
+    line-height: 1.6;
 }
 
-/* Data Table */
+/* Data table */
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 8px;
-    font-size: 12px;
+    margin-top: 10px;
+    font-size: 13px;
+    background: #fff;
 }
 
 .data-table th {
     background: #f0f0f0;
-    padding: 8px;
+    padding: 10px 12px;
     text-align: left;
     border: 1px solid #ddd;
     font-weight: 600;
@@ -35,58 +37,59 @@
 }
 
 .data-table td {
-    padding: 8px;
+    padding: 10px 12px;
     border: 1px solid #ddd;
     color: #333;
 }
 
 .data-table .mono {
-    font-family: monospace;
+    font-family: 'Courier New', monospace;
     background: #f9f9f9;
 }
 
-/* Comparison Grid */
+/* Comparison grid */
 .comparison-grid {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
-    gap: 12px;
-    margin-top: 10px;
+    gap: 15px;
+    margin-top: 12px;
 }
 
 .comparison-item {
     background: #f9f9f9;
     border: 1px solid #ddd;
-    padding: 10px;
+    padding: 12px;
     border-radius: 4px;
 }
 
 .comparison-label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     color: #666;
     text-transform: uppercase;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
 .comparison-text {
-    font-size: 12px;
-    line-height: 1.4;
+    font-size: 13px;
+    line-height: 1.6;
     color: #333;
 }
 
 .comparison-arrow {
-    font-size: 20px;
+    font-size: 24px;
     align-self: center;
     color: #28a745;
+    font-weight: bold;
 }
 
 /* Alerts */
 .alert {
-    padding: 10px 12px;
+    padding: 12px 15px;
     border-radius: 4px;
-    margin-top: 8px;
-    font-size: 12px;
-    line-height: 1.5;
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.6;
     border-left: 4px solid;
 }
 
@@ -114,70 +117,68 @@
     color: #0c5460;
 }
 
-/* Process Flow */
+/* Process flow */
 .process-flow {
     background: #f8f9fa;
     border: 1px solid #dee2e6;
     border-radius: 4px;
-    padding: 10px;
-    margin-top: 8px;
+    padding: 12px;
+    margin-top: 10px;
 }
 
 .flow-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 0;
-    font-size: 12px;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 13px;
     color: #333;
 }
 
+.flow-item:first-child {
+    padding-top: 0;
+}
+
+.flow-item:last-child {
+    padding-bottom: 0;
+}
+
 .flow-icon {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     background: #6c757d;
     color: white;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 13px;
     flex-shrink: 0;
+    font-weight: bold;
 }
 
-.flow-icon.success {
-    background: #28a745;
-}
+.flow-icon.success { background: #28a745; }
+.flow-icon.error { background: #dc3545; }
+.flow-icon.warning { background: #ffc107; color: #333; }
+.flow-icon.info { background: #17a2b8; }
 
-.flow-icon.error {
-    background: #dc3545;
-}
-
-.flow-icon.warning {
-    background: #ffc107;
-    color: #333;
-}
-
-.flow-icon.info {
-    background: #17a2b8;
-}
-
-/* Diagnostic Box */
+/* Diagnostic box */
 .diagnostic-box {
-    background: #fff9e6;
+    background: #fffbf0;
     border: 2px solid #ffc107;
     border-radius: 4px;
-    padding: 12px;
-    margin-top: 10px;
+    padding: 15px;
+    margin-top: 12px;
 }
 
 .diagnostic-box h4 {
-    margin: 0 0 8px 0;
+    margin: 0 0 10px 0;
     color: #856404;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 
 .diagnostic-list {
@@ -187,11 +188,12 @@
 }
 
 .diagnostic-list li {
-    padding: 4px 0;
-    font-size: 12px;
+    padding: 6px 0;
+    font-size: 13px;
     display: flex;
-    align-items: start;
-    gap: 8px;
+    align-items: flex-start;
+    gap: 10px;
+    color: #333;
 }
 
 .diagnostic-list li:before {
@@ -201,37 +203,54 @@
     flex-shrink: 0;
 }
 
-/* Waiting Progress */
+/* Waiting progress */
 .waiting-progress {
-    background: #fff9e6;
+    background: #fffbf0;
     border: 2px solid #ffc107;
     border-radius: 4px;
-    padding: 12px;
-    margin-top: 10px;
+    padding: 15px;
+    margin-top: 12px;
 }
 
 .waiting-progress h4 {
-    margin: 0 0 8px 0;
+    margin: 0 0 10px 0;
     color: #856404;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.waiting-progress > div {
     font-size: 13px;
+    color: #333;
 }
 
 .progress-bar-container {
     background: #f0f0f0;
     border-radius: 4px;
-    height: 20px;
+    height: 24px;
     overflow: hidden;
-    margin-top: 8px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
 }
 
 .progress-bar {
-    background: linear-gradient(90deg, #ffc107, #ffca2c);
+    background: #ffc107;
     height: 100%;
-    transition: width 0.3s;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #333;
-    font-weight: bold;
-    font-size: 11px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .comparison-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .comparison-arrow {
+        transform: rotate(90deg);
+        justify-self: center;
+    }
 }
