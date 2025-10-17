@@ -1,9 +1,9 @@
 /**
- * Process Debugger Core
- * Main debugger class and initialization - PERFORMANCE OPTIMIZED
+ * Process Debugger Core - REFACTORED for On-Demand Rendering
+ * Events stored in memory, rendered only when requested via modal
  */
 
-import { debounce, throttle, truncate, escapeHtml } from './debugger-utils.js';
+import { debounce, throttle, escapeHtml } from './debugger-utils.js';
 import { createWaitingEvent, createMatchedEvent, createOrphanEvent } from './debugger-events.js';
 import {
     renderDataTable,
@@ -20,19 +20,25 @@ console.log('[Process Debugger] Module loaded');
 
 class ProcessDebugger {
     constructor() {
-        this.timeline = document.getElementById('timeline');
-        this.eventCounter = document.getElementById('eventCounter');
-        this.perfIndicator = document.getElementById('perfIndicator');
-        this.autoScroll = false;
-        this.autoRefreshBreakdown = true;
-        this.limitEvents = true;
-        this.maxEvents = 100;
+        // Core data storage (NO DOM rendering until requested)
+        this.eventsByMarker = new Map(); // marker -> [eventData objects]
         this.eventCount = 0;
         this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
+        this.severityCounts = { success: 0, info: 0, warning: 0, critical: 0 };
+        
+        // Source/target segments
         this.sourceSegments = [];
         this.targetSegments = [];
         this.generationStartTime = null;
 
+        // DOM elements
+        this.detailsPanel = document.getElementById('eventDetailsPanel');
+        this.panelTitle = document.getElementById('panelTitle');
+        this.panelBody = document.getElementById('panelBody');
+        this.panelClose = document.getElementById('panelClose');
+        this.eventCounter = document.getElementById('eventCounter');
+        this.perfIndicator = document.getElementById('perfIndicator');
+        
         // Performance tracking
         this.renderTimes = [];
         this.maxRenderTimeTracked = 20;
@@ -41,7 +47,7 @@ class ProcessDebugger {
         this.eventQueue = [];
         this.processingQueue = false;
 
-        // Debounced and throttled functions for performance
+        // Debounced functions
         this.debouncedBreakdownRender = debounce(() => this.renderMarkerBreakdown(), 1000);
         this.throttledStatsUpdate = throttle(() => this.updateStatsDisplay(), 200);
         this.throttledEventCounter = throttle(() => {
@@ -55,10 +61,10 @@ class ProcessDebugger {
         console.log('[Process Debugger] Initializing...');
         this.setupEventListeners();
         this.setupMessageListener();
+        this.setupPanelListeners();
         this.renderMarkerBreakdown();
         this.updatePerfIndicator();
         
-        // Notify parent window that debugger is ready
         this.notifyParent('DEBUG_READY');
         console.log('[Process Debugger] Initialization complete');
     }
@@ -71,36 +77,32 @@ class ProcessDebugger {
             } catch (e) {
                 console.error(`[Process Debugger] Failed to notify parent with ${type}:`, e);
             }
-        } else {
-            console.warn(`[Process Debugger] No opener window found for ${type} - debugger opened directly?`);
         }
     }
 
     setupEventListeners() {
-        document.getElementById('clearBtn').onclick = () => this.clearTimeline();
+        document.getElementById('clearBtn').onclick = () => this.clearEvents();
         document.getElementById('analyzeWaitingBtn').onclick = () => this.analyzeWaitingSegments();
         document.getElementById('gapStatBox').onclick = () => this.analyzeWaitingSegments();
-
-        document.getElementById('autoScrollBtn').onclick = (e) => {
-            this.autoScroll = !this.autoScroll;
-            e.target.textContent = this.autoScroll ? 'Auto-Scroll: ON' : 'Auto-Scroll: OFF';
-            e.target.classList.toggle('active', this.autoScroll);
-        };
-
-        document.getElementById('expandAllBtn').onclick = () => this.expandAll();
-        document.getElementById('collapseAllBtn').onclick = () => this.collapseAll();
-        document.getElementById('scrollToTopBtn').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
-        document.getElementById('scrollToBottomBtn').onclick = () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-
         document.getElementById('refreshBreakdownBtn').onclick = () => this.renderMarkerBreakdown();
 
         document.getElementById('autoRefreshCheckbox').onchange = (e) => {
             this.autoRefreshBreakdown = e.target.checked;
         };
 
-        document.getElementById('limitEventsCheckbox').onchange = (e) => {
-            this.limitEvents = e.target.checked;
-        };
+        // Removed: scroll buttons, expand/collapse all, auto-scroll
+    }
+
+    setupPanelListeners() {
+        // Close panel on button
+        this.panelClose.onclick = () => this.closePanel();
+        
+        // Close panel on ESC key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.detailsPanel.style.display !== 'none') {
+                this.closePanel();
+            }
+        });
     }
 
     setupMessageListener() {
@@ -120,12 +122,11 @@ class ProcessDebugger {
                 this.queueSegment(e.data.segment);
             } else if (e.data.type === 'RESET') {
                 console.log('[Process Debugger] Received reset command');
-                this.clearTimeline();
+                this.clearEvents();
             }
         });
     }
 
-    // Batch process segments for better performance
     queueSegment(segment) {
         this.eventQueue.push(segment);
         
@@ -138,26 +139,13 @@ class ProcessDebugger {
     processQueue() {
         const startTime = performance.now();
         const maxProcessingTime = 16; // ~60fps
-        const fragment = document.createDocumentFragment();
         let processedCount = 0;
 
-        // Remove timeline empty message once
-        if (this.eventQueue.length > 0 && this.timeline.querySelector('.timeline-empty')) {
-            this.timeline.innerHTML = '';
-        }
-
-        // Process events in batches
+        // Process events in batches (NO DOM rendering)
         while (this.eventQueue.length > 0 && (performance.now() - startTime) < maxProcessingTime) {
             const segment = this.eventQueue.shift();
             
-            // Handle event limit
-            if (this.limitEvents && this.eventCount >= this.maxEvents) {
-                const firstEvent = this.timeline.querySelector('.event');
-                if (firstEvent) firstEvent.remove();
-            } else {
-                this.eventCount++;
-            }
-
+            this.eventCount++;
             this.stats.total++;
 
             const timestamp = new Date().toLocaleTimeString();
@@ -172,37 +160,38 @@ class ProcessDebugger {
                 eventData = createOrphanEvent(segment, timestamp, this);
             }
 
-            const eventElement = this.createEventElement(eventData);
-            fragment.appendChild(eventElement);
+            // Store event in memory (NO DOM rendering)
+            this.storeEvent(segment.marker, eventData);
             processedCount++;
         }
 
-        // Batch DOM update
+        // Batch updates
         if (processedCount > 0) {
-            this.timeline.appendChild(fragment);
             this.throttledStatsUpdate();
             this.throttledEventCounter();
-
-            if (this.autoRefreshBreakdown) {
-                this.debouncedBreakdownRender();
-            }
-
-            if (this.autoScroll) {
-                requestAnimationFrame(() => {
-                    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
-                });
-            }
+            this.debouncedBreakdownRender();
 
             const renderTime = performance.now() - startTime;
             this.trackRenderTime(renderTime);
         }
 
-        // Continue processing if there are more events
+        // Continue processing if more events exist
         if (this.eventQueue.length > 0) {
             requestAnimationFrame(() => this.processQueue());
         } else {
             this.processingQueue = false;
         }
+    }
+
+    storeEvent(marker, eventData) {
+        if (!this.eventsByMarker.has(marker)) {
+            this.eventsByMarker.set(marker, []);
+        }
+        this.eventsByMarker.get(marker).push(eventData);
+        
+        // Update severity counts
+        this.severityCounts[eventData.severity]++;
+        this.updateSeverityDisplay();
     }
 
     analyzeWaitingSegments() {
@@ -213,42 +202,20 @@ class ProcessDebugger {
             return;
         }
 
-        // Add to queue instead of rendering immediately
+        // Create waiting events and store them
         waitingSegments.forEach(segment => {
             const eventData = createWaitingEvent(segment, this);
-            this.eventQueue.push({ isWaitingAnalysis: true, eventData });
-        });
-
-        if (!this.processingQueue) {
-            this.processingQueue = true;
-            requestAnimationFrame(() => this.processWaitingQueue());
-        }
-    }
-
-    processWaitingQueue() {
-        const fragment = document.createDocumentFragment();
-        const waitingEvents = this.eventQueue.filter(e => e.isWaitingAnalysis);
-        
-        waitingEvents.forEach(item => {
-            const eventElement = this.createEventElement(item.eventData);
-            fragment.appendChild(eventElement);
+            this.storeEvent(segment.marker, eventData);
             this.eventCount++;
+            this.severityCounts[eventData.severity]++;
         });
 
-        this.eventQueue = this.eventQueue.filter(e => !e.isWaitingAnalysis);
+        this.updateSeverityDisplay();
+        this.throttledStatsUpdate();
+        this.eventCounter.textContent = this.eventCount;
+        this.renderMarkerBreakdown();
         
-        if (waitingEvents.length > 0) {
-            this.timeline.appendChild(fragment);
-            this.eventCounter.textContent = this.eventCount;
-
-            if (this.autoScroll) {
-                requestAnimationFrame(() => {
-                    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-                });
-            }
-        }
-
-        this.processingQueue = false;
+        alert(`Added ${waitingSegments.length} waiting segment analysis. Click cards to view details.`);
     }
 
     getWaitingSegments() {
@@ -257,33 +224,21 @@ class ProcessDebugger {
         return this.sourceSegments.filter(source => !targetMap.has(source.marker));
     }
 
-    expandAll() {
-        document.querySelectorAll('.event-details').forEach(d => d.classList.add('visible'));
-        document.querySelectorAll('.expand-btn').forEach(b => {
-            b.classList.add('expanded');
-            b.innerHTML = '<span class="icon">▼</span> Hide Details';
-        });
-    }
-
-    collapseAll() {
-        document.querySelectorAll('.event-details').forEach(d => d.classList.remove('visible'));
-        document.querySelectorAll('.expand-btn').forEach(b => {
-            b.classList.remove('expanded');
-            b.innerHTML = '<span class="icon">▼</span> Show Details';
-        });
-    }
-
-    clearTimeline() {
-        this.timeline.innerHTML = `<div class="timeline-empty">Timeline cleared. New events will appear here.<br><br><small>Events will accumulate here. Enable "Limit events" to prevent performance issues.</small></div>`;
+    clearEvents() {
+        this.eventsByMarker.clear();
         this.eventCount = 0;
         this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
+        this.severityCounts = { success: 0, info: 0, warning: 0, critical: 0 };
         this.targetSegments = [];
         this.eventQueue = [];
         this.renderTimes = [];
         this.updateStatsDisplay();
+        this.updateSeverityDisplay();
         this.eventCounter.textContent = 0;
         this.renderMarkerBreakdown();
         this.updatePerfIndicator();
+        this.closePanel();
+        console.log('[Process Debugger] Events cleared');
     }
 
     renderMarkerBreakdown() {
@@ -323,7 +278,7 @@ class ProcessDebugger {
         // Build the grid of cards
         const gridHtml = `<div class="breakdown-grid">${
             allMarkers.map(item => 
-                `<div class="breakdown-card status-${item.status}" data-marker="${item.marker}" title="Click to find '${item.marker}' in timeline">
+                `<div class="breakdown-card status-${item.status}" data-marker="${item.marker}" title="Click to see ${item.marker} event details">
                     ${item.marker}
                 </div>`
             ).join('')
@@ -339,39 +294,86 @@ class ProcessDebugger {
         
         container.innerHTML = gridHtml + waitingListHtml;
 
-        // Add a single event listener to the container for efficiency
+        // Add click handler to grid container (event delegation)
         container.onclick = (event) => {
             const card = event.target.closest('.breakdown-card');
             if (!card) return;
 
             const marker = card.dataset.marker;
-            // Find the *first* event with this marker, as there could be multiple (e.g., waiting then matched)
-            const eventElement = document.querySelector(`.event[data-marker="${marker}"]`);
-
-            if (eventElement) {
-                eventElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                // Add a temporary highlight for user feedback
-                eventElement.style.transition = 'background-color 0.2s ease-in-out';
-                eventElement.style.backgroundColor = '#fff9c4'; // Light yellow
-                setTimeout(() => {
-                    eventElement.style.backgroundColor = '';
-                }, 1500);
-            }
+            this.showEventPanel(marker);
         };
 
         const renderTime = performance.now() - startTime;
         this.trackRenderTime(renderTime);
     }
 
-    createEventElement(eventData) {
-        const detailsId = `details-${eventData.number}`;
-        const div = document.createElement('div');
-        div.className = `event severity-${eventData.severity}`;
-        div.dataset.marker = eventData.marker;
+    showEventPanel(marker) {
+        const events = this.eventsByMarker.get(marker) || [];
+        
+        if (events.length === 0) {
+            this.panelTitle.textContent = `No Events for ${marker}`;
+            this.panelBody.innerHTML = '<p style="text-align: center; padding: 40px; color: #999;">No events recorded for this marker yet.</p>';
+        } else {
+            this.panelTitle.textContent = `Event Timeline: ${marker} (${events.length} event${events.length > 1 ? 's' : ''})`;
+            this.panelBody.innerHTML = this.renderEventsTimeline(events);
+            
+            // Setup expand/collapse buttons
+            this.panelBody.querySelectorAll('.expand-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const detailsId = btn.dataset.target;
+                    this.toggleDetails(detailsId, btn);
+                });
+            });
+        }
+        
+        // Show panel and scroll to it
+        this.detailsPanel.style.display = 'block';
+        this.detailsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 
-        // Create cleaner HTML source by joining with newlines
-        const stepsHtml = eventData.steps.map((step, i) => {
+    renderEventsTimeline(events) {
+        let html = '<div class="event-timeline">';
+        
+        events.forEach((eventData, index) => {
+            const severityClass = eventData.severity;
+            const detailsId = `panel-details-${eventData.number}`;
+            
+            html += `<div class="timeline-item">
+                <div class="timeline-marker ${severityClass}">${index + 1}</div>
+                <div class="event severity-${severityClass}">
+                    <div class="event-number">#${eventData.number}</div>
+                    <div class="event-header">
+                        <span class="event-time">${eventData.timestamp}</span>
+                        <span class="severity-badge ${severityClass}">
+                            <span class="severity-icon">${eventData.statusIcon}</span>
+                            ${eventData.type.toUpperCase()}
+                        </span>
+                    </div>
+                    <div class="event-summary">
+                        ${renderSummaryJSON(eventData.jsonPair)}
+                        <div class="summary-status">
+                            ${eventData.statusText ? `<div class="status-text"><strong>${eventData.statusText.replace('Status: ', '')}</strong></div>` : ''}
+                            <button class="expand-btn" data-target="${detailsId}">
+                                <span class="icon">▼</span> Show ${eventData.steps.length} Debug Steps
+                            </button>
+                        </div>
+                    </div>
+                    <div class="event-details" id="${detailsId}">
+                        <div class="details-title">
+                            🔍 Step-by-Step ${eventData.type === 'orphan' ? 'ORPHAN' : eventData.type === 'waiting' ? 'WAITING' : 'MATCHED'} Processing Details
+                        </div>
+                        ${this.renderSteps(eventData.steps)}
+                    </div>
+                </div>
+            </div>`;
+        });
+        
+        html += '</div>';
+        return html;
+    }
+
+    renderSteps(steps) {
+        return steps.map((step, i) => {
             const stepSeverity = step.severity || 'info';
             const severityClass = `step-${stepSeverity}`;
             const numberClass = stepSeverity;
@@ -402,43 +404,6 @@ class ProcessDebugger {
                 ${contentHtml}
             </div>`;
         }).join('\n');
-
-        // Conditionally render the status text div
-        const statusTextHtml = eventData.statusText 
-            ? `<div class="status-text"><strong>${eventData.statusText.replace('Status: ', '')}</strong></div>`
-            : '';
-
-        div.innerHTML = `
-            <div class="event-number">#${eventData.number}</div>
-            <div class="event-header">
-                <span class="event-time">${eventData.timestamp}</span>
-                <span class="severity-badge ${eventData.severity}">
-                    <span class="severity-icon">${eventData.statusIcon}</span>
-                    ${eventData.type.toUpperCase()}
-                </span>
-            </div>
-            <div class="event-summary">
-                ${renderSummaryJSON(eventData.jsonPair)}
-                <div class="summary-status">
-                    ${statusTextHtml}
-                    <button class="expand-btn" data-target="${detailsId}">
-                        <span class="icon">▼</span> Show ${eventData.steps.length} Debug Steps
-                    </button>
-                </div>
-            </div>
-            <div class="event-details" id="${detailsId}">
-                <div class="details-title">
-                    🔍 Step-by-Step ${eventData.type === 'orphan' ? 'ORPHAN' : eventData.type === 'waiting' ? 'WAITING' : 'MATCHED'} Processing Details
-                    <span style="margin-left: auto; font-size: 11px; color: #999;">${eventData.steps.length} detailed steps</span>
-                </div>
-                ${stepsHtml}
-            </div>
-        `;
-
-        const expandBtn = div.querySelector('.expand-btn');
-        expandBtn.addEventListener('click', () => this.toggleDetails(detailsId, expandBtn));
-
-        return div;
     }
 
     toggleDetails(detailsId, button) {
@@ -449,6 +414,10 @@ class ProcessDebugger {
         button.innerHTML = details.classList.contains('visible')
             ? '<span class="icon">▼</span> Hide Debug Steps'
             : `<span class="icon">▼</span> Show ${stepCount} Debug Steps`;
+    }
+
+    closePanel() {
+        this.detailsPanel.style.display = 'none';
     }
 
     trackRenderTime(time) {
@@ -483,6 +452,17 @@ class ProcessDebugger {
         document.getElementById('matchedCount').textContent = this.stats.matched;
         document.getElementById('orphanCount').textContent = this.stats.orphan;
         document.getElementById('gapCount').textContent = this.stats.gap;
+    }
+
+    updateSeverityDisplay() {
+        document.getElementById('severitySuccess').innerHTML = 
+            `<span class="severity-icon">✓</span> ${this.severityCounts.success} Success`;
+        document.getElementById('severityInfo').innerHTML = 
+            `<span class="severity-icon">ℹ</span> ${this.severityCounts.info} Info`;
+        document.getElementById('severityWarning').innerHTML = 
+            `<span class="severity-icon">⚠</span> ${this.severityCounts.warning} Warning`;
+        document.getElementById('severityCritical').innerHTML = 
+            `<span class="severity-icon">✗</span> ${this.severityCounts.critical} Critical`;
     }
 }
 

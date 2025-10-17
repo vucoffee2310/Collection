@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Process Debug - AI Segment Mapper</title>
     
-    <!-- Base CSS Files (from main app) - UPDATED PATHS -->
+    <!-- Base CSS Files (from main app) -->
     <link rel="stylesheet" href="../../mapper-app/css/base.css">
     <link rel="stylesheet" href="../../mapper-app/css/components.css">
     <link rel="stylesheet" href="../../mapper-app/css/layout.css">
@@ -55,8 +55,6 @@
             <button id="autoScrollBtn">Auto-Scroll: OFF</button>
             <button id="expandAllBtn">Expand All</button>
             <button id="collapseAllBtn">Collapse All</button>
-            <button id="scrollToTopBtn">↑ Top</button>
-            <button id="scrollToBottomBtn">↓ Bottom</button>
             <span class="controls-info">
                 Events: <strong id="eventCounter">0</strong>
                 <span id="perfIndicator" class="perf-indicator" style="margin-left: 10px;"></span>
@@ -92,7 +90,7 @@
         </div>
 
         <details class="breakdown-section" open>
-            <summary class="breakdown-header">🔍 Detailed Marker Breakdown (Click to collapse)</summary>
+            <summary class="breakdown-header">🔍 Marker Overview - Click any card to see details</summary>
             
             <div class="breakdown-controls">
                 <button id="refreshBreakdownBtn" class="mini-btn">🔄 Refresh Now</button>
@@ -100,36 +98,43 @@
                     <input type="checkbox" id="autoRefreshCheckbox" checked>
                     Auto-refresh on events
                 </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="limitEventsCheckbox" checked>
-                    Limit events (max 100)
-                </label>
             </div>
             
             <div id="markerBreakdownTable"></div>
             
             <div class="breakdown-footer">
-                <strong>Legend:</strong> 
-                <span class="legend-item status-matched">✅ Matched</span>
-                <span class="legend-item status-waiting">⏳ Waiting</span>
-                <span class="legend-item status-orphan">⚠️ Orphan</span>
+                <div class="footer-section">
+                    <strong>Event Severity:</strong>
+                    <span class="severity-badge success mini" id="severitySuccess">
+                        <span class="severity-icon">✓</span> 0 Success
+                    </span>
+                    <span class="severity-badge info mini" id="severityInfo">
+                        <span class="severity-icon">ℹ</span> 0 Info
+                    </span>
+                    <span class="severity-badge warning mini" id="severityWarning">
+                        <span class="severity-icon">⚠</span> 0 Warning
+                    </span>
+                    <span class="severity-badge critical mini" id="severityCritical">
+                        <span class="severity-icon">✗</span> 0 Critical
+                    </span>
+                </div>
+                <div class="footer-section">
+                    <strong>Marker Status:</strong>
+                    <span class="legend-item status-matched">✅ Matched</span>
+                    <span class="legend-item status-waiting">⏳ Waiting</span>
+                    <span class="legend-item status-orphan">⚠️ Orphan</span>
+                </div>
             </div>
         </details>
 
-        <div class="timeline-header">
-            ⏱️ Timeline: Detailed Segment Processing Events (Severity Levels: 
-            <span class="severity-badge success" style="font-size: 10px; padding: 2px 6px;">✓ Success</span>
-            <span class="severity-badge info" style="font-size: 10px; padding: 2px 6px;">ℹ Info</span>
-            <span class="severity-badge warning" style="font-size: 10px; padding: 2px 6px;">⚠ Warning</span>
-            <span class="severity-badge critical" style="font-size: 10px; padding: 2px 6px;">✖ Critical</span>
-            )
-        </div>
-
-        <div id="timeline">
-            <div class="timeline-empty">
-                No events yet. Start generation from the main page to see the detailed process here.
-                <br><br>
-                <small>Events will accumulate here. Enable "Limit events" to prevent performance issues.</small>
+        <!-- Event Details Panel (shown on demand when card clicked) -->
+        <div id="eventDetailsPanel" class="event-details-panel" style="display: none;">
+            <div class="panel-header">
+                <h2 id="panelTitle">Event Details</h2>
+                <button id="panelClose" class="panel-close">✕ Close</button>
+            </div>
+            <div id="panelBody" class="panel-body">
+                <!-- Events rendered here on demand -->
             </div>
         </div>
     </div>

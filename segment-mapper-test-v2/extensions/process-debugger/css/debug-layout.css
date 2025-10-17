@@ -29,32 +29,3 @@ body {
     z-index: 100;
     padding-bottom: 10px;
 }
-
-#timeline {
-    position: relative;
-    overflow: visible;
-}
-
-.timeline-header {
-    background: white;
-    padding: 10px 15px;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-weight: 600;
-    font-size: 14px;
-    position: sticky;
-    top: 60px;
-    z-index: 50;
-}
-
-.timeline-empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: #999;
-    font-style: italic;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin-bottom: 20px;
-}
