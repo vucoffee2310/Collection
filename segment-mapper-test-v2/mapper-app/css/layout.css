@@ -23,7 +23,7 @@
     grid-template-columns: 2fr 1fr;
     gap: 0;
     overflow: hidden;
-    min-height: 0; /* Important for proper flex behavior */
+    min-height: 0;
 }
 
 /* Column Layout */
@@ -35,7 +35,7 @@
     padding: 20px;
     overflow-y: auto;
     overflow-x: hidden;
-    min-height: 0; /* Important for proper flex behavior */
+    min-height: 0;
 }
 
 .content-column {
@@ -47,10 +47,14 @@
     background: #fafafa;
 }
 
+/* Auto-grow sidebar panel */
+.sidebar-column .panel {
+    min-height: min-content;
+}
+
 /* Custom Scrollbars */
 .content-column::-webkit-scrollbar,
 .sidebar-column::-webkit-scrollbar,
-.log-panel::-webkit-scrollbar,
 .details-pre::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -58,14 +62,12 @@
 
 .content-column::-webkit-scrollbar-track,
 .sidebar-column::-webkit-scrollbar-track,
-.log-panel::-webkit-scrollbar-track,
 .details-pre::-webkit-scrollbar-track {
     background: #f1f1f1;
 }
 
 .content-column::-webkit-scrollbar-thumb,
 .sidebar-column::-webkit-scrollbar-thumb,
-.log-panel::-webkit-scrollbar-thumb,
 .details-pre::-webkit-scrollbar-thumb {
     background: #888;
     border-radius: 5px;
@@ -73,7 +75,6 @@
 
 .content-column::-webkit-scrollbar-thumb:hover,
 .sidebar-column::-webkit-scrollbar-thumb:hover,
-.log-panel::-webkit-scrollbar-thumb:hover,
 .details-pre::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
@@ -84,7 +85,7 @@
     padding: 15px;
     background: #fff; 
     border-radius: 5px;
-    flex-shrink: 0; /* Prevent panels from shrinking */
+    flex-shrink: 0;
 }
 
 /* Input Group */

@@ -1,26 +1,60 @@
 export class Logger {
-    // Accepts the DOM element directly instead of an ID
-    constructor(element) {
-        this.logElement = element;
-        if (!this.logElement) {
-            console.error(`Logger was initialized with a null element.`);
-        }
+    constructor() {
+        this.logs = [];
+        this.maxLogs = 500; // Limit log entries to prevent memory issues
     }
 
     _log(message, type = '', contentClass = '') {
-        if (!this.logElement) return;
-        const entry = document.createElement('div');
-        entry.className = `log-entry ${type}`;
         const timestamp = new Date().toLocaleTimeString();
-        const content = contentClass ? `<span class="${contentClass}">${message}</span>` : message;
-        entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${content}`;
-        this.logElement.appendChild(entry);
-        this.logElement.scrollTop = this.logElement.scrollHeight;
+        const entry = {
+            timestamp,
+            message,
+            type,
+            contentClass
+        };
+        
+        this.logs.push(entry);
+        
+        // Trim old logs if exceeding max
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
     }
+    
     log(message) { this._log(message); }
     info(message) { this._log(message, 'info'); }
     warn(message) { this._log(message, 'warn'); }
     error(message) { this._log(message, 'error'); }
     chunk(message) { this._log(message, '', 'log-chunk'); }
-    clear() { if (this.logElement) this.logElement.innerHTML = ''; }
+    
+    clear() { 
+        this.logs = []; 
+    }
+    
+    getLogs() {
+        return this.logs;
+    }
+    
+    getLogsHTML() {
+        if (this.logs.length === 0) {
+            return '<div style="color: #888; font-style: italic;">No logs yet.</div>';
+        }
+        
+        return this.logs.map(entry => {
+            const content = entry.contentClass ? 
+                `<span class="${entry.contentClass}">${this._escapeHtml(entry.message)}</span>` : 
+                this._escapeHtml(entry.message);
+            
+            return `<div class="log-entry ${entry.type}"><span class="timestamp">[${entry.timestamp}]</span> ${content}</div>`;
+        }).join('');
+    }
+    
+    _escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 }

@@ -11,17 +11,21 @@ export class AIStream {
         this.sendToDebugWindow = dependencies.sendToDebugWindow;
         
         this.buttonElement = dependencies.buttonElement;
-        this.requestDetailsEl = dependencies.requestDetailsEl;
-        this.requestDataEl = dependencies.requestDataEl;
-        this.networkResponseDetailsEl = dependencies.networkResponseDetailsEl;
-        this.generationSummaryEl = dependencies.generationSummaryEl;
-        this.responseDataStreamEl = dependencies.responseDataStreamEl;
+        this.reportDisplayEl = dependencies.reportDisplayEl;
         
         this.parser = new StreamingParser();
         this.running = false;
         this.abortController = null;
         this.startTime = 0;
-        this.generationSummary = {};
+        
+        // Report data
+        this.report = {
+            summary: null,
+            streamedData: ''
+        };
+        
+        // Track what's been rendered to avoid full re-renders
+        this.streamedDataRendered = 0;
         
         // Performance optimization: batch segment updates
         this.segmentQueue = [];
@@ -30,6 +34,10 @@ export class AIStream {
         // Throttle partial updates
         this.lastPartialUpdate = 0;
         this.partialUpdateThrottle = 200; // ms
+        
+        // Throttle report updates during streaming
+        this.lastReportUpdate = 0;
+        this.reportUpdateThrottle = 500; // ms
     }
 
     toggle() { 
@@ -46,20 +54,24 @@ export class AIStream {
             return;
         }
         
-        this.clearUIDisplays();
+        this.clearReport();
+        this.logger.clear();
         this.logger.info('Starting generation process...');
         
         // Notify debug window to reset
         this.sendToDebugWindow('RESET', {});
         
         this.startTime = performance.now();
-        this.generationSummary = { 
-            status: 'In Progress...', 
+        this.report.summary = { 
+            status: 'In Progress',
             chunksReceived: 0,
             segmentsParsed: 0,
-            finishReason: null
+            finishReason: null,
+            duration: null
         };
-        this.displayGenerationSummary();
+        
+        this.streamedDataRendered = 0;
+        this.updateReport();
 
         this.running = true;
         this.updateButton();
@@ -84,12 +96,11 @@ export class AIStream {
             signal: this.abortController.signal
         };
         
-        this.displayRequestDetails(this.API_URL, fetchOptions);
+        this.updateReport();
         this.logger.info("Sending request to AI...");
 
         fetch(this.API_URL, fetchOptions)
         .then(async (response) => {
-            this.displayNetworkResponseDetails(response);
             if (!response.ok) {
                 throw await this._createApiError(response);
             }
@@ -144,7 +155,7 @@ export class AIStream {
         }
 
         this.finalizeSummary(finalStatus, errorMessage);
-        this.displayGenerationSummary();
+        this.updateReport();
     }
 
     async processStream(reader) {
@@ -167,13 +178,12 @@ export class AIStream {
                         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                         
                         if (data.candidates?.[0]?.finishReason) {
-                            this.generationSummary.finishReason = data.candidates[0].finishReason;
+                            this.report.summary.finishReason = data.candidates[0].finishReason;
                         }
                         
                         if (text) {
-                            // Update response data stream
-                            this.responseDataStreamEl.textContent += text;
-                            this.responseDataStreamEl.scrollTop = this.responseDataStreamEl.scrollHeight;
+                            // Update streamed data
+                            this.report.streamedData += text;
                             
                             // Throttle log updates
                             if (chunkCount % 5 === 0) {
@@ -186,7 +196,7 @@ export class AIStream {
                                 this.queueSegments(newSegments);
                             }
                             
-                            this.generationSummary.chunksReceived++;
+                            this.report.summary.chunksReceived++;
                             chunkCount++;
                             
                             // Throttle partial updates
@@ -197,6 +207,12 @@ export class AIStream {
                                     this.mapper.setTargetPartial(pending);
                                 }
                                 this.lastPartialUpdate = now;
+                            }
+                            
+                            // Throttle report updates during streaming
+                            if (now - this.lastReportUpdate > this.reportUpdateThrottle) {
+                                this.updateReport();
+                                this.lastReportUpdate = now;
                             }
                         }
                     } catch (e) { 
@@ -224,7 +240,6 @@ export class AIStream {
         
         if (!this.processingSegments) {
             this.processingSegments = true;
-            // Use microtask for better performance
             queueMicrotask(() => this.processSegmentQueue());
         }
     }
@@ -235,11 +250,10 @@ export class AIStream {
             return;
         }
         
-        // Process in batches
         const batchSize = 5;
         const batch = this.segmentQueue.splice(0, batchSize);
         
-        this.generationSummary.segmentsParsed += batch.length;
+        this.report.summary.segmentsParsed += batch.length;
         this.mapper.addTargetBatch(batch);
         
         // Send to debug window (batched)
@@ -257,16 +271,127 @@ export class AIStream {
     
     finalizeSummary(status, errorMessage) {
         const duration = ((performance.now() - this.startTime) / 1000).toFixed(2);
-        this.generationSummary.status = status;
-        this.generationSummary.duration = `${duration} seconds`;
+        this.report.summary.status = status;
+        this.report.summary.duration = `${duration} seconds`;
         if (errorMessage) {
-            this.generationSummary.errorDetails = errorMessage;
+            this.report.summary.errorDetails = errorMessage;
         }
     }
 
-    displayGenerationSummary() {
-        if (this.generationSummaryEl) {
-            this.generationSummaryEl.textContent = JSON.stringify(this.generationSummary, null, 2);
+    updateReport() {
+        if (!this.reportDisplayEl) return;
+        
+        // Check if report structure exists
+        const existingSummarySection = this.reportDisplayEl.querySelector('.summary-section');
+        const existingLogsSection = this.reportDisplayEl.querySelector('.logs-section');
+        const existingStreamSection = this.reportDisplayEl.querySelector('.stream-section');
+        
+        // If structure doesn't exist, do initial render
+        if (!existingSummarySection || !existingLogsSection || !existingStreamSection) {
+            this.renderReportStructure();
+        }
+        
+        // Update summary
+        this.updateSummarySection();
+        
+        // Update logs
+        this.updateLogsSection();
+        
+        // Append new streamed data (incremental)
+        this.appendStreamedData();
+    }
+    
+    renderReportStructure() {
+        const statusClass = this.report.summary?.status ? 
+            this.report.summary.status.toLowerCase().replace(/\s+/g, '-') : '';
+        
+        const html = `
+            <div class="report-section summary-section">
+                <h4>Generation Summary <span class="status-badge ${statusClass}" id="status-badge">${this.report.summary?.status || 'Initializing'}</span></h4>
+                <div class="report-content" id="summary-content"></div>
+            </div>
+            
+            <div class="report-section logs-section">
+                <h4>Logs</h4>
+                <div class="report-content logs-content" id="logs-content"></div>
+            </div>
+            
+            <div class="report-section stream-section">
+                <h4>Streamed Response Data <span style="font-size: 11px; font-weight: normal; opacity: 0.8;" id="char-count">(0 characters)</span></h4>
+                <div class="report-content stream-content" id="stream-content"></div>
+            </div>
+        `;
+        
+        this.reportDisplayEl.innerHTML = html;
+        this.streamedDataRendered = 0;
+    }
+    
+    updateSummarySection() {
+        if (!this.report.summary) return;
+        
+        const summaryContent = document.getElementById('summary-content');
+        const statusBadge = document.getElementById('status-badge');
+        
+        if (summaryContent) {
+            summaryContent.textContent = JSON.stringify(this.report.summary, null, 2);
+        }
+        
+        if (statusBadge) {
+            const statusClass = this.report.summary.status.toLowerCase().replace(/\s+/g, '-');
+            statusBadge.className = `status-badge ${statusClass}`;
+            statusBadge.textContent = this.report.summary.status;
+        }
+    }
+    
+    updateLogsSection() {
+        const logsContent = document.getElementById('logs-content');
+        if (!logsContent) return;
+        
+        const logsHTML = this.logger.getLogsHTML();
+        logsContent.innerHTML = logsHTML;
+        
+        // Auto-scroll to bottom
+        logsContent.scrollTop = logsContent.scrollHeight;
+    }
+    
+    appendStreamedData() {
+        const streamContent = document.getElementById('stream-content');
+        const charCount = document.getElementById('char-count');
+        
+        if (!streamContent) return;
+        
+        // Calculate new data to append
+        const newData = this.report.streamedData.substring(this.streamedDataRendered);
+        
+        if (newData.length > 0) {
+            // Create text node and append (more efficient than innerHTML)
+            const textNode = document.createTextNode(newData);
+            streamContent.appendChild(textNode);
+            
+            // Update rendered count
+            this.streamedDataRendered = this.report.streamedData.length;
+            
+            // Update character count
+            if (charCount) {
+                charCount.textContent = `(${this.report.streamedData.length} characters)`;
+            }
+            
+            // Auto-scroll to bottom during streaming
+            if (this.running) {
+                streamContent.scrollTop = streamContent.scrollHeight;
+            }
+        }
+    }
+
+    clearReport() {
+        this.report = {
+            summary: null,
+            streamedData: ''
+        };
+        this.streamedDataRendered = 0;
+        
+        if (this.reportDisplayEl) {
+            this.reportDisplayEl.innerHTML = '<div class="report-empty">No report data available. Click "Generate & Map" to start.</div>';
         }
     }
 
@@ -274,28 +399,16 @@ export class AIStream {
         this.buttonElement.textContent = this.running ? 'Stop Generation' : 'Generate & Map';
     }
 
-    clearUIDisplays() {
-        this.logger.clear();
-        this.requestDetailsEl.textContent = '...';
-        this.requestDataEl.textContent = '...';
-        this.networkResponseDetailsEl.textContent = '...';
-        this.generationSummaryEl.textContent = '...';
-        this.responseDataStreamEl.textContent = '';
+    _escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
-    
-    displayRequestDetails(url, options) {
-        const requestObj = { URL: url, Method: options.method, Headers: options.headers };
-        this.requestDetailsEl.textContent = JSON.stringify(requestObj, null, 2);
-        this.requestDataEl.textContent = options.body;
-    }
-    
-    displayNetworkResponseDetails(response) {
-        const responseObj = {
-            Status: response.status,
-            StatusText: response.statusText,
-            OK: response.ok,
-            Headers: Object.fromEntries(response.headers.entries())
-        };
-        this.networkResponseDetailsEl.textContent = JSON.stringify(responseObj, null, 2);
+
+    _formatJSON(obj) {
+        return this._escapeHtml(JSON.stringify(obj, null, 2));
     }
 }

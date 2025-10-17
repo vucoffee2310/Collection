@@ -8,22 +8,17 @@ console.log('[Main App] main.js module loaded');
 
 // --- DOM Element Lookups (Composition Root) ---
 const elements = {
-    logDisplay: document.getElementById('log-display'),
     sourceInput: document.getElementById('sourceInput'),
     startButton: document.getElementById('btn'),
     openDebugButton: document.getElementById('openDebugWindow'),
     mapDisplay: document.getElementById('display'),
-    requestDetails: document.getElementById('request-details'),
-    requestData: document.getElementById('request-data'),
-    networkResponseDetails: document.getElementById('network-response-details'),
-    generationSummary: document.getElementById('generation-summary'),
-    responseDataStream: document.getElementById('response-data-stream')
+    reportDisplay: document.getElementById('report-display')
 };
 
 console.log('[Main App] DOM elements found:', Object.keys(elements).filter(k => elements[k] !== null).length);
 
 // --- Class Instantiation & Dependency Injection ---
-const logger = new Logger(elements.logDisplay);
+const logger = new Logger();
 const mapper = new Mapper(elements.mapDisplay);
 
 // Debug window management (optional extension)
@@ -31,7 +26,6 @@ let debugWindow = null;
 let debugWindowReady = false;
 let debugMessageQueue = [];
 
-// Simpler path - always relative to current HTML file location
 const DEBUG_EXTENSION_PATH = '../extensions/process-debugger/debug.html';
 
 console.log('[Main App] Debug extension path:', DEBUG_EXTENSION_PATH);
@@ -44,11 +38,7 @@ const streamDependencies = {
     logger: logger,
     sourceInputElement: elements.sourceInput,
     buttonElement: elements.startButton,
-    requestDetailsEl: elements.requestDetails,
-    requestDataEl: elements.requestData,
-    networkResponseDetailsEl: elements.networkResponseDetails,
-    generationSummaryEl: elements.generationSummary,
-    responseDataStreamEl: elements.responseDataStream,
+    reportDisplayEl: elements.reportDisplay,
     // Debug window communication (optional extension)
     sendToDebugWindow: (type, data) => {
         if (debugWindow && !debugWindow.closed) {
@@ -60,7 +50,6 @@ const streamDependencies = {
                     console.error('[Main App] ❌ Failed to send message:', e);
                 }
             } else {
-                // Queue messages if window not ready
                 console.log('[Main App] 📦 Queueing message (window not ready):', type);
                 debugMessageQueue.push({ type, ...data });
             }
@@ -87,11 +76,9 @@ function autoParseSource() {
     const segments = Parser.parseWithUniqueMarkers(contentForMapping);
     mapper.setSource(segments);
     
-    // Store segments for when debug window connects
     currentSourceSegments = segments;
     console.log('[Main App] ✅ Parsed source segments:', segments.length);
     
-    // Send to debug window (if available and ready)
     if (debugWindow && !debugWindow.closed && debugWindowReady) {
         try {
             debugWindow.postMessage({ 
@@ -115,7 +102,6 @@ function openDebugWindow() {
         debugWindow.focus();
         logger.info('[Debug Extension] Debug window already open, focusing...');
         
-        // Resend current segments in case they weren't received
         if (debugWindowReady && currentSourceSegments.length > 0) {
             try {
                 debugWindow.postMessage({ 
@@ -143,7 +129,6 @@ function openDebugWindow() {
         logger.info('[Debug Extension] Process debug window opened');
         console.log('[Main App] ✅ Debug window opened successfully');
         
-        // Check if extension actually loaded
         setTimeout(() => {
             if (debugWindow && debugWindow.closed) {
                 console.error('[Main App] ❌ Debug window was closed immediately');
@@ -168,7 +153,6 @@ window.addEventListener('message', (event) => {
         logger.info('[Debug Extension] Debug window ready to receive data');
         console.log('[Main App] ✅ Debug window is ready!');
         
-        // Send queued messages first
         if (debugMessageQueue.length > 0) {
             console.log('[Main App] 📦 Sending', debugMessageQueue.length, 'queued messages');
             debugMessageQueue.forEach(msg => {
@@ -182,7 +166,6 @@ window.addEventListener('message', (event) => {
             debugMessageQueue = [];
         }
         
-        // Send current source segments
         if (currentSourceSegments.length > 0) {
             try {
                 debugWindow.postMessage({ 
@@ -207,7 +190,6 @@ window.addEventListener('load', () => {
     logger.log("Application initialized.");
     autoParseSource();
     
-    // Show debug button status
     if (elements.openDebugButton) {
         elements.openDebugButton.title = 'Opens debug extension (optional) - Shows real-time processing details';
     }
@@ -215,7 +197,6 @@ window.addEventListener('load', () => {
     console.log('[Main App] 📊 Current source segments:', currentSourceSegments.length);
 });
 
-// Debounced auto-parse
 const debouncedAutoParseSource = debounce(autoParseSource, 500);
 
 elements.sourceInput.addEventListener('input', debouncedAutoParseSource);
@@ -224,7 +205,6 @@ elements.startButton.addEventListener('click', () => {
     stream.toggle();
 });
 
-// Debug button (gracefully handle missing extension)
 if (elements.openDebugButton) {
     elements.openDebugButton.addEventListener('click', openDebugWindow);
     console.log('[Main App] ✅ Debug button listener attached');
