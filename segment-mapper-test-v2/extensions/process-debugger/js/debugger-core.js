@@ -42,8 +42,9 @@ class ProcessDebugger {
         this.processingQueue = false;
         this.isSyncingHistorical = false; // Flag to indicate historical sync
 
-        // Debounced functions
-        this.debouncedBreakdownRender = debounce(() => this.renderMarkerBreakdown(), 1000);
+        // Throttled functions for performance.
+        // Throttle ensures the breakdown UI updates periodically during a fast stream of events (like historical sync) without freezing the browser.
+        this.throttledBreakdownRender = throttle(() => this.renderMarkerBreakdown(), 300);
         this.throttledStatsUpdate = throttle(() => this.updateStatsDisplay(), 200);
 
         this.init();
@@ -211,10 +212,8 @@ class ProcessDebugger {
             console.log('[Process Debugger] 📊 Processed batch:', processedCount, 'segments, Remaining:', this.eventQueue.length);
             this.throttledStatsUpdate();
             
-            // Only update breakdown if not syncing or if queue is getting small
-            if (!this.isSyncingHistorical || this.eventQueue.length < 10) {
-                this.debouncedBreakdownRender();
-            }
+            // Throttled update for the marker breakdown provides responsive UI during fast streams
+            this.throttledBreakdownRender();
 
             // Auto-scroll to bottom if enabled and user hasn't scrolled away
             if (this.autoScrollEnabled && !this.userScrolledAway && !this.isSyncingHistorical) {

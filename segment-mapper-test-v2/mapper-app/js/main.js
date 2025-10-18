@@ -275,6 +275,7 @@ const debouncedAutoParseSource = debounce(autoParseSource, 500);
 elements.sourceInput.addEventListener('input', debouncedAutoParseSource);
 elements.startButton.addEventListener('click', () => {
     console.log('[Main App] 🎬 Generate button clicked');
+    debouncedAutoParseSource.flush();
     stream.toggle();
 });
 

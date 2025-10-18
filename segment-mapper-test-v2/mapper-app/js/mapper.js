@@ -75,9 +75,13 @@ export class Mapper {
     }
 
     finalize() {
-        if (this.throttledUpdatePartial.pending()) {
+        // Flush any pending throttled updates
+        if (this.throttledUpdatePartial && typeof this.throttledUpdatePartial.flush === 'function') {
             this.throttledUpdatePartial.flush();
         }
+        
+        // Clear partial after flushing
+        this.targetPartial = null;
     }
 
     // Update only the segments that just arrived

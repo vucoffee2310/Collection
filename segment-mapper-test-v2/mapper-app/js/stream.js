@@ -213,7 +213,7 @@ export class AIStream {
                             
                             // Throttle partial updates
                             const now = performance.now();
-                            if (now - this.lastPartialUpdate > this.partialUpdateThrottle) {
+                            if (now - this.lastPartialUpdate >= this.partialUpdateThrottle) {
                                 const pending = this.parser.getPending();
                                 if (pending) {
                                     this.mapper.setTargetPartial(pending);
@@ -222,7 +222,7 @@ export class AIStream {
                             }
                             
                             // Throttle report updates during streaming
-                            if (now - this.lastReportUpdate > this.reportUpdateThrottle) {
+                            if (now - this.lastReportUpdate >= this.reportUpdateThrottle) {
                                 this.updateReport();
                                 this.lastReportUpdate = now;
                             }
@@ -234,29 +234,41 @@ export class AIStream {
             }
         }
         
-        // Finalize
+        // Finalize - flush all pending operations
         const final = this.parser.finalize();
         if (final.length > 0) {
             this.queueSegments(final);
         }
         
-        // Process remaining queue
-        this.processSegmentQueue();
+        // Force process remaining queue
+        while (this.segmentQueue.length > 0) {
+            this.processSegmentQueue();
+        }
         
+        // Force final partial update
         this.mapper.setTargetPartial(null);
         this.mapper.finalize();
+        
+        // Force final report update
+        this.updateReport();
     }
     
     queueSegments(segments) {
         this.segmentQueue.push(...segments);
         
+        // Start processing if not already running
         if (!this.processingSegments) {
-            this.processingSegments = true;
-            queueMicrotask(() => this.processSegmentQueue());
+            this.scheduleSegmentProcessing();
         }
     }
-    
+
+    scheduleSegmentProcessing() {
+        this.processingSegments = true;
+        queueMicrotask(() => this.processSegmentQueue());
+    }
+
     processSegmentQueue() {
+        // Always check if we should continue
         if (this.segmentQueue.length === 0) {
             this.processingSegments = false;
             return;
@@ -283,7 +295,13 @@ export class AIStream {
         if (this.segmentQueue.length > 0) {
             requestAnimationFrame(() => this.processSegmentQueue());
         } else {
+            // Mark as not processing, but check again in case new items were added
             this.processingSegments = false;
+            
+            // Double-check for race condition: items added while we were finishing
+            if (this.segmentQueue.length > 0 && !this.processingSegments) {
+                this.scheduleSegmentProcessing();
+            }
         }
     }
     
