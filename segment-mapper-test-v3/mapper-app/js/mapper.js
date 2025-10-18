@@ -1,4 +1,4 @@
-import { throttle } from '../../shared/js/utils.js'; // ✅ Import directly from shared
+import { throttle } from '../../shared/js/utils.js';
 
 export class Mapper {
     constructor(displayElement, logger, sendToDebugWindowCallback) {
@@ -7,16 +7,16 @@ export class Mapper {
         this.targetPartial = null;
         this.displayElement = displayElement;
         this.logger = logger;
-        this.sendToDebugWindow = sendToDebugWindowCallback || (() => {}); // No-op if not provided
+        this.sendToDebugWindow = sendToDebugWindowCallback || (() => {});
         
-        // Track rendered DOM elements for incremental updates
-        this.renderedPairs = new Map(); // marker -> pair element
-        this.renderedGroups = new Map(); // groupKey -> group element
-        this.renderedBatches = new Map(); // batchKey -> batch element
+        this.renderedPairs = new Map();
+        this.renderedGroups = new Map();
+        this.renderedBatches = new Map();
         
-        // Throttle only partial updates
         this.throttledUpdatePartial = throttle(this.updatePartialDisplay.bind(this), 200);
     }
+    
+    /* === PUBLIC API === */
     
     setSource(segments) { 
         this.source = segments;
@@ -31,6 +31,44 @@ export class Mapper {
         this.initialRender(); 
     }
 
+    addTargetBatch(segments) { 
+        if (!segments || segments.length === 0) return;
+        this.target.push(...segments);
+        this.updateMatchedSegments(segments);
+    }
+    
+    setTargetPartial(partial) { 
+        if (!partial) {
+            this.targetPartial = null;
+            return;
+        }
+
+        const pairElement = this.renderedPairs.get(partial.marker);
+        if (pairElement && pairElement.classList.contains('matched')) {
+            this.logger.warn(`[RACE_CONDITION] Partial update for ${partial.marker} after matched. Ignoring.`);
+            this.sendToDebugWindow('RACE_CONDITION_DETECTED', { 
+                marker: partial.marker, 
+                details: 'Partial update after matched state.' 
+            });
+            return;
+        }
+
+        if (this.targetPartial?.marker !== partial?.marker || 
+            this.targetPartial?.text !== partial?.text) {
+            this.targetPartial = partial;
+            this.throttledUpdatePartial();
+        }
+    }
+
+    finalize() {
+        if (this.throttledUpdatePartial?.flush) {
+            this.throttledUpdatePartial.flush();
+        }
+        this.targetPartial = null;
+    }
+
+    /* === PRIVATE METHODS === */
+
     clearDisplay() {
         this.renderedPairs.clear();
         this.renderedGroups.clear();
@@ -40,49 +78,12 @@ export class Mapper {
         }
     }
 
-    addTargetBatch(segments) { 
-        if (!segments || segments.length === 0) return;
-        
-        this.target.push(...segments);
-        
-        // Incremental update - only update changed pairs
-        this.updateMatchedSegments(segments);
-    }
-    
-    setTargetPartial(partial) { 
-        // Guard against the final null call from the stream controller
-        if (!partial) {
-            this.targetPartial = null;
-            return;
-        }
-
-        // Check for race condition: partial update received after final match
-        const pairElement = this.renderedPairs.get(partial.marker);
-        if (pairElement && pairElement.classList.contains('matched')) {
-            this.logger.warn(`[RACE_CONDITION] Partial update for ${partial.marker} received after it was already matched. Ignoring.`);
-            this.sendToDebugWindow('RACE_CONDITION_DETECTED', { 
-                marker: partial.marker, 
-                details: `Partial update received, but the segment was already in a 'matched' state.` 
-            });
-            return;
-        }
-
-        // Only update if partial actually changed
-        if (this.targetPartial?.marker !== partial?.marker || 
-            this.targetPartial?.text !== partial?.text) {
-            this.targetPartial = partial;
-            this.throttledUpdatePartial();
-        }
-    }
-
     updatePartialDisplay() {
         if (!this.targetPartial) return;
         
-        const marker = this.targetPartial.marker;
-        const pairElement = this.renderedPairs.get(marker);
-        
+        const pairElement = this.renderedPairs.get(this.targetPartial.marker);
         if (pairElement) {
-            const source = this.source.find(s => s.marker === marker);
+            const source = this.source.find(s => s.marker === this.targetPartial.marker);
             if (source) {
                 this.updatePairElement(pairElement, {
                     type: 'partial',
@@ -93,72 +94,53 @@ export class Mapper {
         }
     }
 
-    finalize() {
-        // Flush any pending throttled updates
-        if (this.throttledUpdatePartial && typeof this.throttledUpdatePartial.flush === 'function') {
-            this.throttledUpdatePartial.flush();
-        }
-        
-        // Clear partial after flushing
-        this.targetPartial = null;
-    }
-
-    // Update only the segments that just arrived
     updateMatchedSegments(newSegments) {
         const sourceMap = new Map(this.source.map(s => [s.marker, s]));
         
         newSegments.forEach(segment => {
-            const marker = segment.marker;
-            const sourceMatch = sourceMap.get(marker);
-            const pairElement = this.renderedPairs.get(marker);
+            const sourceMatch = sourceMap.get(segment.marker);
+            const pairElement = this.renderedPairs.get(segment.marker);
             
             if (sourceMatch && pairElement) {
-                // Update gap/partial to matched
                 this.updatePairElement(pairElement, {
                     type: 'matched',
                     source: sourceMatch,
                     target: segment
                 });
             } else if (!sourceMatch) {
-                // This is an orphan - add to orphan group
                 this.addOrphanSegment(segment);
             }
         });
     }
 
-    // Update a single pair element (NO full repaint)
     updatePairElement(pairElement, item) {
-        // Update class
         pairElement.className = `pair ${item.type}`;
         
-        // Build JSON object
-        let jsonObj = {};
-        if (item.type === 'matched') {
-            jsonObj = { marker: item.source.marker, source: item.source.text, target: item.target.text };
-        } else if (item.type === 'gap') {
-            jsonObj = { marker: item.source.marker, source: item.source.text, target: null };
-        } else if (item.type === 'partial') {
-            jsonObj = { marker: item.target.marker, source: item.source ? item.source.text : null, target: item.target.text + ' [STREAMING...]' };
-        } else if (item.type === 'orphan') {
-            jsonObj = { marker: item.target.marker, source: null, target: item.target.text };
-        }
+        const statusSpan = pairElement.querySelector('.pair-status');
+        if (statusSpan) statusSpan.textContent = item.type.toUpperCase();
         
-        // Update JSON div (only this element repaints)
-        const jsonDiv = pairElement.querySelector('.json');
-        if (jsonDiv) {
-            jsonDiv.innerHTML = this.formatJSON(jsonObj);
-        }
+        const targetValue = pairElement.querySelectorAll('.json-value')[1] || 
+                           pairElement.querySelector('.json-value');
         
-        // Update meta div
-        const metaDiv = pairElement.querySelector('.meta');
-        if (metaDiv) {
-            metaDiv.textContent = `Status: ${item.type.toUpperCase()}`;
+        if (targetValue) {
+            targetValue.className = 'json-value';
+            
+            if (item.type === 'gap') {
+                targetValue.textContent = '(waiting...)';
+                targetValue.classList.add('empty');
+            } else if (item.type === 'partial') {
+                targetValue.textContent = item.target?.text || '...';
+                targetValue.classList.add('streaming');
+            } else if (item.target?.text) {
+                targetValue.textContent = item.target.text;
+            } else {
+                targetValue.textContent = '(no target)';
+                targetValue.classList.add('empty');
+            }
         }
     }
 
-    // Add orphan segment dynamically
     addOrphanSegment(segment) {
-        // Get or create orphan group
         let orphanGroup = this.renderedGroups.get('ORPHAN');
         
         if (!orphanGroup) {
@@ -167,21 +149,14 @@ export class Mapper {
             this.displayElement.appendChild(orphanGroup);
         }
         
-        // Get or create orphan batch
-        const orphanBatchKey = 'ORPHAN-BATCH';
-        let orphanBatch = this.renderedBatches.get(orphanBatchKey);
+        let orphanBatch = this.renderedBatches.get('ORPHAN-BATCH');
         
         if (!orphanBatch) {
             orphanBatch = this.createBatchElement('ORPHAN');
-            this.renderedBatches.set(orphanBatchKey, orphanBatch);
-            
-            const groupContent = orphanGroup.querySelector('.group-content');
-            if (groupContent) {
-                groupContent.appendChild(orphanBatch);
-            }
+            this.renderedBatches.set('ORPHAN-BATCH', orphanBatch);
+            orphanGroup.querySelector('.group-content').appendChild(orphanBatch);
         }
         
-        // Create and add orphan pair
         const pairElement = this.createPairElement({
             type: 'orphan',
             source: null,
@@ -189,130 +164,141 @@ export class Mapper {
         });
         
         this.renderedPairs.set(segment.marker, pairElement);
-        orphanBatch.appendChild(pairElement);
+        orphanBatch.querySelector('.batch-content').appendChild(pairElement);
         
-        // Update counts
         this.updateBatchHeader(orphanBatch, 'ORPHAN');
         this.updateGroupHeader(orphanGroup, 'ORPHAN');
     }
 
     updateBatchHeader(batchElement, batchNum) {
-        const pairCount = batchElement.querySelectorAll('.pair').length;
-        const header = batchElement.querySelector('.batch-header');
-        if (header) {
-            header.textContent = `BATCH #${batchNum} (${pairCount} segments)`;
+        const count = batchElement.querySelectorAll('.pair').length;
+        const textSpan = batchElement.querySelector('.batch-title');
+        if (textSpan) {
+            textSpan.textContent = batchNum === 'ORPHAN' ? 
+                `Orphans (${count})` : 
+                `Batch ${batchNum} (${count})`;
         }
     }
 
     updateGroupHeader(groupElement, groupNum) {
         const batchCount = groupElement.querySelectorAll('.batch').length;
         const segmentCount = groupElement.querySelectorAll('.pair').length;
-        const header = groupElement.querySelector('.group-header');
-        if (header) {
-            header.textContent = `GROUP #${groupNum} (${batchCount} batch${batchCount > 1 ? 'es' : ''}, ${segmentCount} segments)`;
-        }
+        
+        const batchCountSpan = groupElement.querySelector('.batch-count');
+        const segmentCountSpan = groupElement.querySelector('.segment-count');
+        
+        if (batchCountSpan) batchCountSpan.textContent = batchCount;
+        if (segmentCountSpan) segmentCountSpan.textContent = segmentCount;
     }
 
-    // Initial render - creates all gaps (called only on reset/source change)
+    /* === RENDERING === */
+
     initialRender() {
         if (!this.displayElement) return;
         
-        // Handle empty states
-        if (this.source.length === 0) {
-            this.displayElement.innerHTML = '<div class="empty">Source text is missing or not in the correct format.</div>';
+        if (!this.source.length) {
+            this.displayElement.innerHTML = '<div class="empty">No source segments available.</div>';
             return;
         }
 
         const fragment = document.createDocumentFragment();
         const targetMap = new Map(this.target.map(t => [t.marker, t]));
-        
-        // Build batches
         const allBatches = this.buildBatches(targetMap);
         
-        // Group batches: first group has 1 batch, rest have 10 batches each
+        this.renderGroups(fragment, allBatches);
+        this.renderOrphans(fragment);
+        
+        this.displayElement.innerHTML = '';
+        this.displayElement.appendChild(fragment);
+    }
+
+    renderGroups(fragment, allBatches) {
         let groupNum = 1;
         let batchIndex = 0;
         
         while (batchIndex < allBatches.length) {
             const batchesPerGroup = groupNum === 1 ? 1 : 10;
-            const batchesInThisGroup = allBatches.slice(batchIndex, batchIndex + batchesPerGroup);
+            const batchesInGroup = allBatches.slice(batchIndex, batchIndex + batchesPerGroup);
             
-            if (batchesInThisGroup.length > 0) {
+            if (batchesInGroup.length) {
                 const groupElement = this.createGroupElement(groupNum);
                 const groupContent = groupElement.querySelector('.group-content');
                 
-                batchesInThisGroup.forEach((batchItems, index) => {
+                batchesInGroup.forEach((batchItems, index) => {
                     const batchNum = batchIndex + index + 1;
-                    const batchElement = this.createBatchElement(batchNum);
-                    
-                    batchItems.forEach(item => {
-                        const pairElement = this.createPairElement(item);
-                        const marker = item.source?.marker || item.target?.marker;
-                        this.renderedPairs.set(marker, pairElement);
-                        batchElement.appendChild(pairElement);
-                    });
-                    
-                    this.updateBatchHeader(batchElement, batchNum);
-                    this.renderedBatches.set(`BATCH-${batchNum}`, batchElement);
+                    const batchElement = this.renderBatch(batchItems, batchNum);
                     groupContent.appendChild(batchElement);
+                    this.renderedBatches.set(`BATCH-${batchNum}`, batchElement);
                 });
                 
                 this.updateGroupHeader(groupElement, groupNum);
                 this.renderedGroups.set(`GROUP-${groupNum}`, groupElement);
                 fragment.appendChild(groupElement);
                 
-                batchIndex += batchesInThisGroup.length;
+                batchIndex += batchesInGroup.length;
                 groupNum++;
             }
         }
+    }
 
-        // Handle existing orphans
+    renderBatch(batchItems, batchNum) {
+        const batchElement = this.createBatchElement(batchNum);
+        const batchContent = batchElement.querySelector('.batch-content');
+        
+        batchItems.forEach(item => {
+            const pairElement = this.createPairElement(item);
+            const marker = item.source?.marker || item.target?.marker;
+            this.renderedPairs.set(marker, pairElement);
+            batchContent.appendChild(pairElement);
+        });
+        
+        this.updateBatchHeader(batchElement, batchNum);
+        
+        return batchElement;
+    }
+
+    renderOrphans(fragment) {
         const sourceMap = new Map(this.source.map(s => [s.marker, s]));
         const orphans = this.target.filter(t => !sourceMap.has(t.marker));
         
-        if (orphans.length > 0) {
-            const orphanGroup = this.createGroupElement('ORPHAN');
-            const groupContent = orphanGroup.querySelector('.group-content');
-            
-            const orphanBatch = this.createBatchElement('ORPHAN');
-            
-            orphans.forEach(target => {
-                const pairElement = this.createPairElement({
-                    type: 'orphan',
-                    source: null,
-                    target: target
-                });
-                this.renderedPairs.set(target.marker, pairElement);
-                orphanBatch.appendChild(pairElement);
+        if (!orphans.length) return;
+        
+        const orphanGroup = this.createGroupElement('ORPHAN');
+        const groupContent = orphanGroup.querySelector('.group-content');
+        const orphanBatch = this.createBatchElement('ORPHAN');
+        const batchContent = orphanBatch.querySelector('.batch-content');
+        
+        orphans.forEach(target => {
+            const pairElement = this.createPairElement({
+                type: 'orphan',
+                source: null,
+                target: target
             });
-            
-            this.updateBatchHeader(orphanBatch, 'ORPHAN');
-            this.renderedBatches.set('ORPHAN-BATCH', orphanBatch);
-            groupContent.appendChild(orphanBatch);
-            
-            this.updateGroupHeader(orphanGroup, 'ORPHAN');
-            this.renderedGroups.set('ORPHAN', orphanGroup);
-            fragment.appendChild(orphanGroup);
-        }
-
-        // Single DOM update
-        this.displayElement.innerHTML = '';
-        this.displayElement.appendChild(fragment);
+            this.renderedPairs.set(target.marker, pairElement);
+            batchContent.appendChild(pairElement);
+        });
+        
+        this.updateBatchHeader(orphanBatch, 'ORPHAN');
+        this.renderedBatches.set('ORPHAN-BATCH', orphanBatch);
+        groupContent.appendChild(orphanBatch);
+        
+        this.updateGroupHeader(orphanGroup, 'ORPHAN');
+        this.renderedGroups.set('ORPHAN', orphanGroup);
+        fragment.appendChild(orphanGroup);
     }
 
     buildBatches(targetMap) {
-        const allBatches = [];
+        const batches = [];
         let currentBatch = [];
         const batchSize = 3;
 
-        for (let i = 0; i < this.source.length; i++) {
-            const sourceSeg = this.source[i];
+        this.source.forEach((sourceSeg, i) => {
             const matchedSeg = targetMap.get(sourceSeg.marker);
             let item;
 
             if (matchedSeg) {
                 item = { type: 'matched', source: sourceSeg, target: matchedSeg };
-            } else if (this.targetPartial && this.targetPartial.marker === sourceSeg.marker) {
+            } else if (this.targetPartial?.marker === sourceSeg.marker) {
                 item = { type: 'partial', source: sourceSeg, target: this.targetPartial };
             } else {
                 item = { type: 'gap', source: sourceSeg, target: null };
@@ -321,119 +307,136 @@ export class Mapper {
             currentBatch.push(item);
 
             if (currentBatch.length === batchSize || i === this.source.length - 1) {
-                if (currentBatch.length > 0) {
-                    allBatches.push(currentBatch);
-                    currentBatch = [];
-                }
+                batches.push(currentBatch);
+                currentBatch = [];
             }
-        }
+        });
 
-        return allBatches;
+        return batches;
     }
 
+    /* === DOM CREATION === */
+
     createGroupElement(groupNum) {
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'batch-group';
-        groupDiv.dataset.groupNum = groupNum;
+        const div = this.createElement('div', 'batch-group');
+        div.dataset.groupNum = groupNum;
         
-        const groupHeader = document.createElement('div');
-        groupHeader.className = 'group-header';
-        groupHeader.textContent = `GROUP #${groupNum}`;
-        groupDiv.appendChild(groupHeader);
+        const header = this.createElement('div', 'group-header');
+        header.addEventListener('click', () => div.classList.toggle('collapsed'));
         
-        const groupContent = document.createElement('div');
-        groupContent.className = 'group-content';
-        groupDiv.appendChild(groupContent);
+        const title = this.createElement('div', 'group-title');
+        title.innerHTML = `
+            <span class="collapse-icon">▼</span>
+            <span>${groupNum === 'ORPHAN' ? '⚠ ORPHAN SEGMENTS' : `GROUP ${groupNum}`}</span>
+        `;
         
-        return groupDiv;
+        const stats = this.createElement('div', 'group-stats');
+        stats.innerHTML = `
+            <div class="group-stat">
+                <span class="group-stat-label">Batches:</span>
+                <span class="group-stat-value batch-count">0</span>
+            </div>
+            <div class="group-stat">
+                <span class="group-stat-label">Segments:</span>
+                <span class="group-stat-value segment-count">0</span>
+            </div>
+        `;
+        
+        header.appendChild(title);
+        header.appendChild(stats);
+        
+        const content = this.createElement('div', 'group-content');
+        
+        div.appendChild(header);
+        div.appendChild(content);
+        
+        return div;
     }
 
     createBatchElement(batchNum) {
-        const batchDiv = document.createElement('div');
-        batchDiv.className = 'batch';
-        batchDiv.dataset.batchNum = batchNum;
+        const div = this.createElement('div', 'batch');
+        div.dataset.batchNum = batchNum;
         
-        const batchHeader = document.createElement('div');
-        batchHeader.className = 'batch-header';
-        batchHeader.textContent = `BATCH #${batchNum} (0 segments)`;
-        batchDiv.appendChild(batchHeader);
+        const header = this.createElement('div', 'batch-header');
+        header.addEventListener('click', () => div.classList.toggle('collapsed'));
         
-        return batchDiv;
+        const collapseIcon = this.createElement('span', 'batch-collapse-icon');
+        collapseIcon.textContent = '▼';
+        
+        const title = this.createElement('span', 'batch-title');
+        title.textContent = batchNum === 'ORPHAN' ? 'Orphans' : `Batch ${batchNum}`;
+        
+        header.appendChild(collapseIcon);
+        header.appendChild(title);
+        
+        const content = this.createElement('div', 'batch-content');
+        
+        div.appendChild(header);
+        div.appendChild(content);
+        
+        return div;
     }
 
     createPairElement(item) {
-        const pairDiv = document.createElement('div');
-        pairDiv.className = `pair ${item.type}`;
-        const marker = item.source?.marker || item.target?.marker;
-        pairDiv.dataset.marker = marker;
+        const div = this.createElement('div', `pair ${item.type}`);
+        div.dataset.marker = item.source?.marker || item.target?.marker;
         
-        let jsonObj = {};
-        if (item.type === 'matched') {
-            jsonObj = { marker: item.source.marker, source: item.source.text, target: item.target.text };
-        } else if (item.type === 'gap') {
-            jsonObj = { marker: item.source.marker, source: item.source.text, target: null };
+        const header = this.createElement('div', 'pair-header');
+        
+        const marker = this.createElement('span', 'pair-marker');
+        marker.textContent = div.dataset.marker;
+        
+        const status = this.createElement('span', 'pair-status');
+        status.textContent = item.type.toUpperCase();
+        
+        header.appendChild(marker);
+        header.appendChild(status);
+        
+        const content = this.createElement('div', 'pair-content');
+        const grid = this.createElement('div', 'json-grid');
+        
+        // Source
+        if (item.source || item.type !== 'orphan') {
+            grid.appendChild(this.createLabel('Source'));
+            grid.appendChild(this.createValue(item.source?.text, !item.source?.text));
+        }
+        
+        // Target
+        grid.appendChild(this.createLabel('Target'));
+        
+        if (item.type === 'gap') {
+            grid.appendChild(this.createValue('(waiting...)', true));
         } else if (item.type === 'partial') {
-            jsonObj = { marker: item.target.marker, source: item.source ? item.source.text : null, target: item.target.text + ' [STREAMING...]' };
-        } else if (item.type === 'orphan') {
-            jsonObj = { marker: item.target.marker, source: null, target: item.target.text };
+            const val = this.createValue(item.target?.text || '...', false);
+            val.classList.add('streaming');
+            grid.appendChild(val);
+        } else {
+            grid.appendChild(this.createValue(item.target?.text, !item.target?.text));
         }
         
-        const jsonDiv = document.createElement('div');
-        jsonDiv.className = 'json';
-        jsonDiv.innerHTML = this.formatJSON(jsonObj);
+        content.appendChild(grid);
+        div.appendChild(header);
+        div.appendChild(content);
         
-        const metaDiv = document.createElement('div');
-        metaDiv.className = 'meta';
-        metaDiv.textContent = `Status: ${item.type.toUpperCase()}`;
-        
-        pairDiv.appendChild(jsonDiv);
-        pairDiv.appendChild(metaDiv);
-        
-        return pairDiv;
+        return div;
     }
-    
-    _escapeHtml(str) { 
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); 
+
+    createElement(tag, className) {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        return el;
     }
-    
-    _formatValue(value, indentLevel) {
-        const indent = '&nbsp;'.repeat(indentLevel * 2);
-        const baseIndent = '&nbsp;'.repeat((indentLevel - 1) * 2);
-        
-        if (value === null) return '<span class="json-null">null</span>';
-        if (typeof value === 'string') return `<span class="json-string">"${this._escapeHtml(value)}"</span>`;
-        if (typeof value === 'number') return `<span class="json-number">${value}</span>`;
-        if (typeof value === 'boolean') return `<span class="json-boolean">${value}</span>`;
-        
-        if (Array.isArray(value)) {
-            if (value.length === 0) return '[]';
-            let html = '[';
-            for (let i = 0; i < value.length; i++) {
-                html += `<br>${indent}${this._formatValue(value[i], indentLevel + 1)}`;
-                if (i < value.length - 1) html += ',';
-            }
-            html += `<br>${baseIndent}]`;
-            return html;
-        }
-        
-        if (typeof value === 'object') {
-            const keys = Object.keys(value);
-            if (keys.length === 0) return '{}';
-            let html = '{';
-            for (let i = 0; i < keys.length; i++) {
-                const key = keys[i];
-                html += `<br>${indent}<span class="json-key">"${this._escapeHtml(key)}"</span>: ${this._formatValue(value[key], indentLevel + 1)}`;
-                if (i < keys.length - 1) html += ',';
-            }
-            html += `<br>${baseIndent}}`;
-            return html;
-        }
-        
-        return this._escapeHtml(String(value));
+
+    createLabel(text) {
+        const label = this.createElement('div', 'json-label');
+        label.textContent = text;
+        return label;
     }
-    
-    formatJSON(obj) {
-        if (obj === null || obj === undefined) return '<span class="json-null">null</span>';
-        return this._formatValue(obj, 1);
+
+    createValue(text, isEmpty) {
+        const value = this.createElement('div', 'json-value');
+        value.textContent = text || '(no target)';
+        if (isEmpty) value.classList.add('empty');
+        return value;
     }
 }
