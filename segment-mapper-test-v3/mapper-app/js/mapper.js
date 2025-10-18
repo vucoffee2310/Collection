@@ -9,16 +9,26 @@ export class Mapper {
         this.logger = logger;
         this.sendToDebugWindow = sendToDebugWindowCallback || (() => {});
         
+        // Cached DOM elements for performance
         this.renderedPairs = new Map();
         this.renderedGroups = new Map();
         this.renderedBatches = new Map();
         
-        this.throttledUpdatePartial = throttle(this.updatePartialDisplay.bind(this), 200);
+        // State tracking for race condition prevention
+        this.markerStates = new Map(); // tracks: 'gap', 'partial', 'matched', 'orphan'
+        this.updateSequence = 0; // global sequence counter
+        this.markerSequences = new Map(); // tracks last sequence per marker
         
-        // Sticky timeline annotation
-        this.timelineAnnotation = null;
-        this.intersectionObserver = null;
-        this.currentContext = { group: null, batch: null };
+        // Throttled update with proper cancellation
+        this.throttledUpdatePartial = throttle(this.updatePartialDisplay.bind(this), 200);
+        this.pendingPartialMarker = null; // track what's pending in throttle
+        
+        // Configuration
+        this.config = {
+            batchSize: 3,
+            firstGroupBatches: 1,
+            regularGroupBatches: 10
+        };
     }
     
     /* === PUBLIC API === */
@@ -32,225 +42,303 @@ export class Mapper {
     reset() { 
         this.target = []; 
         this.targetPartial = null;
+        this.markerStates.clear();
+        this.markerSequences.clear();
+        this.updateSequence = 0;
+        this.pendingPartialMarker = null;
+        this.throttledUpdatePartial.cancel();
         this.clearDisplay();
         this.initialRender(); 
     }
 
     addTargetBatch(segments) { 
-        if (!segments || segments.length === 0) return;
+        if (!segments?.length) return;
+        
+        // Increment sequence for this batch update
+        const batchSequence = ++this.updateSequence;
+        
         this.target.push(...segments);
-        this.updateMatchedSegments(segments);
+        this.updateMatchedSegments(segments, batchSequence);
     }
     
     setTargetPartial(partial) { 
         if (!partial) {
             this.targetPartial = null;
+            this.pendingPartialMarker = null;
+            this.throttledUpdatePartial.cancel();
             return;
         }
 
-        const pairElement = this.renderedPairs.get(partial.marker);
-        if (pairElement && pairElement.classList.contains('matched')) {
-            this.logger.warn(`[RACE_CONDITION] Partial update for ${partial.marker} after matched. Ignoring.`);
+        const currentState = this.markerStates.get(partial.marker);
+        
+        // RACE CONDITION CHECK #1: Don't update if already matched or orphaned
+        if (currentState === 'matched' || currentState === 'orphan') {
+            if (this.logger) {
+                this.logger.warn(`[RACE_CONDITION] Partial update ignored for ${partial.marker} (state: ${currentState})`);
+            }
             this.sendToDebugWindow('RACE_CONDITION_DETECTED', { 
-                marker: partial.marker, 
-                details: 'Partial update after matched state.' 
+                marker: partial.marker,
+                currentState: currentState,
+                attemptedState: 'partial',
+                details: 'Partial update after terminal state.' 
             });
+            
+            // Cancel any pending throttled update for this marker
+            if (this.pendingPartialMarker === partial.marker) {
+                this.throttledUpdatePartial.cancel();
+                this.pendingPartialMarker = null;
+            }
             return;
         }
 
-        if (this.targetPartial?.marker !== partial?.marker || 
-            this.targetPartial?.text !== partial?.text) {
+        // Only update if content changed
+        if (this.targetPartial?.marker !== partial.marker || 
+            this.targetPartial?.text !== partial.text) {
             this.targetPartial = partial;
+            this.pendingPartialMarker = partial.marker;
             this.throttledUpdatePartial();
         }
     }
 
     finalize() {
+        // Flush any pending throttled updates
         if (this.throttledUpdatePartial?.flush) {
             this.throttledUpdatePartial.flush();
         }
         this.targetPartial = null;
+        this.pendingPartialMarker = null;
     }
 
-    /* === PRIVATE METHODS === */
+    /* === DISPLAY MANAGEMENT === */
 
     clearDisplay() {
         this.renderedPairs.clear();
         this.renderedGroups.clear();
         this.renderedBatches.clear();
         
-        // Disconnect observer
-        if (this.intersectionObserver) {
-            this.intersectionObserver.disconnect();
-            this.intersectionObserver = null;
-        }
-        
         if (this.displayElement) {
             this.displayElement.innerHTML = '';
         }
-        
-        this.timelineAnnotation = null;
-        this.currentContext = { group: null, batch: null };
     }
 
     updatePartialDisplay() {
-        if (!this.targetPartial) return;
-        
-        const pairElement = this.renderedPairs.get(this.targetPartial.marker);
-        if (pairElement) {
-            const source = this.source.find(s => s.marker === this.targetPartial.marker);
-            if (source) {
-                this.updatePairElement(pairElement, {
-                    type: 'partial',
-                    source: source,
-                    target: this.targetPartial
-                });
-            }
+        if (!this.targetPartial) {
+            this.pendingPartialMarker = null;
+            return;
         }
+        
+        const marker = this.targetPartial.marker;
+        const currentState = this.markerStates.get(marker);
+        
+        // RACE CONDITION CHECK #2: Re-check state before applying throttled update
+        if (currentState === 'matched' || currentState === 'orphan') {
+            if (this.logger) {
+                this.logger.warn(`[RACE_CONDITION] Throttled partial update cancelled for ${marker} (state: ${currentState})`);
+            }
+            this.targetPartial = null;
+            this.pendingPartialMarker = null;
+            return;
+        }
+        
+        const pairElement = this.renderedPairs.get(marker);
+        if (!pairElement) {
+            this.pendingPartialMarker = null;
+            return;
+        }
+        
+        const source = this.source.find(s => s.marker === marker);
+        if (source) {
+            const updateSequence = ++this.updateSequence;
+            this.applyPairUpdate(pairElement, {
+                type: 'partial',
+                source: source,
+                target: this.targetPartial
+            }, marker, updateSequence);
+        }
+        
+        this.pendingPartialMarker = null;
     }
 
-    updateMatchedSegments(newSegments) {
+    updateMatchedSegments(newSegments, batchSequence) {
         const sourceMap = new Map(this.source.map(s => [s.marker, s]));
+        const orphans = [];
         
         newSegments.forEach(segment => {
-            const sourceMatch = sourceMap.get(segment.marker);
-            const pairElement = this.renderedPairs.get(segment.marker);
+            const marker = segment.marker;
+            const sourceMatch = sourceMap.get(marker);
+            const pairElement = this.renderedPairs.get(marker);
+            
+            // Create sequence for this specific update
+            const updateSequence = batchSequence || ++this.updateSequence;
             
             if (sourceMatch && pairElement) {
-                this.updatePairElement(pairElement, {
+                // Cancel any pending partial update for this marker
+                if (this.pendingPartialMarker === marker) {
+                    this.throttledUpdatePartial.cancel();
+                    this.pendingPartialMarker = null;
+                    if (this.targetPartial?.marker === marker) {
+                        this.targetPartial = null;
+                    }
+                }
+                
+                // Update existing pair with matched state
+                this.applyPairUpdate(pairElement, {
                     type: 'matched',
                     source: sourceMatch,
                     target: segment
-                });
+                }, marker, updateSequence);
+                
             } else if (!sourceMatch) {
-                this.addOrphanSegment(segment);
+                // Collect orphans for batch processing
+                orphans.push(segment);
             }
         });
+        
+        // Process all orphans at once
+        if (orphans.length > 0) {
+            const orphanSequence = ++this.updateSequence;
+            this.addOrphanSegments(orphans, orphanSequence);
+        }
+    }
+
+    applyPairUpdate(pairElement, item, marker, sequence) {
+        const currentState = this.markerStates.get(marker);
+        const lastSequence = this.markerSequences.get(marker) || 0;
+        
+        // RACE CONDITION CHECK #3: Prevent older updates from overwriting newer ones
+        if (sequence < lastSequence) {
+            if (this.logger) {
+                this.logger.warn(`[RACE_CONDITION] Out-of-order update rejected for ${marker} (seq ${sequence} < ${lastSequence})`);
+            }
+            this.sendToDebugWindow('RACE_CONDITION_DETECTED', {
+                marker: marker,
+                currentSequence: lastSequence,
+                rejectedSequence: sequence,
+                details: 'Out-of-order update prevented'
+            });
+            return;
+        }
+        
+        // RACE CONDITION CHECK #4: Prevent state regression (matched/orphan are terminal)
+        if ((currentState === 'matched' || currentState === 'orphan') && 
+            (item.type === 'partial' || item.type === 'gap')) {
+            if (this.logger) {
+                this.logger.warn(`[RACE_CONDITION] State regression prevented for ${marker} (${currentState} -> ${item.type})`);
+            }
+            this.sendToDebugWindow('RACE_CONDITION_DETECTED', {
+                marker: marker,
+                currentState: currentState,
+                attemptedState: item.type,
+                details: 'Terminal state regression prevented'
+            });
+            return;
+        }
+        
+        // Apply the update
+        this.updatePairElement(pairElement, item);
+        
+        // Update state tracking
+        this.markerStates.set(marker, item.type);
+        this.markerSequences.set(marker, sequence);
     }
 
     updatePairElement(pairElement, item) {
+        // Update class and status in one DOM operation
         pairElement.className = `pair ${item.type}`;
         
         const statusSpan = pairElement.querySelector('.pair-status');
-        if (statusSpan) statusSpan.textContent = item.type.toUpperCase();
+        if (statusSpan) {
+            statusSpan.textContent = item.type.toUpperCase();
+        }
         
+        // Update target value
         const targetValue = pairElement.querySelectorAll('.json-value')[1] || 
                            pairElement.querySelector('.json-value');
         
         if (targetValue) {
-            targetValue.className = 'json-value';
-            
-            if (item.type === 'gap') {
+            this.updateTargetValue(targetValue, item);
+        }
+    }
+    
+    updateTargetValue(targetValue, item) {
+        // Reset classes
+        targetValue.className = 'json-value';
+        
+        switch (item.type) {
+            case 'gap':
                 targetValue.textContent = '(waiting...)';
                 targetValue.classList.add('empty');
-            } else if (item.type === 'partial') {
+                break;
+            case 'partial':
                 targetValue.textContent = item.target?.text || '...';
                 targetValue.classList.add('streaming');
-            } else if (item.target?.text) {
-                targetValue.textContent = item.target.text;
-            } else {
+                break;
+            case 'matched':
+            case 'orphan':
+                if (item.target?.text) {
+                    targetValue.textContent = item.target.text;
+                } else {
+                    targetValue.textContent = '(no target)';
+                    targetValue.classList.add('empty');
+                }
+                break;
+            default:
                 targetValue.textContent = '(no target)';
                 targetValue.classList.add('empty');
-            }
         }
     }
 
-    addOrphanSegment(segment) {
-        let orphanGroup = this.renderedGroups.get('ORPHAN');
+    addOrphanSegments(segments, sequence) {
+        if (!segments?.length) return;
         
+        // Get or create orphan group
+        let orphanGroup = this.renderedGroups.get('ORPHAN');
         if (!orphanGroup) {
             orphanGroup = this.createGroupElement('ORPHAN');
             this.renderedGroups.set('ORPHAN', orphanGroup);
             this.displayElement.appendChild(orphanGroup);
         }
         
+        // Get or create orphan batch
         let orphanBatch = this.renderedBatches.get('ORPHAN-BATCH');
-        
         if (!orphanBatch) {
-            orphanBatch = this.createBatchElement('ORPHAN');
+            orphanBatch = this.createBatchElement('ORPHAN', 'ORPHAN');
             this.renderedBatches.set('ORPHAN-BATCH', orphanBatch);
             orphanGroup.querySelector('.group-content').appendChild(orphanBatch);
         }
         
-        const pairElement = this.createPairElement({
-            type: 'orphan',
-            source: null,
-            target: segment
-        });
+        // Batch create all orphan pairs
+        const fragment = document.createDocumentFragment();
+        const batchContent = orphanBatch.querySelector('.batch-content');
         
-        // Add data attributes for tracking
-        pairElement.dataset.groupNum = 'ORPHAN';
-        pairElement.dataset.batchNum = 'ORPHAN';
-        
-        this.renderedPairs.set(segment.marker, pairElement);
-        orphanBatch.querySelector('.batch-content').appendChild(pairElement);
-        
-        // Setup observer for new pair
-        if (this.intersectionObserver) {
-            this.intersectionObserver.observe(pairElement);
-        }
-    }
-
-    /* === TIMELINE ANNOTATION === */
-
-    createTimelineAnnotation() {
-        const annotation = this.createElement('div', 'timeline-annotation');
-        annotation.textContent = 'Loading...';
-        return annotation;
-    }
-
-    updateTimelineAnnotation(groupNum, batchNum) {
-        if (!this.timelineAnnotation) return;
-        
-        // Avoid redundant updates
-        if (this.currentContext.group === groupNum && this.currentContext.batch === batchNum) {
-            return;
-        }
-        
-        this.currentContext.group = groupNum;
-        this.currentContext.batch = batchNum;
-        
-        // Use textContent for performance (no DOM parsing)
-        if (groupNum === 'ORPHAN') {
-            this.timelineAnnotation.textContent = 'Orphan Segments';
-            this.timelineAnnotation.classList.add('orphan-section');
-        } else {
-            this.timelineAnnotation.textContent = `Group ${groupNum} - Batch ${batchNum}`;
-            this.timelineAnnotation.classList.remove('orphan-section');
-        }
-    }
-
-    setupIntersectionObserver() {
-        // Disconnect existing observer
-        if (this.intersectionObserver) {
-            this.intersectionObserver.disconnect();
-        }
-
-        const options = {
-            root: this.displayElement.closest('.content-column'),
-            rootMargin: '-60px 0px -85% 0px', // Optimized for better trigger point
-            threshold: 0
-        };
-
-        this.intersectionObserver = new IntersectionObserver((entries) => {
-            // Process only the first intersecting entry for better performance
-            const visibleEntry = entries.find(entry => entry.isIntersecting);
+        segments.forEach(segment => {
+            const marker = segment.marker;
             
-            if (visibleEntry) {
-                const pair = visibleEntry.target;
-                const groupNum = pair.dataset.groupNum;
-                const batchNum = pair.dataset.batchNum;
-                
-                if (groupNum && batchNum) {
-                    this.updateTimelineAnnotation(groupNum, batchNum);
-                }
+            // Cancel any pending partial for this marker
+            if (this.pendingPartialMarker === marker) {
+                this.throttledUpdatePartial.cancel();
+                this.pendingPartialMarker = null;
             }
-        }, options);
-
-        // Observe all pairs
-        this.renderedPairs.forEach(pairElement => {
-            this.intersectionObserver.observe(pairElement);
+            
+            const pairElement = this.createPairElement({
+                type: 'orphan',
+                source: null,
+                target: segment
+            });
+            
+            pairElement.dataset.groupNum = 'ORPHAN';
+            pairElement.dataset.batchNum = 'ORPHAN';
+            
+            this.renderedPairs.set(marker, pairElement);
+            
+            // Track state
+            this.markerStates.set(marker, 'orphan');
+            this.markerSequences.set(marker, sequence);
+            
+            fragment.appendChild(pairElement);
         });
+        
+        batchContent.appendChild(fragment);
     }
 
     /* === RENDERING === */
@@ -264,32 +352,22 @@ export class Mapper {
         }
 
         const fragment = document.createDocumentFragment();
-        
-        // Create and add timeline annotation
-        this.timelineAnnotation = this.createTimelineAnnotation();
-        fragment.appendChild(this.timelineAnnotation);
-        
         const targetMap = new Map(this.target.map(t => [t.marker, t]));
         const allBatches = this.buildBatches(targetMap);
+        
+        // Initialize marker states
+        this.source.forEach(seg => {
+            if (!this.markerStates.has(seg.marker)) {
+                this.markerStates.set(seg.marker, 'gap');
+            }
+        });
         
         this.renderGroups(fragment, allBatches);
         this.renderOrphans(fragment);
         
+        // Single DOM update
         this.displayElement.innerHTML = '';
         this.displayElement.appendChild(fragment);
-        
-        // Setup intersection observer after render
-        requestAnimationFrame(() => {
-            this.setupIntersectionObserver();
-            // Initialize with first pair's context
-            const firstPair = this.displayElement.querySelector('.pair');
-            if (firstPair) {
-                this.updateTimelineAnnotation(
-                    firstPair.dataset.groupNum,
-                    firstPair.dataset.batchNum
-                );
-            }
-        });
     }
 
     renderGroups(fragment, allBatches) {
@@ -297,20 +375,25 @@ export class Mapper {
         let batchIndex = 0;
         
         while (batchIndex < allBatches.length) {
-            const batchesPerGroup = groupNum === 1 ? 1 : 10;
+            const batchesPerGroup = groupNum === 1 
+                ? this.config.firstGroupBatches 
+                : this.config.regularGroupBatches;
+            
             const batchesInGroup = allBatches.slice(batchIndex, batchIndex + batchesPerGroup);
             
-            if (batchesInGroup.length) {
+            if (batchesInGroup.length > 0) {
                 const groupElement = this.createGroupElement(groupNum);
                 const groupContent = groupElement.querySelector('.group-content');
+                const groupFragment = document.createDocumentFragment();
                 
                 batchesInGroup.forEach((batchItems, index) => {
                     const batchNum = batchIndex + index + 1;
                     const batchElement = this.renderBatch(batchItems, batchNum, groupNum);
-                    groupContent.appendChild(batchElement);
+                    groupFragment.appendChild(batchElement);
                     this.renderedBatches.set(`BATCH-${batchNum}`, batchElement);
                 });
                 
+                groupContent.appendChild(groupFragment);
                 this.renderedGroups.set(`GROUP-${groupNum}`, groupElement);
                 fragment.appendChild(groupElement);
                 
@@ -321,21 +404,22 @@ export class Mapper {
     }
 
     renderBatch(batchItems, batchNum, groupNum) {
-        const batchElement = this.createBatchElement(batchNum);
+        const batchElement = this.createBatchElement(batchNum, groupNum);
         const batchContent = batchElement.querySelector('.batch-content');
+        const fragment = document.createDocumentFragment();
         
         batchItems.forEach(item => {
             const pairElement = this.createPairElement(item);
             const marker = item.source?.marker || item.target?.marker;
             
-            // Add data attributes for scroll tracking
             pairElement.dataset.groupNum = groupNum;
             pairElement.dataset.batchNum = batchNum;
             
             this.renderedPairs.set(marker, pairElement);
-            batchContent.appendChild(pairElement);
+            fragment.appendChild(pairElement);
         });
         
+        batchContent.appendChild(fragment);
         return batchElement;
     }
 
@@ -347,27 +431,34 @@ export class Mapper {
         
         const orphanGroup = this.createGroupElement('ORPHAN');
         const groupContent = orphanGroup.querySelector('.group-content');
-        const orphanBatch = this.createBatchElement('ORPHAN');
+        const orphanBatch = this.createBatchElement('ORPHAN', 'ORPHAN');
         const batchContent = orphanBatch.querySelector('.batch-content');
+        const batchFragment = document.createDocumentFragment();
         
         orphans.forEach(target => {
+            const marker = target.marker;
             const pairElement = this.createPairElement({
                 type: 'orphan',
                 source: null,
                 target: target
             });
             
-            // Add data attributes for scroll tracking
             pairElement.dataset.groupNum = 'ORPHAN';
             pairElement.dataset.batchNum = 'ORPHAN';
             
-            this.renderedPairs.set(target.marker, pairElement);
-            batchContent.appendChild(pairElement);
+            this.renderedPairs.set(marker, pairElement);
+            
+            // Track state
+            this.markerStates.set(marker, 'orphan');
+            
+            batchFragment.appendChild(pairElement);
         });
         
-        this.renderedBatches.set('ORPHAN-BATCH', orphanBatch);
+        batchContent.appendChild(batchFragment);
         groupContent.appendChild(orphanBatch);
+        orphanGroup.appendChild(groupContent);
         
+        this.renderedBatches.set('ORPHAN-BATCH', orphanBatch);
         this.renderedGroups.set('ORPHAN', orphanGroup);
         fragment.appendChild(orphanGroup);
     }
@@ -375,8 +466,7 @@ export class Mapper {
     buildBatches(targetMap) {
         const batches = [];
         let currentBatch = [];
-        const batchSize = 3;
-
+        
         this.source.forEach((sourceSeg, i) => {
             const matchedSeg = targetMap.get(sourceSeg.marker);
             let item;
@@ -391,7 +481,7 @@ export class Mapper {
             
             currentBatch.push(item);
 
-            if (currentBatch.length === batchSize || i === this.source.length - 1) {
+            if (currentBatch.length === this.config.batchSize || i === this.source.length - 1) {
                 batches.push(currentBatch);
                 currentBatch = [];
             }
@@ -406,23 +496,29 @@ export class Mapper {
         const div = this.createElement('div', 'batch-group');
         div.dataset.groupNum = groupNum;
         
-        const header = this.createElement('div', 'group-header');
         const content = this.createElement('div', 'group-content');
-        
-        div.appendChild(header);
         div.appendChild(content);
         
         return div;
     }
 
-    createBatchElement(batchNum) {
+    createBatchElement(batchNum, groupNum) {
         const div = this.createElement('div', 'batch');
         div.dataset.batchNum = batchNum;
         
-        const header = this.createElement('div', 'batch-header');
+        // Create timeline annotation
+        const annotation = this.createElement('div', 'timeline-annotation');
+        annotation.textContent = batchNum === 'ORPHAN' 
+            ? 'Orphan Segments' 
+            : `Group ${groupNum} - Batch ${batchNum}`;
+        
+        if (batchNum === 'ORPHAN') {
+            annotation.classList.add('orphan-section');
+        }
+        
         const content = this.createElement('div', 'batch-content');
         
-        div.appendChild(header);
+        div.appendChild(annotation);
         div.appendChild(content);
         
         return div;
@@ -432,44 +528,76 @@ export class Mapper {
         const div = this.createElement('div', `pair ${item.type}`);
         div.dataset.marker = item.source?.marker || item.target?.marker;
         
+        // Create header
+        const header = this.createPairHeader(div.dataset.marker, item.type);
+        
+        // Create content
+        const content = this.createPairContent(item);
+        
+        div.appendChild(header);
+        div.appendChild(content);
+        
+        return div;
+    }
+    
+    createPairHeader(marker, type) {
         const header = this.createElement('div', 'pair-header');
         
-        const marker = this.createElement('span', 'pair-marker');
-        marker.textContent = div.dataset.marker;
+        const markerSpan = this.createElement('span', 'pair-marker');
+        markerSpan.textContent = marker;
         
-        const status = this.createElement('span', 'pair-status');
-        status.textContent = item.type.toUpperCase();
+        const statusSpan = this.createElement('span', 'pair-status');
+        statusSpan.textContent = type.toUpperCase();
         
-        header.appendChild(marker);
-        header.appendChild(status);
+        header.appendChild(markerSpan);
+        header.appendChild(statusSpan);
         
+        return header;
+    }
+    
+    createPairContent(item) {
         const content = this.createElement('div', 'pair-content');
         const grid = this.createElement('div', 'json-grid');
         
-        // Source
+        // Add source if not orphan
         if (item.source || item.type !== 'orphan') {
             grid.appendChild(this.createLabel('Source'));
             grid.appendChild(this.createValue(item.source?.text, !item.source?.text));
         }
         
-        // Target
+        // Add target
         grid.appendChild(this.createLabel('Target'));
-        
-        if (item.type === 'gap') {
-            grid.appendChild(this.createValue('(waiting...)', true));
-        } else if (item.type === 'partial') {
-            const val = this.createValue(item.target?.text || '...', false);
-            val.classList.add('streaming');
-            grid.appendChild(val);
-        } else {
-            grid.appendChild(this.createValue(item.target?.text, !item.target?.text));
-        }
+        grid.appendChild(this.createTargetValue(item));
         
         content.appendChild(grid);
-        div.appendChild(header);
-        div.appendChild(content);
+        return content;
+    }
+    
+    createTargetValue(item) {
+        let text = '';
+        let isEmpty = false;
+        let isStreaming = false;
         
-        return div;
+        switch (item.type) {
+            case 'gap':
+                text = '(waiting...)';
+                isEmpty = true;
+                break;
+            case 'partial':
+                text = item.target?.text || '...';
+                isStreaming = true;
+                break;
+            default:
+                text = item.target?.text;
+                isEmpty = !text;
+        }
+        
+        const value = this.createValue(text, isEmpty);
+        if (isStreaming) {
+            value.classList.add('streaming');
+        }
+        
+        return value;
     }
 
     createElement(tag, className) {
@@ -484,7 +612,7 @@ export class Mapper {
         return label;
     }
 
-    createValue(text, isEmpty) {
+    createValue(text, isEmpty = false) {
         const value = this.createElement('div', 'json-value');
         value.textContent = text || '(no target)';
         if (isEmpty) value.classList.add('empty');

@@ -89,9 +89,9 @@ export class AIStream {
         const payload = {
             contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
             generationConfig: {
-                temperature: 1.5,
+                temperature: 1.6,
                 thinkingConfig: { thinkingBudget: 500 },
-                topP: 0.5,
+                topP: 0.4,
             }
         };
 

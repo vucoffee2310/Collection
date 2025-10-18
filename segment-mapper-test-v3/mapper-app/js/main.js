@@ -2,7 +2,7 @@ import { Parser } from './parser.js';
 import { Mapper } from './mapper.js';
 import { AIStream } from './stream.js';
 import { Logger } from './logger.js';
-import { debounce } from '../../shared/js/utils.js'; // ✅ Import directly from shared
+import { debounce } from '../../shared/js/utils.js';
 import { ProcessDebugger } from '../../extensions/process-debugger/js/debugger-core.js';
 
 console.log('[Main App] main.js module loaded');
@@ -21,8 +21,8 @@ const elements = {
 
 // --- Class Instantiation & Dependency Injection ---
 const logger = new Logger();
-const mapper = new Mapper(elements.mapDisplay);
-const debuggerInstance = new ProcessDebugger(); // Debugger is now part of the main app
+const mapper = new Mapper(elements.mapDisplay, logger);
+const debuggerInstance = new ProcessDebugger();
 
 // Direct communication with the debugger instance
 const streamDependencies = {
@@ -33,15 +33,15 @@ const streamDependencies = {
     reportDisplayEl: elements.reportDisplay,
     
     onGenerationStart: () => {
-        debuggerInstance.clearEvents(); // Reset the debugger state
+        debuggerInstance.clearEvents();
     },
     
     onGenerationEnd: () => {
-        // No action needed here for now
+        // No action needed
     },
     
     onTargetSegment: (segment) => {
-        debuggerInstance.queueSegment(segment); // Send new segments directly
+        debuggerInstance.queueSegment(segment);
     },
 };
 
@@ -68,14 +68,27 @@ window.addEventListener('load', () => {
     autoParseSource();
 });
 
+// Create debounced version with longer delay for better UX
 const debouncedAutoParseSource = debounce(autoParseSource, 500);
 
-elements.sourceInput.addEventListener('input', debouncedAutoParseSource);
+elements.sourceInput.addEventListener('input', () => {
+    debouncedAutoParseSource();
+});
 
 elements.generateButton.addEventListener('click', () => {
     console.log('[Main App] 🎬 Generate button clicked');
-    debouncedAutoParseSource.flush();
-    stream.toggle();
+    
+    // IMPORTANT: Flush debounce before starting generation
+    // This ensures source is fully parsed before streaming starts
+    if (debouncedAutoParseSource.pending()) {
+        console.log('[Main App] ⚡ Flushing pending source parse...');
+        debouncedAutoParseSource.flush();
+    }
+    
+    // Small delay to ensure DOM updates from parse have completed
+    requestAnimationFrame(() => {
+        stream.toggle();
+    });
 });
 
 // View Switching Logic
