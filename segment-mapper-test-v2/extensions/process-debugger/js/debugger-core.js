@@ -1,7 +1,6 @@
 /**
- * Process Debugger Core - With improved historical sync handling
+ * Process Debugger Core - Complete implementation with all requirements
  */
-
 import { debounce, throttle, escapeHtml } from './debugger-utils.js';
 import { createWaitingEvent, createMatchedEvent, createOrphanEvent } from './debugger-events.js';
 import {
@@ -19,11 +18,13 @@ console.log('[Process Debugger] Module loaded');
 
 class ProcessDebugger {
     constructor() {
-        // Core data storage
+        // ============================================
+        // CORE DATA STORAGE
+        // ============================================
         this.eventsByMarker = new Map();
         this.eventCount = 0;
         this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
-        
+
         // Source/target segments
         this.sourceSegments = [];
         this.targetSegments = [];
@@ -32,31 +33,38 @@ class ProcessDebugger {
         // DOM elements
         this.timelineContainer = document.getElementById('timeline-container');
         this.breakdownSection = document.getElementById('breakdownSection');
-        
-        // Auto-scroll state
-        this.autoScrollEnabled = false;
-        this.userScrolledAway = false;
-        
-        // Batch processing with larger buffer for historical sync
+
+        // ============================================
+        // BATCH PROCESSING
+        // ============================================
         this.eventQueue = [];
         this.processingQueue = false;
-        this.isSyncingHistorical = false; // Flag to indicate historical sync
+        this.isSyncingHistorical = false;
 
-        // Throttled functions for performance.
-        // Throttle ensures the breakdown UI updates periodically during a fast stream of events (like historical sync) without freezing the browser.
-        this.throttledBreakdownRender = throttle(() => this.renderMarkerBreakdown(), 300);
+        // ============================================
+        // SESSION TRACKING
+        // ============================================
+        this.sessionStartTime = Date.now();
+
+        // ============================================
+        // PERFORMANCE OPTIMIZATION
+        // ============================================
+        // Debounced breakdown render (waits for quiet period)
+        this.debouncedBreakdownRender = debounce(() => this.renderMarkerBreakdown(), 150);
+        // Throttled stats update (max once per 200ms)
         this.throttledStatsUpdate = throttle(() => this.updateStatsDisplay(), 200);
 
         this.init();
     }
 
+    // ============================================
+    // INITIALIZATION
+    // ============================================
     init() {
         console.log('[Process Debugger] Initializing...');
         this.setupEventListeners();
         this.setupMessageListener();
-        this.setupScrollDetection();
         this.renderMarkerBreakdown();
-        
         this.notifyParent('DEBUG_READY');
         console.log('[Process Debugger] Initialization complete - sent DEBUG_READY signal');
     }
@@ -72,52 +80,25 @@ class ProcessDebugger {
         }
     }
 
+    // ============================================
+    // EVENT LISTENERS
+    // ============================================
     setupEventListeners() {
-        // Clear button
-        document.getElementById('clearBtn').onclick = () => this.clearEvents();
-        
-        // Analyze waiting button
-        document.getElementById('analyzeWaitingBtn').onclick = () => this.analyzeWaitingSegments();
-        document.getElementById('gapStatBox').onclick = () => this.analyzeWaitingSegments();
-        
-        // Auto-scroll toggle
-        const autoScrollBtn = document.getElementById('autoScrollBtn');
-        autoScrollBtn.onclick = () => {
-            this.autoScrollEnabled = !this.autoScrollEnabled;
-            autoScrollBtn.textContent = `Auto-Scroll: ${this.autoScrollEnabled ? 'ON' : 'OFF'}`;
-            autoScrollBtn.classList.toggle('active', this.autoScrollEnabled);
-            if (this.autoScrollEnabled) {
-                this.userScrolledAway = false;
-            }
-        };
-        
-        // Combined Expand/Collapse toggle
-        const toggleExpandBtn = document.getElementById('toggleExpandBtn');
-        toggleExpandBtn.onclick = () => {
-            if (this.breakdownSection.open) {
-                this.collapseAll();
-                toggleExpandBtn.textContent = 'Expand All';
-            } else {
-                this.expandAll();
-                toggleExpandBtn.textContent = 'Collapse All';
-            }
-        };
-    }
+        // Clear button (in breakdown header)
+        const clearBtn = document.getElementById('clearBtn');
+        if (clearBtn) {
+            clearBtn.onclick = (e) => {
+                e.stopPropagation(); // Prevent toggling breakdown section
+                this.clearEvents();
+            };
+        }
 
-    setupScrollDetection() {
-        // Detect when user manually scrolls away from auto-scroll
-        let scrollTimeout;
-        window.addEventListener('scroll', () => {
-            if (this.autoScrollEnabled) {
-                clearTimeout(scrollTimeout);
-                scrollTimeout = setTimeout(() => {
-                    const isAtBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 100);
-                    if (!isAtBottom) {
-                        this.userScrolledAway = true;
-                    }
-                }, 100);
-            }
-        });
+        // Save log button
+        const saveLogBtn = document.getElementById('saveLogBtn');
+        if (saveLogBtn) {
+            saveLogBtn.onclick = () => this.saveLog();
+            this.updateSaveButtonState();
+        }
     }
 
     setupMessageListener() {
@@ -137,9 +118,7 @@ class ProcessDebugger {
                 const segment = e.data.segment;
                 console.log('[Process Debugger] 📥 Received target segment:', segment.marker);
                 
-                // Check if this is likely a historical sync (many segments arriving quickly)
                 if (!this.isSyncingHistorical && this.eventQueue.length === 0) {
-                    // First segment might be start of historical sync
                     console.log('[Process Debugger] 🔄 Potentially starting historical sync...');
                 }
                 
@@ -153,19 +132,21 @@ class ProcessDebugger {
         });
     }
 
+    // ============================================
+    // EVENT PROCESSING
+    // ============================================
     queueSegment(segment) {
         this.eventQueue.push(segment);
         
-        // Use larger batches during historical sync
+        // Detect historical sync (many segments arriving rapidly)
         if (this.eventQueue.length > 20) {
             this.isSyncingHistorical = true;
             console.log('[Process Debugger] 📦 Historical sync detected - buffering segments:', this.eventQueue.length);
         }
-        
+
         if (!this.processingQueue) {
             this.processingQueue = true;
-            
-            // Delay processing if we're receiving many segments (historical sync)
+            // Delay processing during historical sync to allow batching
             const delay = this.isSyncingHistorical ? 500 : 0;
             setTimeout(() => {
                 requestAnimationFrame(() => this.processQueue());
@@ -178,17 +159,20 @@ class ProcessDebugger {
             this.processingQueue = false;
             this.isSyncingHistorical = false;
             console.log('[Process Debugger] ✅ Queue processing complete');
+            
+            // Force immediate final render
+            this.renderMarkerBreakdown();
+            this.updateStatsDisplay();
             return;
         }
-        
+
         const startTime = performance.now();
-        const maxProcessingTime = this.isSyncingHistorical ? 50 : 16; // Longer processing time for historical sync
-        const batchSize = this.isSyncingHistorical ? 10 : 1; // Larger batches for historical sync
+        const maxProcessingTime = this.isSyncingHistorical ? 50 : 16;
+        const batchSize = this.isSyncingHistorical ? 10 : 1;
         let processedCount = 0;
 
         while (this.eventQueue.length > 0 && (performance.now() - startTime) < maxProcessingTime) {
             const segment = this.eventQueue.shift();
-            
             this.eventCount++;
             this.stats.total++;
 
@@ -210,15 +194,12 @@ class ProcessDebugger {
 
         if (processedCount > 0) {
             console.log('[Process Debugger] 📊 Processed batch:', processedCount, 'segments, Remaining:', this.eventQueue.length);
-            this.throttledStatsUpdate();
             
-            // Throttled update for the marker breakdown provides responsive UI during fast streams
-            this.throttledBreakdownRender();
-
-            // Auto-scroll to bottom if enabled and user hasn't scrolled away
-            if (this.autoScrollEnabled && !this.userScrolledAway && !this.isSyncingHistorical) {
-                this.scrollToBottom();
-            }
+            // Update stats immediately (fast)
+            this.updateStatsDisplay();
+            
+            // Debounce breakdown (waits for burst to finish)
+            this.debouncedBreakdownRender();
         }
 
         if (this.eventQueue.length > 0) {
@@ -230,40 +211,16 @@ class ProcessDebugger {
         } else {
             // Queue empty - finalize
             this.processingQueue = false;
-            
             if (this.isSyncingHistorical) {
                 console.log('[Process Debugger] ✅ Historical sync complete - processed', this.eventCount, 'total events');
                 this.isSyncingHistorical = false;
-                
-                // Force final render after historical sync
-                this.renderMarkerBreakdown();
-                this.updateStatsDisplay();
             }
+            
+            // Cancel pending debounced call and render NOW
+            this.debouncedBreakdownRender.cancel();
+            this.renderMarkerBreakdown();
+            this.updateStatsDisplay();
         }
-    }
-
-    scrollToBottom() {
-        requestAnimationFrame(() => {
-            window.scrollTo({
-                top: document.body.scrollHeight,
-                behavior: 'smooth'
-            });
-            this.userScrolledAway = false;
-        });
-    }
-
-    expandAll() {
-        // Expand breakdown section
-        this.breakdownSection.open = true;
-        console.log('[Debug] Expanded all sections');
-    }
-
-    collapseAll() {
-        // Collapse breakdown section
-        this.breakdownSection.open = false;
-        // Clear timeline view when collapsing
-        this.timelineContainer.innerHTML = '';
-        console.log('[Debug] Collapsed all sections');
     }
 
     storeEvent(marker, eventData) {
@@ -273,48 +230,12 @@ class ProcessDebugger {
         this.eventsByMarker.get(marker).push(eventData);
     }
 
-    analyzeWaitingSegments() {
-        const waitingSegments = this.getWaitingSegments();
-
-        if (waitingSegments.length === 0) {
-            alert('No waiting segments to analyze. All source segments have been matched!');
-            return;
-        }
-
-        waitingSegments.forEach(segment => {
-            const eventData = createWaitingEvent(segment, this);
-            this.storeEvent(segment.marker, eventData);
-            this.eventCount++;
-        });
-
-        this.throttledStatsUpdate();
-        this.renderMarkerBreakdown();
-        
-        alert(`Added ${waitingSegments.length} waiting segment analysis. Click cards to view full details.`);
-    }
-
-    getWaitingSegments() {
-        const targetMap = new Map();
-        this.targetSegments.forEach(t => targetMap.set(t.marker, t));
-        return this.sourceSegments.filter(source => !targetMap.has(source.marker));
-    }
-
-    clearEvents() {
-        this.eventsByMarker.clear();
-        this.eventCount = 0;
-        this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
-        this.targetSegments = [];
-        this.eventQueue = [];
-        this.isSyncingHistorical = false;
-        this.updateStatsDisplay();
-        this.renderMarkerBreakdown();
-        this.timelineContainer.innerHTML = '';
-        console.log('[Process Debugger] Events cleared');
-    }
-
+    // ============================================
+    // RENDERING
+    // ============================================
     renderMarkerBreakdown() {
         const container = document.getElementById('markerBreakdownTable');
-
+        
         if (this.sourceSegments.length === 0) {
             container.innerHTML = '<div class="breakdown-empty">No source segments loaded yet. Start from the main page.</div>';
             return;
@@ -345,12 +266,19 @@ class ProcessDebugger {
 
         const gridHtml = `<div class="breakdown-grid">${
             allMarkers.map(item => 
-                `<div class="breakdown-card status-${item.status}" data-marker="${item.marker}" title="Click to see ${item.marker} full details">
+                `<div class="breakdown-card status-${item.status}" 
+                      data-marker="${item.marker}" 
+                      data-status="${item.status}" 
+                      title="Click to see ${item.marker} details">
                     ${item.marker}
+                    <span class="save-marker-icon" 
+                          data-marker="${item.marker}" 
+                          data-status="${item.status}"
+                          title="Save ${item.marker} log to file">💾</span>
                 </div>`
             ).join('')
         }</div>`;
-        
+
         let waitingListHtml = '';
         if (waitingMarkers.length > 0) {
             waitingListHtml = `<div class="waiting-list">
@@ -358,30 +286,79 @@ class ProcessDebugger {
                 <div class="waiting-markers">${waitingMarkers.join(', ')}</div>
             </div>`;
         }
-        
+
         container.innerHTML = gridHtml + waitingListHtml;
 
+        // Event delegation (handle both card click and save icon click)
         container.onclick = (event) => {
+            // Check if save icon was clicked
+            if (event.target.classList.contains('save-marker-icon')) {
+                event.stopPropagation(); // Don't trigger card click
+                const marker = event.target.dataset.marker;
+                const status = event.target.dataset.status;
+                this.saveMarkerLog(marker, status);
+                
+                // Visual feedback
+                event.target.textContent = '✅';
+                setTimeout(() => {
+                    event.target.textContent = '💾';
+                }, 1500);
+                return;
+            }
+
+            // Handle card click
             const card = event.target.closest('.breakdown-card');
             if (!card) return;
 
             const marker = card.dataset.marker;
+            const status = card.dataset.status;
+
+            // Auto-analyze waiting cards on first click
+            if (status === 'waiting' && !this.eventsByMarker.has(marker)) {
+                const source = this.sourceSegments.find(s => s.marker === marker);
+                if (source) {
+                    const eventData = createWaitingEvent(source, this);
+                    this.storeEvent(marker, eventData);
+                    this.eventCount++;
+                    this.throttledStatsUpdate();
+                }
+            }
+
             this.showTimelineForMarker(marker);
         };
     }
 
     showTimelineForMarker(marker) {
         const events = this.eventsByMarker.get(marker) || [];
-        
-        let headerHtml = `<h2 class="timeline-header">No Events for ${marker}</h2>`;
-        let bodyHtml = '<p class="timeline-empty">No events recorded for this marker yet.</p>';
+        const status = this.getMarkerStatus(marker);
 
-        if (events.length > 0) {
-            headerHtml = `<h2 class="timeline-header">${marker} Timeline <span class="timeline-event-count">(${events.length} event${events.length > 1 ? 's' : ''})</span></h2>`;
-            bodyHtml = this.renderEventsTimeline(events);
-        }
-        
+        let headerHtml = `<h2 class="timeline-header">
+            <span>${marker} Timeline <span class="timeline-event-count">(${events.length} event${events.length > 1 ? 's' : ''})</span></span>
+            <button class="save-marker-btn" data-marker="${marker}" data-status="${status}">💾 Save This Log</button>
+        </h2>`;
+
+        let bodyHtml = events.length > 0
+            ? this.renderEventsTimeline(events)
+            : '<p class="timeline-empty">No events recorded for this marker yet.</p>';
+
         this.timelineContainer.innerHTML = headerHtml + bodyHtml;
+
+        // Add save button listener
+        const saveBtn = this.timelineContainer.querySelector('.save-marker-btn');
+        if (saveBtn) {
+            saveBtn.onclick = () => {
+                this.saveMarkerLog(marker, status);
+
+                // Visual feedback
+                saveBtn.textContent = '✅ Saved!';
+                saveBtn.classList.add('saved');
+                setTimeout(() => {
+                    saveBtn.textContent = '💾 Save This Log';
+                    saveBtn.classList.remove('saved');
+                }, 2000);
+            };
+        }
+
         this.timelineContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -390,7 +367,6 @@ class ProcessDebugger {
         
         events.forEach((eventData, index) => {
             const severityClass = eventData.severity;
-            
             html += `<div class="timeline-item">
                 <div class="timeline-marker ${severityClass}">${index + 1}</div>
                 <div class="event severity-${severityClass}">
@@ -459,10 +435,234 @@ class ProcessDebugger {
         document.getElementById('matchedCount').textContent = this.stats.matched;
         document.getElementById('orphanCount').textContent = this.stats.orphan;
         document.getElementById('gapCount').textContent = this.stats.gap;
+        
+        // Update save button state
+        this.updateSaveButtonState();
+    }
+
+    // ============================================
+    // UTILITY METHODS
+    // ============================================
+    getMarkerStatus(marker) {
+        const sourceMatch = this.sourceSegments.find(s => s.marker === marker);
+        const targetMatch = this.targetSegments.find(t => t.marker === marker);
+
+        if (sourceMatch && targetMatch) return 'matched';
+        if (sourceMatch && !targetMatch) return 'waiting';
+        if (!sourceMatch && targetMatch) return 'orphan';
+        return 'unknown';
+    }
+
+    clearEvents() {
+        // Confirmation if there's data
+        if (this.eventCount > 0) {
+            const confirmed = confirm(
+                `Clear all ${this.eventCount} events?\n\n` +
+                `This will reset:\n` +
+                `• All event timelines\n` +
+                `• Target segments\n` +
+                `• Statistics\n\n` +
+                `Source segments will remain loaded.`
+            );
+            if (!confirmed) return;
+        }
+
+        this.eventsByMarker.clear();
+        this.eventCount = 0;
+        this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
+        this.targetSegments = [];
+        this.eventQueue = [];
+        this.isSyncingHistorical = false;
+        this.updateStatsDisplay();
+        this.renderMarkerBreakdown();
+        this.timelineContainer.innerHTML = '';
+        console.log('[Process Debugger] Events cleared');
+    }
+
+    // ============================================
+    // LOG EXPORT - GLOBAL
+    // ============================================
+    saveLog() {
+        try {
+            // Build complete log data
+            const logData = {
+                metadata: this.buildMetadata(),
+                statistics: {
+                    ...this.stats,
+                    sourceCount: this.sourceSegments.length,
+                    eventCount: this.eventCount
+                },
+                sourceSegments: this.sourceSegments,
+                targetSegments: this.targetSegments,
+                events: Object.fromEntries(this.eventsByMarker),
+                markerBreakdown: this.buildMarkerBreakdown(),
+                generationInfo: this.buildGenerationInfo()
+            };
+
+            // Convert to JSON
+            const jsonString = JSON.stringify(logData, null, 2);
+
+            // Check size and warn if large
+            const sizeInMB = new Blob([jsonString]).size / (1024 * 1024);
+            if (sizeInMB > 5) {
+                if (!confirm(`Large log file (${sizeInMB.toFixed(1)} MB). Continue download?`)) {
+                    return;
+                }
+            }
+
+            // Create download
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = this.generateFilename();
+            a.click();
+
+            // Cleanup
+            URL.revokeObjectURL(url);
+
+            // User feedback
+            this.showSaveConfirmation();
+
+            console.log('[Process Debugger] 💾 Saved full log:', this.generateFilename());
+
+        } catch (error) {
+            console.error('[Process Debugger] Failed to save log:', error);
+            alert(`Failed to save log: ${error.message}`);
+        }
+    }
+
+    buildMetadata() {
+        return {
+            exportedAt: new Date().toISOString(),
+            exportedBy: 'Process Debugger v1.0',
+            sessionDuration: ((Date.now() - this.sessionStartTime) / 1000).toFixed(1) + 's',
+            pageUrl: window.location.href,
+            userAgent: navigator.userAgent
+        };
+    }
+
+    buildMarkerBreakdown() {
+        const targetMap = new Map(this.targetSegments.map(t => [t.marker, t]));
+        const sourceMap = new Map(this.sourceSegments.map(s => [s.marker, s]));
+
+        const matched = [];
+        const waiting = [];
+        const orphan = [];
+
+        this.sourceSegments.forEach(s => {
+            if (targetMap.has(s.marker)) matched.push(s.marker);
+            else waiting.push(s.marker);
+        });
+
+        this.targetSegments.forEach(t => {
+            if (!sourceMap.has(t.marker)) orphan.push(t.marker);
+        });
+
+        return { matched, waiting, orphan };
+    }
+
+    buildGenerationInfo() {
+        return {
+            startTime: this.generationStartTime
+                ? new Date(this.generationStartTime).toISOString()
+                : null,
+            isRunning: this.processingQueue,
+            sessionDuration: ((Date.now() - this.sessionStartTime) / 1000).toFixed(1) + 's'
+        };
+    }
+
+    generateFilename() {
+        const now = new Date();
+        const date = now.toISOString().split('T')[0];
+        const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
+        return `debug-log-${date}-${time}.json`;
+    }
+
+    updateSaveButtonState() {
+        const saveBtn = document.getElementById('saveLogBtn');
+        if (saveBtn) {
+            saveBtn.disabled = this.eventCount === 0;
+            saveBtn.title = this.eventCount === 0
+                ? 'No events to save yet'
+                : `Save ${this.eventCount} events to JSON file`;
+        }
+    }
+
+    showSaveConfirmation() {
+        const saveBtn = document.getElementById('saveLogBtn');
+        if (!saveBtn) return;
+
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = '✅ Saved!';
+        saveBtn.style.background = '#28a745';
+        setTimeout(() => {
+            saveBtn.textContent = originalText;
+            saveBtn.style.background = '';
+        }, 2000);
+    }
+
+    // ============================================
+    // LOG EXPORT - PER MARKER
+    // ============================================
+    saveMarkerLog(marker, status) {
+        try {
+            // Build marker-specific log
+            const source = this.sourceSegments.find(s => s.marker === marker);
+            const target = this.targetSegments.find(t => t.marker === marker);
+            const events = this.eventsByMarker.get(marker) || [];
+
+            const logData = {
+                metadata: {
+                    marker: marker,
+                    exportedAt: new Date().toISOString(),
+                    exportedBy: 'Process Debugger v1.0',
+                    sessionUrl: window.location.href
+                },
+                source: source ? { marker: source.marker, text: source.text } : null,
+                target: target ? { marker: target.marker, text: target.text, exists: true } : { exists: false },
+                status: status,
+                events: events,
+                statistics: {
+                    totalEvents: events.length,
+                    firstEventTime: events[0]?.timestamp || null,
+                    lastEventTime: events[events.length - 1]?.timestamp || null
+                }
+            };
+
+            // Convert to JSON
+            const jsonString = JSON.stringify(logData, null, 2);
+
+            // Create download
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = this.generateMarkerFilename(marker, status);
+            a.click();
+
+            // Cleanup
+            URL.revokeObjectURL(url);
+
+            console.log(`[Process Debugger] 💾 Saved log for ${marker} (${status})`);
+
+        } catch (error) {
+            console.error('[Process Debugger] Failed to save marker log:', error);
+            alert(`Failed to save log for ${marker}: ${error.message}`);
+        }
+    }
+
+    generateMarkerFilename(marker, status) {
+        const now = new Date();
+        const date = now.toISOString().split('T')[0];
+        const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
+        return `marker-${marker}-${status}-${date}-${time}.json`;
     }
 }
 
-// Initialize
+// ============================================
+// INITIALIZE
+// ============================================
 console.log('[Process Debugger] Script loaded, waiting for DOM...');
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {

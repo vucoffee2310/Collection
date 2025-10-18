@@ -1,6 +1,6 @@
 /**
- * Debug Controls - Compact design with circle stats
- */
+* Debug Controls - Compact design with circle stats
+*/
 
 /* Compact buttons */
 .controls-row button {
@@ -24,18 +24,10 @@
     transform: translateY(1px);
 }
 
-.controls-row button.active,
-.controls-row button.btn-toggle.active {
-    background: #28a745;
-}
-
-.controls-row button.analyze-waiting {
-    background: #ffc107;
-    color: #333;
-}
-
-.controls-row button.analyze-waiting:hover {
-    background: #e0a800;
+.controls-row button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 /* Stats as circles */
@@ -45,7 +37,7 @@
     justify-content: center;
     cursor: pointer;
     min-width: 50px;
-    height: 50px; /* Provide space for hover effect */
+    height: 50px;
 }
 
 .stat-number {

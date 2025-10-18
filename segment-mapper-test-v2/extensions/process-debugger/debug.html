@@ -1,102 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Process Debug - AI Segment Mapper</title>
-    
-    <!-- Base CSS Files (from main app) -->
-    <link rel="stylesheet" href="../../mapper-app/css/base.css">
-    <link rel="stylesheet" href="../../mapper-app/css/components.css">
-    <link rel="stylesheet" href="../../mapper-app/css/layout.css">
-    
-    <!-- Debug-specific CSS Files -->
-    <link rel="stylesheet" href="css/debug-layout.css">
-    <link rel="stylesheet" href="css/debug-controls.css">
-    <link rel="stylesheet" href="css/debug-breakdown.css">
-    <link rel="stylesheet" href="css/debug-events.css">
-    <link rel="stylesheet" href="css/debug-steps.css">
-    <link rel="stylesheet" href="css/debug-components.css">
-</head>
-<body>
-    <!-- Path Debug Info -->
-    <script>
-        console.log('[Debug Window] 🔍 Loaded at:', window.location.href);
-        console.log('[Debug Window] Protocol:', window.location.protocol);
-        console.log('[Debug Window] Has opener:', !!window.opener);
-        
-        if (window.location.protocol === 'file:') {
-            document.body.innerHTML = `
-                <div style="padding: 40px; background: #fff3cd; border: 3px solid #ffc107; margin: 20px; border-radius: 8px;">
-                    <h1 style="color: #856404;">⚠️ Running from file:// protocol</h1>
-                    <p style="font-size: 16px;">The debug extension requires a web server to work properly.</p>
-                    <h2>Quick Fix:</h2>
-                    <ol style="font-size: 14px; line-height: 1.8;">
-                        <li>Open terminal in the <code>segment-mapper</code> folder</li>
-                        <li>Run: <code>python -m http.server 8000</code></li>
-                        <li>Open: <code>http://localhost:8000/mapper-app/index.html</code></li>
-                    </ol>
-                    <p><strong>Current location:</strong> <code>${window.location.href}</code></p>
-                </div>
-            `;
-            throw new Error('Running from file:// protocol - need web server');
-        }
-    </script>
-
-    <div class="debug-container">
-        <!-- Compact Header with all content aligned right -->
-        <div class="header">
+   <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Process Debug - AI Segment Mapper</title>
+      <!-- Base CSS Files (from main app) -->
+      <link rel="stylesheet" href="../../mapper-app/css/base.css">
+      <link rel="stylesheet" href="../../mapper-app/css/components.css">
+      <link rel="stylesheet" href="../../mapper-app/css/layout.css">
+      <!-- Debug-specific CSS Files -->
+      <link rel="stylesheet" href="css/debug-layout.css">
+      <link rel="stylesheet" href="css/debug-controls.css">
+      <link rel="stylesheet" href="css/debug-breakdown.css">
+      <link rel="stylesheet" href="css/debug-events.css">
+      <link rel="stylesheet" href="css/debug-steps.css">
+      <link rel="stylesheet" href="css/debug-components.css">
+   </head>
+   <body>
+      <!-- Path Debug Info -->
+      <script>
+         console.log('[Debug Window] 🔍 Loaded at:', window.location.href);
+         console.log('[Debug Window] Protocol:', window.location.protocol);
+         console.log('[Debug Window] Has opener:', !!window.opener);
+         if (window.location.protocol === 'file:') {
+             document.body.innerHTML = `
+             <div style="padding: 40px; background: #fff3cd; border: 3px solid #ffc107; margin: 20px; border-radius: 8px;">
+                 <h1 style="color: #856404;">⚠️ Running from file:// protocol</h1>
+                 <p style="font-size: 16px;">The debug extension requires a web server to work properly.</p>
+                 <h2>Quick Fix:</h2>
+                 <ol style="font-size: 14px; line-height: 1.8;">
+                     <li>Open terminal in the <code>segment-mapper</code> folder</li>
+                     <li>Run: <code>python -m http.server 8000</code></li>
+                     <li>Open: <code>http://localhost:8000/mapper-app/index.html</code></li>
+                 </ol>
+                 <p><strong>Current location:</strong> <code>${window.location.href}</code></p>
+             </div>
+             `;
+             throw new Error('Running from file:// protocol - need web server');
+         }
+      </script>
+      <div class="debug-container">
+         <!-- Compact Header -->
+         <div class="header">
             <div class="header-main-row">
-                <h1>🔬 Process Debug</h1>
-
-                <div class="stats-row">
-                    <div class="stat-item info">
-                        <div class="stat-number" id="sourceCount">0</div>
-                        <div class="stat-label">Sources</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="totalEvents">0</div>
-                        <div class="stat-label">Responses</div>
-                    </div>
-                    <div class="stat-item matched">
-                        <div class="stat-number" id="matchedCount">0</div>
-                        <div class="stat-label">Matched</div>
-                    </div>
-                    <div class="stat-item orphan">
-                        <div class="stat-number" id="orphanCount">0</div>
-                        <div class="stat-label">Orphans</div>
-                    </div>
-                    <div class="stat-item gap" id="gapStatBox">
-                        <div class="stat-number" id="gapCount">0</div>
-                        <div class="stat-label">Waiting</div>
-                    </div>
-                </div>
-
-                <div class="controls-row">
-                    <button id="clearBtn">Clear</button>
-                    <button id="analyzeWaitingBtn" class="analyze-waiting">🔍 Analyze</button>
-                    <button id="autoScrollBtn" class="btn-toggle">Auto-Scroll: OFF</button>
-                    <button id="toggleExpandBtn">Collapse All</button>
-                </div>
+               <h1>🔬 Process Debug</h1>
+               <div class="stats-row">
+                  <div class="stat-item info">
+                     <div class="stat-number" id="sourceCount">0</div>
+                     <div class="stat-label">Sources</div>
+                  </div>
+                  <div class="stat-item">
+                     <div class="stat-number" id="totalEvents">0</div>
+                     <div class="stat-label">Responses</div>
+                  </div>
+                  <div class="stat-item matched">
+                     <div class="stat-number" id="matchedCount">0</div>
+                     <div class="stat-label">Matched</div>
+                  </div>
+                  <div class="stat-item orphan">
+                     <div class="stat-number" id="orphanCount">0</div>
+                     <div class="stat-label">Orphans</div>
+                  </div>
+                  <div class="stat-item gap">
+                     <div class="stat-number" id="gapCount">0</div>
+                     <div class="stat-label">Waiting</div>
+                  </div>
+               </div>
+               <div class="controls-row">
+                  <button id="saveLogBtn">💾 Save Log</button>
+               </div>
             </div>
-        </div>
-
-        <!-- Breakdown Section -->
-        <details class="breakdown-section" id="breakdownSection" open>
+         </div>
+         <!-- Breakdown Section -->
+         <details class="breakdown-section" id="breakdownSection" open>
             <summary class="breakdown-header">
-                🔍 Marker Overview - Click any card to see full details
+               <span class="breakdown-title">🔍 Marker Overview - Click any card to see full details</span>
+               <button id="clearBtn" class="clear-btn" title="Clear all events and reset">🗑️ Clear</button>
             </summary>
-            
             <div id="markerBreakdownTable"></div>
-            
-        </details>
-
-        <!-- Container for Event Timelines -->
-        <div id="timeline-container"></div>
-        
-    </div>
-
-    <!-- JavaScript Modules -->
-    <script type="module" src="js/debugger-core.js"></script>
-</body>
+         </details>
+         <!-- Container for Event Timelines -->
+         <div id="timeline-container"></div>
+      </div>
+      <!-- JavaScript Modules -->
+      <script type="module" src="js/debugger-core.js"></script>
+   </body>
 </html>

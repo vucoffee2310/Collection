@@ -3,7 +3,7 @@
  */
 
 import { getSourceMarkerSummary } from './debugger-utils.js';
-import { MatchedStepTemplates, WaitingStepTemplates, OrphanStepTemplates } from './debugger-templates.js';
+import { MatchedStepTemplates, WaitingStepTemplates, OrphanStepTemplates, RaceConditionStepTemplates } from './debugger-templates.js';
 
 export function createWaitingEvent(source, debugContext) {
     const baseMarker = source.marker.split('-')[0];
@@ -165,6 +165,28 @@ export function createOrphanEvent(target, timestamp, debugContext) {
         jsonPair,
         statusText: `Status: ORPHAN - ${reason}`,
         statusIcon: severity === 'critical' ? '🔴' : '⚠️',
+        steps
+    };
+}
+
+export function createRaceConditionEvent(details, debugContext) {
+    const timestamp = new Date().toLocaleTimeString();
+
+    const steps = [
+        RaceConditionStepTemplates.conflictDetected(details.marker, details.details, timestamp),
+        RaceConditionStepTemplates.stateAnalysis(details.marker, ['gap', 'partial'], 'matched'),
+        RaceConditionStepTemplates.recommendation()
+    ];
+
+    return {
+        type: 'race-condition',
+        severity: 'critical',
+        number: debugContext.eventCount + 1,
+        timestamp,
+        marker: details.marker,
+        jsonPair: { "error": "State conflict", "marker": details.marker, "details": details.details },
+        statusText: `Status: CONFLICT - Invalid state transition`,
+        statusIcon: '💥',
         steps
     };
 }

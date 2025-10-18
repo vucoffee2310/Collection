@@ -240,3 +240,33 @@ export const OrphanStepTemplates = {
         }}
     )
 };
+
+export const RaceConditionStepTemplates = {
+    conflictDetected: (marker, details, timestamp) => step(
+        '🔴 State Conflict Detected',
+        `A race condition or out-of-order update was detected for marker <span class="marker-tag orphan">${marker}</span>.`,
+        'critical',
+        { 
+            data: { 'Marker': marker, 'Time': timestamp, 'Problem': 'Invalid state transition attempted.' },
+            alert: { type: 'error', message: details }
+        }
+    ),
+    stateAnalysis: (marker, expectedStates, actualState) => step(
+        '🔬 State Analysis',
+        'The update was ignored because the segment was in an unexpected state.',
+        'error',
+        {
+            flow: [
+                { icon: '❓', text: `Update Type: PARTIAL`, type: 'info' },
+                { icon: '📋', text: `Current State: ${actualState.toUpperCase()}`, type: 'error' },
+                { icon: '👍', text: `Expected State(s): ${expectedStates.join(', ').toUpperCase()}`, type: 'success' },
+                { icon: '💥', text: `CONFLICT: Cannot apply partial update to a '${actualState}' segment.`, type: 'error' }
+            ]
+        }
+    ),
+    recommendation: () => step(
+        '💡 Recommendation',
+        'This usually indicates a network latency issue where a final update arrives before all streaming (partial) updates. The final state is likely correct, but this warning indicates unusual timing.',
+        'info'
+    )
+};
