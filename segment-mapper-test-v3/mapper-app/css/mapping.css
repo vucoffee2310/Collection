@@ -1,72 +1,55 @@
 /* =================================
-   SEGMENT MAPPING DISPLAY - WITH PAIR SEPARATION
+   SEGMENT MAPPING DISPLAY - WITH STICKY TIMELINE ANNOTATION
    ================================= */
 
-/* === LAYOUT STRUCTURE === */
+/* === STICKY TIMELINE ANNOTATION === */
 
-/* Batch Groups */
-.batch-group {
-    background: white;
-    border: 1px solid #ddd;
-    margin: 15px 0;
-}
-
-.batch-group:first-child { margin-top: 0; }
-.batch-group:last-child { margin-bottom: 0; }
-
-.batch-group.collapsed .collapse-icon { transform: rotate(-90deg); }
-.batch-group.collapsed .group-content { display: none; }
-
-/* Group Header */
-.group-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 15px;
+.timeline-annotation {
+    position: sticky;
+    top: 0;
+    z-index: 100;
     background: #f5f5f5;
     border-bottom: 1px solid #ddd;
-    cursor: pointer;
-    user-select: none;
-}
-
-.group-title {
+    padding: 8px 15px;
     font-size: 13px;
     font-weight: 600;
     color: #333;
+    text-align: left;
     display: flex;
     align-items: center;
     gap: 8px;
+    will-change: contents;
 }
 
-.collapse-icon {
-    font-size: 10px;
-    color: #666;
-    width: 12px;
+.timeline-annotation::before {
+    content: '•';
+    color: #007bff;
+    font-size: 20px;
+    line-height: 1;
+    flex-shrink: 0;
 }
 
-/* Group Stats */
-.group-stats {
-    display: flex;
-    gap: 15px;
-    font-size: 11px;
+.timeline-annotation.orphan-section::before {
+    color: #dc3545;
 }
 
-.group-stat {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: #666;
+/* === LAYOUT STRUCTURE === */
+
+/* Batch Groups - Simplified, no collapsing */
+.batch-group {
+    background: white;
+    margin: 0;
+    border: none;
 }
 
-.group-stat-label { font-weight: 500; }
+.batch-group:first-child { margin-top: 0; }
 
-.group-stat-value {
-    font-weight: 700;
-    color: #333;
-    background: #e5e5e5;
-    padding: 2px 6px;
+/* Group Header - Simplified as separator */
+.group-header {
+    display: none; /* Hidden - replaced by sticky annotation */
 }
 
+/* Group Content */
 .group-content {
     padding: 0;
     background: white;
@@ -76,41 +59,22 @@
 
 .batch {
     background: white;
-    border: none;
     margin: 0;
-}
-
-.batch.collapsed .batch-collapse-icon { transform: rotate(-90deg); }
-.batch.collapsed .batch-content { display: none; }
-
-.batch-header {
-    padding: 8px 12px;
-    background: #fafafa;
+    border: none;
     border-bottom: 1px solid #e0e0e0;
-    font-size: 11px;
-    font-weight: 600;
-    color: #555;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    user-select: none;
 }
 
-.batch-header:hover {
-    background: #f0f0f0;
+.batch:last-child {
+    border-bottom: none;
 }
 
-.batch-collapse-icon {
-    font-size: 9px;
-    color: #666;
-    width: 10px;
+/* Batch Header - Simplified as separator */
+.batch-header {
+    display: none; /* Hidden - replaced by sticky annotation */
 }
 
 .batch-content { 
-    padding: 8px 0;
+    padding: 12px 0;
 }
 
 /* === PAIR STRUCTURE === */
@@ -118,17 +82,18 @@
 .pair {
     background: white;
     border-left: 4px solid #ccc;
-    margin: 8px 12px;
+    margin: 12px 16px;
     border: 1px solid #e5e5e5;
     border-left: 4px solid #ccc;
+    scroll-margin-top: 80px; /* Account for sticky header */
 }
 
 .pair:first-child { 
-    margin-top: 0; 
+    margin-top: 12px; 
 }
 
 .pair:last-child { 
-    margin-bottom: 0; 
+    margin-bottom: 12px; 
 }
 
 /* Pair Status Colors */
@@ -142,18 +107,19 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: #fafafa;
     border-bottom: 1px solid #f0f0f0;
 }
 
 .pair-marker {
     font-family: 'Courier New', monospace;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     color: #333;
     background: #e5e5e5;
-    padding: 3px 8px;
+    padding: 4px 10px;
+    border-radius: 3px;
 }
 
 /* Status Badge */
@@ -162,7 +128,8 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.3px;
-    padding: 3px 8px;
+    padding: 4px 8px;
+    border-radius: 3px;
 }
 
 .pair.matched .pair-status { background: #28a745; color: white; }
@@ -172,12 +139,12 @@
 
 /* === PAIR CONTENT === */
 
-.pair-content { padding: 12px; }
+.pair-content { padding: 14px; }
 
 .json-grid {
     display: grid;
-    grid-template-columns: 60px 1fr;
-    gap: 10px 12px;
+    grid-template-columns: 70px 1fr;
+    gap: 12px 14px;
     align-items: start;
 }
 
@@ -185,20 +152,21 @@
     font-weight: 600;
     color: #666;
     text-transform: uppercase;
-    font-size: 9px;
-    letter-spacing: 0.3px;
-    padding-top: 2px;
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    padding-top: 3px;
 }
 
 .json-value {
     font-family: 'Courier New', monospace;
     font-size: 11px;
     color: #333;
-    line-height: 1.5;
+    line-height: 1.6;
     word-break: break-word;
     background: #f8f8f8;
-    padding: 6px 10px;
+    padding: 8px 12px;
     border: 1px solid #e5e5e5;
+    border-radius: 3px;
 }
 
 .json-value.empty {
@@ -211,21 +179,18 @@
     color: #007bff;
     background: #f8fbff;
     border-color: #cce5ff;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 /* === ORPHAN SPECIAL STYLING === */
 
 .batch-group[data-group-num="ORPHAN"] {
-    border-left: 4px solid #e67e22;
-}
-
-.batch-group[data-group-num="ORPHAN"] .group-header {
-    background: #fffbf0;
-    border-bottom-color: #e67e22;
-}
-
-.batch-group[data-group-num="ORPHAN"] .group-title {
-    color: #d35400;
+    border-top: 4px solid #e67e22;
 }
 
 /* === UTILITIES === */
@@ -242,25 +207,19 @@
 /* === RESPONSIVE === */
 
 @media (max-width: 768px) {
-    .group-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-    
-    .group-stats {
-        width: 100%;
-        justify-content: space-between;
+    .timeline-annotation {
+        padding: 10px 15px;
+        font-size: 12px;
     }
     
     .json-grid {
         grid-template-columns: 1fr;
-        gap: 6px;
+        gap: 8px;
     }
     
     .json-label { padding-top: 0; }
     
     .pair {
-        margin: 8px 8px;
+        margin: 10px 10px;
     }
 }

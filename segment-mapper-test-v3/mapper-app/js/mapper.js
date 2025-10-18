@@ -14,6 +14,11 @@ export class Mapper {
         this.renderedBatches = new Map();
         
         this.throttledUpdatePartial = throttle(this.updatePartialDisplay.bind(this), 200);
+        
+        // Sticky timeline annotation
+        this.timelineAnnotation = null;
+        this.intersectionObserver = null;
+        this.currentContext = { group: null, batch: null };
     }
     
     /* === PUBLIC API === */
@@ -73,9 +78,19 @@ export class Mapper {
         this.renderedPairs.clear();
         this.renderedGroups.clear();
         this.renderedBatches.clear();
+        
+        // Disconnect observer
+        if (this.intersectionObserver) {
+            this.intersectionObserver.disconnect();
+            this.intersectionObserver = null;
+        }
+        
         if (this.displayElement) {
             this.displayElement.innerHTML = '';
         }
+        
+        this.timelineAnnotation = null;
+        this.currentContext = { group: null, batch: null };
     }
 
     updatePartialDisplay() {
@@ -163,32 +178,79 @@ export class Mapper {
             target: segment
         });
         
+        // Add data attributes for tracking
+        pairElement.dataset.groupNum = 'ORPHAN';
+        pairElement.dataset.batchNum = 'ORPHAN';
+        
         this.renderedPairs.set(segment.marker, pairElement);
         orphanBatch.querySelector('.batch-content').appendChild(pairElement);
         
-        this.updateBatchHeader(orphanBatch, 'ORPHAN');
-        this.updateGroupHeader(orphanGroup, 'ORPHAN');
-    }
-
-    updateBatchHeader(batchElement, batchNum) {
-        const count = batchElement.querySelectorAll('.pair').length;
-        const textSpan = batchElement.querySelector('.batch-title');
-        if (textSpan) {
-            textSpan.textContent = batchNum === 'ORPHAN' ? 
-                `Orphans (${count})` : 
-                `Batch ${batchNum} (${count})`;
+        // Setup observer for new pair
+        if (this.intersectionObserver) {
+            this.intersectionObserver.observe(pairElement);
         }
     }
 
-    updateGroupHeader(groupElement, groupNum) {
-        const batchCount = groupElement.querySelectorAll('.batch').length;
-        const segmentCount = groupElement.querySelectorAll('.pair').length;
+    /* === TIMELINE ANNOTATION === */
+
+    createTimelineAnnotation() {
+        const annotation = this.createElement('div', 'timeline-annotation');
+        annotation.textContent = 'Loading...';
+        return annotation;
+    }
+
+    updateTimelineAnnotation(groupNum, batchNum) {
+        if (!this.timelineAnnotation) return;
         
-        const batchCountSpan = groupElement.querySelector('.batch-count');
-        const segmentCountSpan = groupElement.querySelector('.segment-count');
+        // Avoid redundant updates
+        if (this.currentContext.group === groupNum && this.currentContext.batch === batchNum) {
+            return;
+        }
         
-        if (batchCountSpan) batchCountSpan.textContent = batchCount;
-        if (segmentCountSpan) segmentCountSpan.textContent = segmentCount;
+        this.currentContext.group = groupNum;
+        this.currentContext.batch = batchNum;
+        
+        // Use textContent for performance (no DOM parsing)
+        if (groupNum === 'ORPHAN') {
+            this.timelineAnnotation.textContent = 'Orphan Segments';
+            this.timelineAnnotation.classList.add('orphan-section');
+        } else {
+            this.timelineAnnotation.textContent = `Group ${groupNum} - Batch ${batchNum}`;
+            this.timelineAnnotation.classList.remove('orphan-section');
+        }
+    }
+
+    setupIntersectionObserver() {
+        // Disconnect existing observer
+        if (this.intersectionObserver) {
+            this.intersectionObserver.disconnect();
+        }
+
+        const options = {
+            root: this.displayElement.closest('.content-column'),
+            rootMargin: '-60px 0px -85% 0px', // Optimized for better trigger point
+            threshold: 0
+        };
+
+        this.intersectionObserver = new IntersectionObserver((entries) => {
+            // Process only the first intersecting entry for better performance
+            const visibleEntry = entries.find(entry => entry.isIntersecting);
+            
+            if (visibleEntry) {
+                const pair = visibleEntry.target;
+                const groupNum = pair.dataset.groupNum;
+                const batchNum = pair.dataset.batchNum;
+                
+                if (groupNum && batchNum) {
+                    this.updateTimelineAnnotation(groupNum, batchNum);
+                }
+            }
+        }, options);
+
+        // Observe all pairs
+        this.renderedPairs.forEach(pairElement => {
+            this.intersectionObserver.observe(pairElement);
+        });
     }
 
     /* === RENDERING === */
@@ -202,6 +264,11 @@ export class Mapper {
         }
 
         const fragment = document.createDocumentFragment();
+        
+        // Create and add timeline annotation
+        this.timelineAnnotation = this.createTimelineAnnotation();
+        fragment.appendChild(this.timelineAnnotation);
+        
         const targetMap = new Map(this.target.map(t => [t.marker, t]));
         const allBatches = this.buildBatches(targetMap);
         
@@ -210,6 +277,19 @@ export class Mapper {
         
         this.displayElement.innerHTML = '';
         this.displayElement.appendChild(fragment);
+        
+        // Setup intersection observer after render
+        requestAnimationFrame(() => {
+            this.setupIntersectionObserver();
+            // Initialize with first pair's context
+            const firstPair = this.displayElement.querySelector('.pair');
+            if (firstPair) {
+                this.updateTimelineAnnotation(
+                    firstPair.dataset.groupNum,
+                    firstPair.dataset.batchNum
+                );
+            }
+        });
     }
 
     renderGroups(fragment, allBatches) {
@@ -226,12 +306,11 @@ export class Mapper {
                 
                 batchesInGroup.forEach((batchItems, index) => {
                     const batchNum = batchIndex + index + 1;
-                    const batchElement = this.renderBatch(batchItems, batchNum);
+                    const batchElement = this.renderBatch(batchItems, batchNum, groupNum);
                     groupContent.appendChild(batchElement);
                     this.renderedBatches.set(`BATCH-${batchNum}`, batchElement);
                 });
                 
-                this.updateGroupHeader(groupElement, groupNum);
                 this.renderedGroups.set(`GROUP-${groupNum}`, groupElement);
                 fragment.appendChild(groupElement);
                 
@@ -241,18 +320,21 @@ export class Mapper {
         }
     }
 
-    renderBatch(batchItems, batchNum) {
+    renderBatch(batchItems, batchNum, groupNum) {
         const batchElement = this.createBatchElement(batchNum);
         const batchContent = batchElement.querySelector('.batch-content');
         
         batchItems.forEach(item => {
             const pairElement = this.createPairElement(item);
             const marker = item.source?.marker || item.target?.marker;
+            
+            // Add data attributes for scroll tracking
+            pairElement.dataset.groupNum = groupNum;
+            pairElement.dataset.batchNum = batchNum;
+            
             this.renderedPairs.set(marker, pairElement);
             batchContent.appendChild(pairElement);
         });
-        
-        this.updateBatchHeader(batchElement, batchNum);
         
         return batchElement;
     }
@@ -274,15 +356,18 @@ export class Mapper {
                 source: null,
                 target: target
             });
+            
+            // Add data attributes for scroll tracking
+            pairElement.dataset.groupNum = 'ORPHAN';
+            pairElement.dataset.batchNum = 'ORPHAN';
+            
             this.renderedPairs.set(target.marker, pairElement);
             batchContent.appendChild(pairElement);
         });
         
-        this.updateBatchHeader(orphanBatch, 'ORPHAN');
         this.renderedBatches.set('ORPHAN-BATCH', orphanBatch);
         groupContent.appendChild(orphanBatch);
         
-        this.updateGroupHeader(orphanGroup, 'ORPHAN');
         this.renderedGroups.set('ORPHAN', orphanGroup);
         fragment.appendChild(orphanGroup);
     }
@@ -322,29 +407,6 @@ export class Mapper {
         div.dataset.groupNum = groupNum;
         
         const header = this.createElement('div', 'group-header');
-        header.addEventListener('click', () => div.classList.toggle('collapsed'));
-        
-        const title = this.createElement('div', 'group-title');
-        title.innerHTML = `
-            <span class="collapse-icon">▼</span>
-            <span>${groupNum === 'ORPHAN' ? '⚠ ORPHAN SEGMENTS' : `GROUP ${groupNum}`}</span>
-        `;
-        
-        const stats = this.createElement('div', 'group-stats');
-        stats.innerHTML = `
-            <div class="group-stat">
-                <span class="group-stat-label">Batches:</span>
-                <span class="group-stat-value batch-count">0</span>
-            </div>
-            <div class="group-stat">
-                <span class="group-stat-label">Segments:</span>
-                <span class="group-stat-value segment-count">0</span>
-            </div>
-        `;
-        
-        header.appendChild(title);
-        header.appendChild(stats);
-        
         const content = this.createElement('div', 'group-content');
         
         div.appendChild(header);
@@ -358,17 +420,6 @@ export class Mapper {
         div.dataset.batchNum = batchNum;
         
         const header = this.createElement('div', 'batch-header');
-        header.addEventListener('click', () => div.classList.toggle('collapsed'));
-        
-        const collapseIcon = this.createElement('span', 'batch-collapse-icon');
-        collapseIcon.textContent = '▼';
-        
-        const title = this.createElement('span', 'batch-title');
-        title.textContent = batchNum === 'ORPHAN' ? 'Orphans' : `Batch ${batchNum}`;
-        
-        header.appendChild(collapseIcon);
-        header.appendChild(title);
-        
         const content = this.createElement('div', 'batch-content');
         
         div.appendChild(header);
