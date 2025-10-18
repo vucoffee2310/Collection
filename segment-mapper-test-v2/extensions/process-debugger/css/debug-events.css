@@ -1,13 +1,12 @@
 /**
-* Debug Events - Timeline view rendered in-page
+* Debug Events - Styled to match mapper's .panel component
 */
 
 #timeline-container {
     background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin-top: 20px;
-    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 15px;
 }
 
 #timeline-container:empty {
@@ -15,12 +14,12 @@
 }
 
 .timeline-header {
-    margin: 0 0 25px 0;
-    font-size: 18px;
-    font-weight: 600;
+    margin: 0 0 15px 0;
+    font-size: 18px; /* Matches mapper h2 */
+    font-weight: normal;
     color: #333;
     border-bottom: 1px solid #eee;
-    padding-bottom: 15px;
+    padding-bottom: 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -34,27 +33,26 @@
     font-size: 15px;
 }
 
-/* Timeline save button */
+/* Timeline save button - standard style */
 .save-marker-btn {
-    padding: 6px 12px;
-    font-size: 12px;
-    background: #6c757d;
+    padding: 10px 20px;
+    font-size: 13px;
+    background: #333;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.2s;
+    transition: background 0.2s;
     flex-shrink: 0;
 }
 
 .save-marker-btn:hover {
-    background: #5a6268;
-    transform: translateY(-1px);
+    background: #555;
 }
 
 .save-marker-btn:active {
-    transform: translateY(0);
+    transform: translateY(1px);
 }
 
 .save-marker-btn.saved {
@@ -253,25 +251,4 @@
 .marker-tag.waiting {
     background: #ffc107;
     color: #333;
-}
-
-@media (max-width: 768px) {
-    #timeline-container {
-        padding: 15px;
-    }
-    
-    .timeline-item {
-        padding-left: 38px;
-    }
-    
-    .timeline-marker {
-        width: 28px;
-        height: 28px;
-        font-size: 12px;
-    }
-    
-    .save-marker-btn {
-        padding: 5px 10px;
-        font-size: 11px;
-    }
 }

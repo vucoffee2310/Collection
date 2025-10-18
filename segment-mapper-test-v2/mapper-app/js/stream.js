@@ -2,13 +2,12 @@ import { StreamingParser } from './parser.js';
 
 export class AIStream {
     constructor(dependencies) {
-        this.API_KEY = "AIzaSyCTpoqrJt3e7tSmo7-LS2fPAHlUPDEe9Zk";
+        this.API_KEY = "AIzaSyBjTyQ0kUUoLzkM4Qv3Bq5pT6QudSNGOSI";
         this.API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse&key=${this.API_KEY}`;
         
         this.mapper = dependencies.mapper;
         this.logger = dependencies.logger;
         this.sourceInputElement = dependencies.sourceInputElement;
-        this.sendToDebugWindow = dependencies.sendToDebugWindow;
         
         // State tracking callbacks
         this.onGenerationStart = dependencies.onGenerationStart;
@@ -280,15 +279,11 @@ export class AIStream {
         this.report.summary.segmentsParsed += batch.length;
         this.mapper.addTargetBatch(batch);
         
-        // Send to debug window AND call state tracking callback
+        // Use the callback to notify main.js about new segments
         batch.forEach(segment => {
-            // Track in main app state (for historical sync)
             if (this.onTargetSegment) {
                 this.onTargetSegment(segment);
             }
-            
-            // Send to debug window (real-time)
-            this.sendToDebugWindow('TARGET_SEGMENT', { segment });
         });
         
         // Continue processing if more segments exist

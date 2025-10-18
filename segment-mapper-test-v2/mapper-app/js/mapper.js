@@ -1,11 +1,13 @@
 import { throttle } from './utils.js';
 
 export class Mapper {
-    constructor(displayElement) {
+    constructor(displayElement, logger, sendToDebugWindowCallback) {
         this.source = [];
         this.target = [];
         this.targetPartial = null;
         this.displayElement = displayElement;
+        this.logger = logger;
+        this.sendToDebugWindow = sendToDebugWindowCallback || (() => {}); // No-op if not provided
         
         // Track rendered DOM elements for incremental updates
         this.renderedPairs = new Map(); // marker -> pair element
@@ -48,6 +50,23 @@ export class Mapper {
     }
     
     setTargetPartial(partial) { 
+        // Guard against the final null call from the stream controller
+        if (!partial) {
+            this.targetPartial = null;
+            return;
+        }
+
+        // Check for race condition: partial update received after final match
+        const pairElement = this.renderedPairs.get(partial.marker);
+        if (pairElement && pairElement.classList.contains('matched')) {
+            this.logger.warn(`[RACE_CONDITION] Partial update for ${partial.marker} received after it was already matched. Ignoring.`);
+            this.sendToDebugWindow('RACE_CONDITION_DETECTED', { 
+                marker: partial.marker, 
+                details: `Partial update received, but the segment was already in a 'matched' state.` 
+            });
+            return;
+        }
+
         // Only update if partial actually changed
         if (this.targetPartial?.marker !== partial?.marker || 
             this.targetPartial?.text !== partial?.text) {

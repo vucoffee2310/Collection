@@ -2,81 +2,92 @@
    MAIN LAYOUT STRUCTURE
    ================================= */
 
-/* Header Section */
-.header {
+/* App-level Header (Shared & Unified Style) */
+.app-header {
     flex-shrink: 0;
     display: flex;
-    justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
     gap: 20px;
     flex-wrap: wrap;
     background: #fff;
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid #ddd; /* Unified mapper-style border */
     z-index: 10;
+    position: sticky;
+    top: 0;
 }
 
-/* Main Container Grid */
-.main-container {
+#appTitle {
+    margin: 0;
+    margin-right: auto; /* Pushes other content to the right */
+    color: #333;
+    font-size: 24px; /* Matches original mapper h1 */
+    font-weight: normal;
+}
+
+.app-controls {
+    display: flex;
+    gap: 10px;
+}
+
+/* Debug Header Content Styling (Now simplified) */
+.debug-header-content {
+    display: none; /* Hidden by default */
+    align-items: center;
+    gap: 20px;
+}
+
+/* --- View-Switching Logic --- */
+body.debug-view-active .debug-header-content {
+    display: flex; /* Show debug header content */
+}
+
+body.debug-view-active #generateBtn {
+    display: none; /* Hide generate button in debug view */
+}
+
+/* App Container for views */
+.app-container {
     flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: #f4f4f4;
+}
+
+/* View switching */
+.view {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    padding: 20px; /* Consistent padding for all views */
+}
+
+.view.active-view {
+    display: block;
+}
+
+/* Main Container Grid (for Mapper View) */
+.main-container {
     display: grid;
     grid-template-columns: 2fr 1fr;
-    gap: 0;
+    gap: 20px;
+    height: 100%;
     overflow: hidden;
-    min-height: 0;
 }
 
-/* Column Layout */
+/* Column Layout (Mapper view only) */
 .content-column, 
 .sidebar-column {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    padding: 20px;
+    padding: 0; /* Padding is now on the .view container */
     overflow-y: auto;
     overflow-x: hidden;
-    min-height: 0;
-}
-
-.content-column {
-    background: #f4f4f4;
-    border-right: 2px solid #ddd;
-}
-
-.sidebar-column {
-    background: #fafafa;
-}
-
-/* Auto-grow sidebar panel */
-.sidebar-column .panel {
-    min-height: min-content;
-}
-
-/* Custom Scrollbars */
-.content-column::-webkit-scrollbar,
-.sidebar-column::-webkit-scrollbar,
-.details-pre::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-.content-column::-webkit-scrollbar-track,
-.sidebar-column::-webkit-scrollbar-track,
-.details-pre::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.content-column::-webkit-scrollbar-thumb,
-.sidebar-column::-webkit-scrollbar-thumb,
-.details-pre::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 5px;
-}
-
-.content-column::-webkit-scrollbar-thumb:hover,
-.sidebar-column::-webkit-scrollbar-thumb:hover,
-.details-pre::-webkit-scrollbar-thumb:hover {
-    background: #555;
 }
 
 /* Panel Component */
@@ -111,6 +122,33 @@
     border-color: #666;
 }
 
+/* Custom Scrollbars */
+.content-column::-webkit-scrollbar,
+.sidebar-column::-webkit-scrollbar,
+.view::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.content-column::-webkit-scrollbar-track,
+.sidebar-column::-webkit-scrollbar-track,
+.view::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.content-column::-webkit-scrollbar-thumb,
+.sidebar-column::-webkit-scrollbar-thumb,
+.view::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 5px;
+}
+
+.content-column::-webkit-scrollbar-thumb:hover,
+.sidebar-column::-webkit-scrollbar-thumb:hover,
+.view::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
     .main-container {
@@ -121,27 +159,20 @@
     .content-column {
         border-right: none;
         border-bottom: 2px solid #ddd;
-        max-height: 50vh;
-    }
-    
-    .sidebar-column {
-        max-height: 50vh;
     }
 }
 
 @media (max-width: 768px) {
-    .header {
+    .app-header {
         padding: 10px 15px;
     }
     
-    .header h1 {
+    #appTitle {
         font-size: 20px;
     }
     
-    .content-column, 
-    .sidebar-column {
+    .view {
         padding: 15px;
-        gap: 15px;
     }
     
     button {

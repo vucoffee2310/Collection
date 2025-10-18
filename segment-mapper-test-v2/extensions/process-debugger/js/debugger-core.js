@@ -1,5 +1,5 @@
 /**
- * Process Debugger Core - Complete implementation with all requirements
+ * Process Debugger Core - Integrated into single-page app
  */
 import { debounce, throttle, escapeHtml } from './debugger-utils.js';
 import { createWaitingEvent, createMatchedEvent, createOrphanEvent } from './debugger-events.js';
@@ -16,16 +16,12 @@ import {
 
 console.log('[Process Debugger] Module loaded');
 
-class ProcessDebugger {
+export class ProcessDebugger {
     constructor() {
-        // ============================================
         // CORE DATA STORAGE
-        // ============================================
         this.eventsByMarker = new Map();
         this.eventCount = 0;
         this.stats = { total: 0, matched: 0, orphan: 0, gap: 0 };
-
-        // Source/target segments
         this.sourceSegments = [];
         this.targetSegments = [];
         this.generationStartTime = null;
@@ -34,66 +30,52 @@ class ProcessDebugger {
         this.timelineContainer = document.getElementById('timeline-container');
         this.breakdownSection = document.getElementById('breakdownSection');
 
-        // ============================================
         // BATCH PROCESSING
-        // ============================================
         this.eventQueue = [];
         this.processingQueue = false;
         this.isSyncingHistorical = false;
 
-        // ============================================
         // SESSION TRACKING
-        // ============================================
         this.sessionStartTime = Date.now();
 
-        // ============================================
         // PERFORMANCE OPTIMIZATION
-        // ============================================
-        // Debounced breakdown render (waits for quiet period)
         this.debouncedBreakdownRender = debounce(() => this.renderMarkerBreakdown(), 150);
-        // Throttled stats update (max once per 200ms)
         this.throttledStatsUpdate = throttle(() => this.updateStatsDisplay(), 200);
 
         this.init();
     }
 
-    // ============================================
-    // INITIALIZATION
-    // ============================================
     init() {
         console.log('[Process Debugger] Initializing...');
         this.setupEventListeners();
-        this.setupMessageListener();
-        this.renderMarkerBreakdown();
-        this.notifyParent('DEBUG_READY');
-        console.log('[Process Debugger] Initialization complete - sent DEBUG_READY signal');
-    }
-
-    notifyParent(type, data = {}) {
-        if (window.opener) {
-            try {
-                window.opener.postMessage({ type, ...data }, '*');
-                console.log(`[Process Debugger] Sent ${type} to parent window`);
-            } catch (e) {
-                console.error(`[Process Debugger] Failed to notify parent with ${type}:`, e);
-            }
-        }
+        this.renderMarkerBreakdown(); // Initial render
+        console.log('[Process Debugger] Initialization complete.');
     }
 
     // ============================================
-    // EVENT LISTENERS
+    // PUBLIC API (Called from main.js)
+    // ============================================
+    handleSourceSegments(segments) {
+        console.log('[Process Debugger] 📥 Received source segments:', segments.length);
+        this.sourceSegments = segments;
+        this.targetSegments = []; // New source implies new generation
+        this.generationStartTime = Date.now();
+        document.getElementById('sourceCount').textContent = this.sourceSegments.length;
+        this.renderMarkerBreakdown();
+        console.log('[Process Debugger] ✅ Source segments loaded and rendered');
+    }
+    
+    // ============================================
+    // EVENT LISTENERS (for debugger's own UI)
     // ============================================
     setupEventListeners() {
-        // Clear button (in breakdown header)
         const clearBtn = document.getElementById('clearBtn');
         if (clearBtn) {
             clearBtn.onclick = (e) => {
-                e.stopPropagation(); // Prevent toggling breakdown section
+                e.stopPropagation();
                 this.clearEvents();
             };
         }
-
-        // Save log button
         const saveLogBtn = document.getElementById('saveLogBtn');
         if (saveLogBtn) {
             saveLogBtn.onclick = () => this.saveLog();
@@ -101,52 +83,16 @@ class ProcessDebugger {
         }
     }
 
-    setupMessageListener() {
-        window.addEventListener('message', (e) => {
-            console.log('[Process Debugger] Received message:', e.data.type);
-            
-            if (e.data.type === 'SOURCE_SEGMENTS') {
-                console.log('[Process Debugger] 📥 Received source segments:', e.data.segments.length);
-                this.sourceSegments = e.data.segments;
-                this.targetSegments = [];
-                this.generationStartTime = Date.now();
-                document.getElementById('sourceCount').textContent = this.sourceSegments.length;
-                this.renderMarkerBreakdown();
-                console.log('[Process Debugger] ✅ Source segments loaded and rendered');
-                
-            } else if (e.data.type === 'TARGET_SEGMENT') {
-                const segment = e.data.segment;
-                console.log('[Process Debugger] 📥 Received target segment:', segment.marker);
-                
-                if (!this.isSyncingHistorical && this.eventQueue.length === 0) {
-                    console.log('[Process Debugger] 🔄 Potentially starting historical sync...');
-                }
-                
-                this.targetSegments.push(segment);
-                this.queueSegment(segment);
-                
-            } else if (e.data.type === 'RESET') {
-                console.log('[Process Debugger] 🔄 Received reset command');
-                this.clearEvents();
-            }
-        });
-    }
-
     // ============================================
     // EVENT PROCESSING
     // ============================================
     queueSegment(segment) {
         this.eventQueue.push(segment);
-        
-        // Detect historical sync (many segments arriving rapidly)
         if (this.eventQueue.length > 20) {
             this.isSyncingHistorical = true;
-            console.log('[Process Debugger] 📦 Historical sync detected - buffering segments:', this.eventQueue.length);
         }
-
         if (!this.processingQueue) {
             this.processingQueue = true;
-            // Delay processing during historical sync to allow batching
             const delay = this.isSyncingHistorical ? 500 : 0;
             setTimeout(() => {
                 requestAnimationFrame(() => this.processQueue());
@@ -159,8 +105,6 @@ class ProcessDebugger {
             this.processingQueue = false;
             this.isSyncingHistorical = false;
             console.log('[Process Debugger] ✅ Queue processing complete');
-            
-            // Force immediate final render
             this.renderMarkerBreakdown();
             this.updateStatsDisplay();
             return;
@@ -168,13 +112,12 @@ class ProcessDebugger {
 
         const startTime = performance.now();
         const maxProcessingTime = this.isSyncingHistorical ? 50 : 16;
-        const batchSize = this.isSyncingHistorical ? 10 : 1;
-        let processedCount = 0;
 
         while (this.eventQueue.length > 0 && (performance.now() - startTime) < maxProcessingTime) {
             const segment = this.eventQueue.shift();
             this.eventCount++;
             this.stats.total++;
+            this.targetSegments.push(segment); // Keep track of targets
 
             const timestamp = new Date().toLocaleTimeString();
             const sourceMatch = this.sourceSegments.find(s => s.marker === segment.marker);
@@ -189,40 +132,28 @@ class ProcessDebugger {
             }
 
             this.storeEvent(segment.marker, eventData);
-            processedCount++;
         }
 
-        if (processedCount > 0) {
-            console.log('[Process Debugger] 📊 Processed batch:', processedCount, 'segments, Remaining:', this.eventQueue.length);
-            
-            // Update stats immediately (fast)
-            this.updateStatsDisplay();
-            
-            // Debounce breakdown (waits for burst to finish)
-            this.debouncedBreakdownRender();
-        }
+        this.updateStatsDisplay();
+        this.debouncedBreakdownRender();
 
         if (this.eventQueue.length > 0) {
-            // Continue processing
             const delay = this.isSyncingHistorical && this.eventQueue.length > 50 ? 100 : 0;
             setTimeout(() => {
                 requestAnimationFrame(() => this.processQueue());
             }, delay);
         } else {
-            // Queue empty - finalize
             this.processingQueue = false;
             if (this.isSyncingHistorical) {
-                console.log('[Process Debugger] ✅ Historical sync complete - processed', this.eventCount, 'total events');
+                console.log('[Process Debugger] ✅ Historical sync complete');
                 this.isSyncingHistorical = false;
             }
-            
-            // Cancel pending debounced call and render NOW
             this.debouncedBreakdownRender.cancel();
             this.renderMarkerBreakdown();
             this.updateStatsDisplay();
         }
     }
-
+    
     storeEvent(marker, eventData) {
         if (!this.eventsByMarker.has(marker)) {
             this.eventsByMarker.set(marker, []);
@@ -658,18 +589,4 @@ class ProcessDebugger {
         const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
         return `marker-${marker}-${status}-${date}-${time}.json`;
     }
-}
-
-// ============================================
-// INITIALIZE
-// ============================================
-console.log('[Process Debugger] Script loaded, waiting for DOM...');
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('[Process Debugger] DOM ready, initializing...');
-        new ProcessDebugger();
-    });
-} else {
-    console.log('[Process Debugger] DOM already ready, initializing...');
-    new ProcessDebugger();
 }

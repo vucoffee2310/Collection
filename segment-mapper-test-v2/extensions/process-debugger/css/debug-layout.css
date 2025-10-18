@@ -1,83 +1,14 @@
 /**
- * Debug Layout - Right-aligned header
+ * Debug Layout - Simplified for unified app style
  */
 
-html {
-    box-sizing: border-box;
-    scroll-behavior: smooth;
-}
-
-*, *::before, *::after {
-    box-sizing: inherit;
-}
-
-body {
-    min-height: 100vh;
-    background: #f4f4f4;
-    margin: 0;
-    padding: 0;
-    overflow-y: auto; /* Ensure vertical scrollbar appears when content overflows */
-}
-
 .debug-container {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding: 0 10px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Spacing between breakdown and timeline */
 }
 
-/* Compact sticky header */
+/* All header styling is now handled by mapper-app/css/layout.css */
 .header {
-    position: sticky;
-    top: 0;
-    background: #fff;
-    z-index: 100;
-    padding: 12px;
-    margin-bottom: 15px;
-    border-bottom: 2px solid #667eea;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Main flex container for all header items */
-.header-main-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end; /* Align all content to the right */
-    flex-wrap: wrap;
-    gap: 20px;
-}
-
-.header h1 {
-    margin: 0; /* REMOVED margin-right: auto */
-    color: #333;
-    font-size: 20px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.controls-row,
-.stats-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* On smaller screens, center the groups */
-@media (max-width: 1024px) {
-    .header-main-row {
-        justify-content: center;
-    }
-    .header h1 {
-        text-align: center;
-    }
-}
-
-@media (max-width: 768px) {
-    .header {
-        padding: 10px;
-    }
-    
-    .header h1 {
-        font-size: 18px;
-    }
+    display: none; /* Hide the old debug-specific header container */
 }

@@ -1,22 +1,20 @@
 /**
-* Debug Breakdown - Compact with unified legend
+* Debug Breakdown - Styled to match mapper's .panel component
 */
 .breakdown-section {
     background: #fff;
     border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-bottom: 15px;
-    padding: 0;
+    border-radius: 5px;
+    padding: 0; /* Padding will be on children */
 }
 
 .breakdown-header {
-    padding: 10px 15px;
-    font-weight: 600;
-    font-size: 14px;
+    font-size: 16px;
+    font-weight: normal;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
     cursor: pointer;
     user-select: none;
-    background: #f8f9fa;
-    border-radius: 4px;
     color: #333;
     display: flex;
     align-items: center;
@@ -24,13 +22,8 @@
     gap: 15px;
 }
 
-.breakdown-header:hover {
-    background: #e9ecef;
-}
-
 .breakdown-section[open] .breakdown-header {
-    border-bottom: 1px solid #ddd;
-    border-radius: 4px 4px 0 0;
+    margin-bottom: 15px;
 }
 
 .breakdown-title {
@@ -40,31 +33,21 @@
 
 /* Clear button inside breakdown header */
 .breakdown-header .clear-btn {
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    background: #dc3545;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    background: #dc3545; /* Retain danger color */
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.2s;
     white-space: nowrap;
     flex-shrink: 0;
-    opacity: 0.9;
-    position: relative;
-    z-index: 10;
 }
 
 .breakdown-header .clear-btn:hover {
     background: #c82333;
-    opacity: 1;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
-}
-
-.breakdown-header .clear-btn:active {
-    transform: translateY(0);
 }
 
 .breakdown-empty {
@@ -74,12 +57,12 @@
     font-style: italic;
 }
 
-/* Compact grid */
+/* Grid and cards padding is adjusted as parent padding changed */
 .breakdown-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     gap: 10px;
-    padding: 15px;
+    padding: 0 15px 15px 15px; /* Adjust padding */
 }
 
 .breakdown-card {
@@ -185,27 +168,4 @@
     font-size: 12px;
     color: #666;
     line-height: 1.6;
-}
-
-@media (max-width: 768px) {
-    .breakdown-header {
-        padding: 8px 12px;
-        font-size: 13px;
-    }
-    
-    .breakdown-header .clear-btn {
-        padding: 5px 10px;
-        font-size: 11px;
-    }
-    
-    .breakdown-grid {
-        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-        gap: 8px;
-        padding: 12px;
-    }
-    
-    .breakdown-card {
-        padding: 10px 6px;
-        font-size: 12px;
-    }
 }

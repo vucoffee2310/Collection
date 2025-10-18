@@ -1,27 +1,23 @@
 /**
-* Debug Controls - Compact design with circle stats
+* Debug Controls - Simplified to match mapper style
 */
 
-/* Compact buttons */
+/* Standardized button style for this section */
 .controls-row button {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    background: #333;
+    padding: 12px 30px; 
+    border: none; 
+    background: #333; 
     color: white;
-    font-size: 12px;
-    font-weight: 500;
-    transition: background 0.15s;
+    cursor: pointer; 
+    font-size: 14px; 
+    border-radius: 4px; 
     white-space: nowrap;
+    font-weight: 500;
+    transition: background 0.2s;
 }
 
-.controls-row button:hover {
-    background: #555;
-}
-
-.controls-row button:active {
-    transform: translateY(1px);
+.controls-row button:hover { 
+    background: #555; 
 }
 
 .controls-row button:disabled {
@@ -30,81 +26,32 @@
     opacity: 0.6;
 }
 
-/* Stats as circles */
-.stat-item {
-    position: relative;
+/* Stats as simple text blocks */
+.stats-row {
     display: flex;
-    justify-content: center;
-    cursor: pointer;
-    min-width: 50px;
-    height: 50px;
+    align-items: center;
+    gap: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    line-height: 1.2;
 }
 
 .stat-number {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 700;
-    background: #6c757d; /* Default color for AI Responses */
-    color: white;
-    transition: transform 0.2s ease-in-out;
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
 }
-
-.stat-item:hover .stat-number {
-    transform: scale(1.1);
-}
-
-/* Color overrides for specific stats */
-.stat-item.info .stat-number { background-color: #17a2b8; }
-.stat-item.matched .stat-number { background-color: #28a745; }
-.stat-item.orphan .stat-number { background-color: #dc3545; }
-.stat-item.gap .stat-number { background-color: #ffc107; color: #333; }
 
 .stat-label {
-    position: absolute;
-    bottom: -5px;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-5px);
-    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
-    background-color: #333;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    white-space: nowrap;
-    z-index: 10;
-}
-
-.stat-item:hover .stat-label {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-/* Performance indicator */
-.perf-indicator {
     font-size: 11px;
     color: #666;
-    padding: 4px 8px;
-    background: #f0f0f0;
-    border-radius: 3px;
-    font-family: 'Courier New', monospace;
-    white-space: nowrap;
+    text-transform: uppercase;
 }
 
-.perf-indicator.warning {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.perf-indicator.error {
-    background: #f8d7da;
-    color: #721c24;
-}
+/* Color coding for specific stats */
+.stat-item.info .stat-number { color: #17a2b8; }
+.stat-item.matched .stat-number { color: #28a745; }
+.stat-item.orphan .stat-number { color: #dc3545; }
+.stat-item.gap .stat-number { color: #ffc107; }
