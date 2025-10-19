@@ -14,67 +14,66 @@
 </head>
 <body>
   <header id="controls">
-    <div class="control-group file-inputs">
-      <div class="file-input-wrapper">
-        <label for="file-input" class="btn">Choose PDF</label>
-        <span id="pdf-file-name">No file selected</span>
-        <input type="file" id="file-input" accept=".pdf" hidden>
-      </div>
+    <div class="control-bar">
+      <label for="file-input" class="btn">PDF</label>
+      <input type="file" id="file-input" accept=".pdf" hidden>
+      <span id="pdf-file-name" class="filename">No file</span>
       
-      <div class="file-input-wrapper">
-        <label for="json-input" class="btn">Choose JSON</label>
-        <span id="json-file-name">Using default</span>
-        <input type="file" id="json-input" accept=".json" hidden>
-      </div>
+      <label for="json-input" class="btn">JSON</label>
+      <input type="file" id="json-input" accept=".json" hidden>
+      <span id="json-file-name" class="filename">Default</span>
       
-      <div class="file-input-wrapper coord-order-wrapper">
-        <span class="coord-label">Global:</span>
-        <div id="coord-display" class="coord-display" title="Global coordinate order">TLBR</div>
-        <div class="coord-buttons">
-          <button class="coord-btn" data-coord="T" title="Top">T</button>
-          <button class="coord-btn" data-coord="L" title="Left">L</button>
-          <button class="coord-btn" data-coord="B" title="Bottom">B</button>
-          <button class="coord-btn" data-coord="R" title="Right">R</button>
-        </div>
-      </div>
-    </div>
-    
-    <div class="control-group options">
-      <div class="theme-wrapper">
-        <span>Theme:</span>
-        <div id="palette-container"></div>
-      </div>
+      <span class="sep">|</span>
       
-      <div class="slider-wrapper">
-        <label for="opacity-slider">Opacity:</label>
+      <span class="label">Coord</span>
+      <div id="coord-display" class="coord-display">TLBR</div>
+      <button class="coord-btn" data-coord="T">T</button>
+      <button class="coord-btn" data-coord="L">L</button>
+      <button class="coord-btn" data-coord="B">B</button>
+      <button class="coord-btn" data-coord="R">R</button>
+      
+      <span class="sep">|</span>
+      
+      <span class="label">Palette</span>
+      <div id="palette-container"></div>
+      
+      <span class="sep">|</span>
+      
+      <div class="slider-compact">
+        <span class="slider-label">Opacity</span>
         <input type="range" id="opacity-slider" min="1" max="100" value="97">
         <span id="opacity-value">97%</span>
       </div>
       
-      <div class="slider-wrapper">
-        <label for="brightness-slider">Text:</label>
+      <div class="slider-compact">
+        <span class="slider-label">Text</span>
         <input type="range" id="brightness-slider" min="0" max="100" value="50">
         <span id="brightness-value">50%</span>
       </div>
       
-      <div class="slider-wrapper">
-        <label for="spacing-slider">Spacing:</label>
+      <div class="slider-compact">
+        <span class="slider-label">Space</span>
         <input type="range" id="spacing-slider" min="10" max="100" value="30">
         <span id="spacing-value">0.3em</span>
       </div>
-    </div>
-    
-    <div class="control-group actions">
-      <div class="expand-controls">
-        <input type="number" id="expand-amount" value="3" min="1" step="1" title="Expand all overlays">
-        <button id="expand-all-btn" class="btn">Expand All</button>
-      </div>
       
-      <button id="split-pdf-btn" class="btn btn-warning" title="Split PDF (Ctrl+Shift+S)">📄 Split PDF</button>
-      <button id="save-print-btn" class="btn" title="Print (Ctrl+Shift+P)">Print</button>
-      <button id="save-direct-pdf-btn" class="btn" title="Export PDF (Ctrl+Shift+E)">PDF Export</button>
-      <button id="save-html-btn" class="btn btn-primary" title="Export HTML (Ctrl+Shift+H)">HTML Export</button>
-      <span id="page-info">Please select a PDF file</span>
+      <span class="sep">|</span>
+      
+      <input type="number" id="expand-amount" value="5.5" min="1" step="0.5">
+      <button id="expand-all-btn" class="btn">Expand</button>
+      
+      <span class="sep">|</span>
+      
+      <button id="split-pdf-btn" class="btn">Split</button>
+      <button id="save-print-btn" class="btn">Print</button>
+      <button id="save-direct-pdf-btn" class="btn">PDF</button>
+      <button id="save-html-btn" class="btn btn-primary">HTML</button>
+      
+      <span class="sep">|</span>
+      
+      <span id="page-info" class="page-info">No PDF</span>
+      
+      <button id="theme-toggle" class="btn btn-icon" title="Toggle theme">◐</button>
     </div>
   </header>
 
@@ -82,10 +81,10 @@
     <div class="loading">Select a PDF file to begin</div>
   </main>
 
-  <div id="split-modal" class="modal" role="dialog" aria-modal="true">
+  <div id="split-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>📄 Split PDF Options</h2>
+        <h2>Split PDF Options</h2>
         <button class="modal-close" id="modal-close">&times;</button>
       </div>
       

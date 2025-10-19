@@ -39,7 +39,9 @@ export class PDFExporter {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       ctx.font = `${fontSize}px ${fontFamily}`;
-      const metrics = ctx.measureText('ẢĐỆÔỨỳ');
+      
+      // ✨ Use mixed characters including Vietnamese diacritics
+      const metrics = ctx.measureText('ÁẢÃÀẠĂẮẲẴẰẶÂẤẨẪẦẬÉẺẼÈẸÊẾỂỄỀỆgpqy');
       
       if (metrics.actualBoundingBoxAscent !== undefined && metrics.actualBoundingBoxDescent !== undefined) {
         const ratio = metrics.actualBoundingBoxAscent / 
@@ -51,8 +53,9 @@ export class PDFExporter {
       console.warn('Canvas metrics unavailable:', e);
     }
     
-    this._baselineCache.set(key, 0.75);
-    return 0.75;
+    // ✨ Better default for Open Sans
+    this._baselineCache.set(key, 0.78);
+    return 0.78;
   }
   
   _extractOverlay(overlay, wrapper) {
@@ -63,6 +66,10 @@ export class PDFExporter {
     const tStyle = getComputedStyle(textEl);
     const wRect = wrapper.getBoundingClientRect();
     const oRect = overlay.getBoundingClientRect();
+    
+    // ✨ Detect layout type
+    const isVertical = overlay.classList.contains('vertical-text');
+    const isSingleLine = overlay.classList.contains('single-line-layout');
     
     return {
       x: oRect.left - wRect.left,
@@ -84,17 +91,32 @@ export class PDFExporter {
       fontSize: parseFloat(tStyle.fontSize),
       fontStyle: this._fontStyle(tStyle.fontWeight, tStyle.fontStyle),
       align: tStyle.textAlign,
+      
+      // ✨ Capture spacing properties
+      letterSpacing: parseFloat(tStyle.letterSpacing) || 0,
+      wordSpacing: parseFloat(tStyle.wordSpacing) || 0,
+      lineHeight: tStyle.lineHeight === 'normal' 
+        ? parseFloat(tStyle.fontSize) * 1.15
+        : parseFloat(tStyle.lineHeight),
+      
       textElement: textEl,
-      wrapperRect: wRect
+      wrapperRect: wRect,
+      isVertical,
+      isSingleLine
     };
   }
   
-  _getLinePositions(element, wrapperRect) {
+  // ✨ NEW: Character-level positioning with spacing support
+  _getLinePositionsWithSpacing(element, wrapperRect) {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
     const range = document.createRange();
     const lines = [];
     const style = getComputedStyle(element);
     const baselineRatio = this._measureBaselineRatio(style.fontFamily, parseFloat(style.fontSize));
+    
+    // ✨ Check if custom letter-spacing is applied
+    const letterSpacing = parseFloat(style.letterSpacing) || 0;
+    const hasCustomSpacing = Math.abs(letterSpacing) > 0.1;
     
     let currentLine = null;
     let textNode;
@@ -102,11 +124,21 @@ export class PDFExporter {
     const finishLine = () => {
       if (currentLine?.text.trim()) {
         const height = currentLine.maxY - currentLine.minY;
-        lines.push({
+        
+        const lineData = {
           text: currentLine.text.trim(),
-          x: currentLine.minX - wrapperRect.left,
-          baseline: (currentLine.minY - wrapperRect.top) + (height * baselineRatio)
-        });
+          x: Math.round((currentLine.minX - wrapperRect.left) * 100) / 100,
+          baseline: Math.round(((currentLine.minY - wrapperRect.top) + (height * baselineRatio)) * 100) / 100
+        };
+        
+        // ✨ Store character positions for accurate spacing
+        if (hasCustomSpacing && currentLine.charPositions) {
+          lineData.charPositions = currentLine.charPositions.map(pos => 
+            Math.round((pos - wrapperRect.left) * 100) / 100
+          );
+        }
+        
+        lines.push(lineData);
       }
     };
     
@@ -119,7 +151,8 @@ export class PDFExporter {
           range.setEnd(textNode, i + 1);
           const rect = range.getBoundingClientRect();
           
-          if (currentLine && Math.abs(rect.top - currentLine.lastY) > 2) {
+          // New line detection
+          if (currentLine && Math.abs(rect.top - currentLine.lastY) > 3) {
             finishLine();
             currentLine = null;
           }
@@ -130,7 +163,8 @@ export class PDFExporter {
               minX: rect.left,
               minY: rect.top,
               maxY: rect.bottom,
-              lastY: rect.top
+              lastY: rect.top,
+              charPositions: hasCustomSpacing ? [rect.left] : null
             };
           } else {
             currentLine.text += nodeText[i];
@@ -138,6 +172,10 @@ export class PDFExporter {
             currentLine.minY = Math.min(currentLine.minY, rect.top);
             currentLine.maxY = Math.max(currentLine.maxY, rect.bottom);
             currentLine.lastY = rect.top;
+            
+            if (hasCustomSpacing) {
+              currentLine.charPositions.push(rect.left);
+            }
           }
         } catch (e) {
           if (currentLine) currentLine.text += nodeText[i];
@@ -151,20 +189,25 @@ export class PDFExporter {
   
   _extractLines(textElement, wrapperRect) {
     const blocks = textElement.querySelectorAll('.merged-text-block');
+    
     const process = (el) => {
       const text = el.textContent?.trim();
       if (!text) return null;
-      const lines = this._getLinePositions(el, wrapperRect);
+      const lines = this._getLinePositionsWithSpacing(el, wrapperRect);
       return lines.length ? { lines } : null;
     };
     
     const result = [];
+    
     if (blocks.length > 0) {
+      // Process each merged text block
+      // Line positions are already absolute and include CSS spacing
       blocks.forEach(block => {
         const data = process(block);
         if (data) result.push(data);
       });
     } else {
+      // Single text block (no merging)
       const data = process(textElement);
       if (data) result.push(data);
     }
@@ -176,27 +219,88 @@ export class PDFExporter {
     const opaque = new jspdf.GState({ opacity: 1 });
     
     overlays.forEach(o => {
+      // Background
       if (o.bg[3] > 0) {
         pdf.setGState(new jspdf.GState({ opacity: o.opacity * o.bg[3] }));
         pdf.setFillColor(...o.bg.slice(0, 3));
-        o.borderR > 0 
-          ? pdf.roundedRect(o.x, o.y, o.w, o.h, o.borderR, o.borderR, 'F')
-          : pdf.rect(o.x, o.y, o.w, o.h, 'F');
+        
+        // ✨ Only use rounded rect if radius is significant
+        if (o.borderR > 1) {
+          pdf.roundedRect(o.x, o.y, o.w, o.h, o.borderR, o.borderR, 'F');
+        } else {
+          pdf.rect(o.x, o.y, o.w, o.h, 'F');
+        }
       }
     });
     
+    // Borders (drawn separately for better layering)
     overlays.forEach(o => {
       if (o.borderW > 0 && o.border[3] > 0) {
         pdf.setGState(new jspdf.GState({ opacity: o.opacity }));
         pdf.setLineWidth(o.borderW);
         pdf.setDrawColor(...o.border.slice(0, 3));
-        o.borderR > 0
-          ? pdf.roundedRect(o.x, o.y, o.w, o.h, o.borderR, o.borderR, 'S')
-          : pdf.rect(o.x, o.y, o.w, o.h, 'S');
+        
+        if (o.borderR > 1) {
+          pdf.roundedRect(o.x, o.y, o.w, o.h, o.borderR, o.borderR, 'S');
+        } else {
+          pdf.rect(o.x, o.y, o.w, o.h, 'S');
+        }
       }
     });
     
     pdf.setGState(opaque);
+  }
+  
+  // ✨ NEW: Draw text with character positions
+  _drawTextWithCharPositions(pdf, o) {
+    this._extractLines(o.textElement, o.wrapperRect).forEach(block => {
+      block.lines.forEach(line => {
+        if (line.charPositions && line.charPositions.length > 0) {
+          // ✨ Draw using actual character positions from browser
+          const chars = line.text.split('');
+          chars.forEach((char, index) => {
+            const x = line.charPositions[index] || line.x;
+            pdf.text(char, x, line.baseline, { baseline: 'alphabetic' });
+          });
+        } else {
+          // Normal rendering
+          pdf.text(line.text, line.x, line.baseline, { baseline: 'alphabetic' });
+        }
+      });
+    });
+  }
+  
+  // ✨ NEW: Draw vertical text
+  _drawVerticalText(pdf, o) {
+    const text = o.textElement.textContent || '';
+    const centerX = o.x + o.w / 2;
+    const centerY = o.y + o.h / 2;
+    
+    pdf.saveGraphicsState();
+    
+    // For vertical text, we need to draw character by character vertically
+    if (Math.abs(o.letterSpacing) > 0.1) {
+      // Vertical with letter spacing
+      let currentY = centerY - (text.length * (o.fontSize + o.letterSpacing)) / 2;
+      
+      text.split('').forEach(char => {
+        pdf.text(char, centerX, currentY, {
+          angle: 90,
+          baseline: 'middle',
+          align: 'center'
+        });
+        currentY += o.fontSize + o.letterSpacing;
+      });
+    } else {
+      // Simple vertical text
+      pdf.text(text, centerX, centerY, {
+        angle: 90,
+        baseline: 'middle',
+        align: 'center'
+      });
+    }
+    
+    pdf.restoreGraphicsState();
   }
   
   _drawText(pdf, overlays) {
@@ -210,44 +314,15 @@ export class PDFExporter {
       pdf.setTextColor(...o.txt.slice(0, 3));
       pdf.setGState(new jspdf.GState({ opacity: o.opacity }));
       
-      const maxWidth = o.w - o.pad[1] - o.pad[2];
-      
-      this._extractLines(o.textElement, o.wrapperRect).forEach(block => {
-        block.lines.forEach((line, idx) => {
-          if (o.align === 'justify' && idx < block.lines.length - 1 && block.lines.length > 1) {
-            this._justify(pdf, line.text, line.x, line.baseline, maxWidth);
-          } else {
-            pdf.text(line.text, line.x, line.baseline, { baseline: 'alphabetic' });
-          }
-        });
-      });
+      // ✨ Handle different text types
+      if (o.isVertical) {
+        this._drawVerticalText(pdf, o);
+      } else {
+        this._drawTextWithCharPositions(pdf, o);
+      }
     });
     
     pdf.setGState(opaque);
-  }
-  
-  _justify(pdf, text, x, y, maxWidth) {
-    const words = text.trim().split(/\s+/);
-    if (words.length <= 1) {
-      pdf.text(text, x, y, { baseline: 'alphabetic' });
-      return;
-    }
-    
-    const wordWidths = words.map(w => pdf.getTextWidth(w));
-    const totalWordWidth = wordWidths.reduce((sum, w) => sum + w, 0);
-    
-    if (totalWordWidth > maxWidth * 0.95) {
-      pdf.text(text, x, y, { baseline: 'alphabetic' });
-      return;
-    }
-    
-    const spaceWidth = (maxWidth - totalWordWidth) / (words.length - 1);
-    let currentX = x;
-    
-    words.forEach((word, i) => {
-      pdf.text(word, currentX, y, { baseline: 'alphabetic' });
-      currentX += wordWidths[i] + spaceWidth;
-    });
   }
   
   async _preparePage(wrapper, pageNum) {
@@ -284,12 +359,25 @@ export class PDFExporter {
   
   async _embedFont(pdf) {
     const font = await this.pdf.loadFont();
-    if (!font) return;
+    if (!font) {
+      console.warn('Font not loaded, PDF will use default font');
+      return;
+    }
     
-    pdf.addFileToVFS(`${CONFIG.FONT.NAME}.ttf`, font);
-    ['normal', 'bold', 'italic', 'bolditalic'].forEach(style => {
-      pdf.addFont(`${CONFIG.FONT.NAME}.ttf`, CONFIG.FONT.NAME, style);
-    });
+    try {
+      // ✨ Add font to VFS
+      pdf.addFileToVFS(CONFIG.FONT.FILE, font);
+      
+      // ✨ Register for all styles
+      ['normal', 'bold', 'italic', 'bolditalic'].forEach(style => {
+        pdf.addFont(CONFIG.FONT.FILE, CONFIG.FONT.NAME, style);
+      });
+      
+      console.log(`Font "${CONFIG.FONT.NAME}" loaded successfully`);
+    } catch (e) {
+      console.error('Failed to embed font:', e);
+      alert('Warning: Could not embed custom font in PDF. Default font will be used.');
+    }
   }
   
   async _createPDF(wrapper) {

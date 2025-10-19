@@ -44,13 +44,15 @@ export class OverlayRenderer {
     const overlay = document.createElement('div');
     overlay.dataset.coords = coords;
     overlay.dataset.pageNum = page;
+    overlay.dataset.targetHeight = pos.height; // ✨ Store target height
     
     const isVertical = pos.width > 0 && (pos.height / pos.width) > CONFIG.OVERLAY.VERTICAL_THRESHOLD;
     const isSingleLine = !info.text.includes('<div') && !info.text.includes('\n');
     
     overlay.className = `overlay${isVertical ? ' vertical-text' : ''}${isSingleLine ? ' single-line-layout' : ''}`;
     
-    overlay.style.cssText = `left:${toPx(pos.left)};top:${toPx(pos.top)};width:${toPx(pos.width)};height:${toPx(pos.height)}`;
+    // ✨ Use fit-content for live view
+    overlay.style.cssText = `left:${toPx(pos.left)};top:${toPx(pos.top)};width:${toPx(pos.width)};height:fit-content`;
     
     const txt = document.createElement('span');
     txt.className = 'overlay-text';

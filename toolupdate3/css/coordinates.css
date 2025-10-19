@@ -1,117 +1,31 @@
-/* ===== GLOBAL COORDINATE CONTROLS ===== */
-.coord-order-wrapper {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-  align-items: center;
+/* Only theme transitions */
+.page-coord-controls, .page-coord-controls * {
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
-.coord-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 8px 0;
-  line-height: 1.4;
-}
-
-.coord-display {
-  min-width: 60px;
-  padding: 9px 10px;
-  border-radius: 6px;
-  border: 2px solid var(--blue);
-  background: var(--bg-darker);
-  color: var(--text-light);
-  font-size: 13px;
-  text-align: center;
-  font-family: monospace;
-  font-weight: bold;
-  letter-spacing: 2px;
-  line-height: 1.2;
-}
-
-.coord-buttons {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.coord-btn {
-  width: 28px;
-  height: 32px;
-  padding: 0;
-  border: 2px solid var(--gray-dark);
-  border-radius: 6px;
-  background: var(--bg-darker);
-  color: var(--text-light);
-  font-size: 13px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: monospace;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.coord-btn:hover {
-  background: var(--blue);
-  border-color: var(--blue);
-  transform: scale(1.1);
-}
-
-.coord-btn.used {
-  background: var(--gray);
-  border-color: var(--gray-dark);
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.coord-btn.used:hover {
-  transform: none;
-  background: var(--gray);
-}
-
-/* ===== PAGE COORDINATE CONTROLS ===== */
+/* Page Controls */
 .page-coord-controls {
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 100;
-  background: rgba(44, 62, 80, 0.95);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #ddd;
   padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  border-radius: 4px;
   min-width: 180px;
 }
 
-.page-coord-controls.preview-active {
-  background: rgba(243, 156, 18, 0.95);
-}
+body.dark-theme .page-coord-controls { background: rgba(43, 43, 43, 0.98); border-color: #555; }
+.page-coord-controls.preview-active { background: rgba(243, 156, 18, 0.98); border-color: #e67e22; }
 
-/* Coordinate Rows */
-.coord-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
+/* Rows */
+.coord-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.coord-row:last-child { margin-bottom: 0; }
 
-.coord-row:last-child {
-  margin-bottom: 0;
-}
-
-.coord-row-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 600;
-  min-width: 30px;
-}
-
-.page-coord-controls.preview-active .coord-row-label {
-  color: white;
-}
+.coord-row-label { font-size: 10px; color: #666; font-weight: 600; min-width: 30px; text-transform: uppercase; }
+body.dark-theme .coord-row-label { color: #999; }
+.page-coord-controls.preview-active .coord-row-label { color: white; }
 
 .page-coord-controls .coord-display {
   min-width: 55px;
@@ -119,114 +33,97 @@
   font-size: 11px;
   letter-spacing: 1.5px;
   flex: 1;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  color: #333;
+  font-family: monospace;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 3px;
 }
 
-.page-coord-controls .coord-display.overridden {
-  border-color: #e67e22;
-}
-
-.page-coord-controls.preview-active .coord-display {
-  border-color: white;
-  color: white;
-}
+body.dark-theme .page-coord-controls .coord-display { background: #333; border-color: #555; color: #e0e0e0; }
+.page-coord-controls .coord-display.overridden { border-color: #e67e22; background: #fff3e0; }
+body.dark-theme .page-coord-controls .coord-display.overridden { background: #4a3a2a; }
+.page-coord-controls.preview-active .coord-display { border-color: white; background: rgba(255, 255, 255, 0.2); color: white; }
 
 /* Reload Button */
 .coord-reload-btn {
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 2px solid var(--blue);
-  border-radius: 6px;
-  background: var(--bg-darker);
-  color: var(--blue);
+  border: 1px solid #999;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
   font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
 }
 
-.coord-reload-btn:hover {
-  background: var(--blue);
-  color: white;
-}
+body.dark-theme .coord-reload-btn { background: #3a3a3a; border-color: #555; color: #e0e0e0; }
+.coord-reload-btn:hover { background: #007bff; border-color: #007bff; color: white; }
+.page-coord-controls.preview-active .coord-reload-btn { border-color: white; color: white; background: rgba(255, 255, 255, 0.2); }
+.page-coord-controls.preview-active .coord-reload-btn:hover { background: white; color: #f39c12; }
 
-.page-coord-controls.preview-active .coord-reload-btn {
-  border-color: white;
-  color: white;
-  background: transparent;
-}
-
-.page-coord-controls.preview-active .coord-reload-btn:hover {
-  background: white;
-  color: #f39c12;
-}
-
-/* Preview Mode */
+/* Preview */
 .coord-preview-text {
   font-size: 10px;
-  color: white;
+  color: #666;
   padding: 6px;
-  background: rgba(0, 0, 0, 0.2);
+  background: #f0f0f0;
   border-radius: 4px;
   text-align: center;
   margin-bottom: 8px;
   display: none;
+  font-weight: 600;
 }
 
-.page-coord-controls.preview-active .coord-preview-text {
-  display: block;
-}
+body.dark-theme .coord-preview-text { background: #333; color: #999; }
+.page-coord-controls.preview-active .coord-preview-text { display: block; background: rgba(0, 0, 0, 0.2); color: white; }
 
 /* Action Buttons */
-.coord-action-row {
-  display: none;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.page-coord-controls.preview-active .coord-action-row {
-  display: flex;
-}
+.coord-action-row { display: none; gap: 6px; margin-bottom: 8px; }
+.page-coord-controls.preview-active .coord-action-row { display: flex; }
 
 .coord-action-btn {
   flex: 1;
   padding: 6px;
   font-size: 10px;
   font-weight: 600;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 4px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.2);
   color: white;
-  transition: background 0.2s;
 }
 
-.coord-action-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
+.coord-action-btn:hover { background: rgba(255, 255, 255, 0.3); }
+.coord-action-btn.primary { background: white; color: #f39c12; border-color: white; }
 
-.coord-action-btn.primary {
-  background: white;
-  color: #f39c12;
-}
-
-.coord-action-btn.primary:hover {
-  background: #ecf0f1;
-}
-
-/* Manual Buttons (Page-specific) */
-.page-coord-controls .coord-buttons {
-  gap: 4px;
-  justify-content: center;
-}
+/* Manual Buttons */
+.page-coord-controls .coord-buttons { gap: 4px; justify-content: center; display: flex; }
 
 .page-coord-controls .coord-btn {
   width: 32px;
   height: 28px;
   font-size: 11px;
+  background: #fff;
+  border: 1px solid #999;
+  color: #333;
+  padding: 0;
+  font-weight: 700;
+  font-family: monospace;
+  border-radius: 3px;
+  cursor: pointer;
 }
+
+body.dark-theme .page-coord-controls .coord-btn { background: #3a3a3a; border-color: #555; color: #e0e0e0; }
+.page-coord-controls .coord-btn:hover { background: #007bff; border-color: #007bff; color: white; }
+.page-coord-controls .coord-btn.used { background: #e0e0e0; border-color: #ccc; color: #999; cursor: not-allowed; opacity: 0.5; }
+body.dark-theme .page-coord-controls .coord-btn.used { background: #2a2a2a; border-color: #444; color: #666; }
 
 /* Cancel Button */
 .coord-cancel-btn {
@@ -245,22 +142,15 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
-  transition: background 0.2s;
+  font-weight: bold;
 }
 
-.page-coord-controls.preview-active .coord-cancel-btn {
-  display: flex;
-}
+body.dark-theme .coord-cancel-btn { border-color: #2b2b2b; }
+.page-coord-controls.preview-active .coord-cancel-btn { display: flex; }
+.coord-cancel-btn:hover { background: #c0392b; }
 
-.coord-cancel-btn:hover {
-  background: #c0392b;
-}
-
-/* Preview Mode Indicator */
-.page-wrapper.preview-mode {
-  outline: 3px solid #f39c12;
-  outline-offset: -3px;
-}
+/* Preview Indicator */
+.page-wrapper.preview-mode { outline: 3px solid #f39c12; outline-offset: -3px; }
 
 .page-wrapper.preview-mode::before {
   content: 'PREVIEW';

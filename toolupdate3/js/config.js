@@ -1,8 +1,8 @@
 export const CONFIG = {
   FONT: { 
-    NAME: 'Bookerly', 
-    FILE: 'Bookerly-Regular.ttf', 
-    URL: './Bookerly-Regular.ttf' 
+    NAME: 'Open Sans',
+    FILE: 'OpenSans_SemiCondensed-Medium.ttf',
+    URL: './OpenSans_SemiCondensed-Medium.ttf'
   },
   
   PDF: { 

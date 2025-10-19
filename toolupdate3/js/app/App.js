@@ -91,6 +91,20 @@ export class PDFOverlayApp {
       H: () => this.el.saveHtmlBtn?.click()
     };
     
+    // Theme toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      if (savedTheme === 'dark') document.body.classList.add('dark-theme');
+      
+      themeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('dark-theme');
+        localStorage.setItem('theme', 
+          document.body.classList.contains('dark-theme') ? 'dark' : 'light'
+        );
+      });
+    }
+    
     document.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && shortcuts[e.key.toUpperCase()]) {
         e.preventDefault();
