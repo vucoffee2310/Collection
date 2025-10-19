@@ -1,0 +1,275 @@
+/* Global Coordinate Controls */
+.coord-order-wrapper { 
+  display: flex;
+  gap: 8px; 
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.coord-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 0;
+  line-height: 1.4;
+}
+
+.coord-display {
+  min-width: 60px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 2px solid var(--blue);
+  background: var(--bg-darker);
+  color: var(--text-light);
+  font-size: 13px;
+  text-align: center;
+  font-family: monospace;
+  font-weight: bold;
+  letter-spacing: 2px;
+  line-height: 1.2;
+}
+
+.coord-buttons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.coord-btn {
+  width: 28px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid var(--gray-dark);
+  border-radius: 6px;
+  background: var(--bg-darker);
+  color: var(--text-light);
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coord-btn:hover { 
+  background: var(--blue); 
+  border-color: var(--blue); 
+  transform: scale(1.1); 
+}
+
+.coord-btn.used { 
+  background: var(--gray); 
+  border-color: var(--gray-dark); 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+}
+
+.coord-btn.used:hover { 
+  transform: none; 
+  background: var(--gray); 
+}
+
+/* Page Coordinate Controls */
+.page-coord-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  background: rgba(44, 62, 80, 0.95);
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  min-width: 180px;
+}
+
+.page-coord-controls.preview-active {
+  background: rgba(243, 156, 18, 0.95);
+}
+
+/* Coordinate Rows */
+.coord-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.coord-row:last-child {
+  margin-bottom: 0;
+}
+
+.coord-row-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+  min-width: 30px;
+}
+
+.page-coord-controls.preview-active .coord-row-label {
+  color: white;
+}
+
+.page-coord-controls .coord-display {
+  min-width: 55px;
+  padding: 6px 8px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  flex: 1;
+}
+
+.page-coord-controls .coord-display.overridden {
+  border-color: #e67e22;
+}
+
+.page-coord-controls.preview-active .coord-display {
+  border-color: white;
+  color: white;
+}
+
+/* Reload Button */
+.coord-reload-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--blue);
+  border-radius: 6px;
+  background: var(--bg-darker);
+  color: var(--blue);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coord-reload-btn:hover {
+  background: var(--blue);
+  color: white;
+}
+
+.page-coord-controls.preview-active .coord-reload-btn {
+  border-color: white;
+  color: white;
+  background: transparent;
+}
+
+.page-coord-controls.preview-active .coord-reload-btn:hover {
+  background: white;
+  color: #f39c12;
+}
+
+/* Preview Mode */
+.coord-preview-text {
+  font-size: 10px;
+  color: white;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  text-align: center;
+  margin-bottom: 8px;
+  display: none;
+}
+
+.page-coord-controls.preview-active .coord-preview-text {
+  display: block;
+}
+
+/* Action Buttons */
+.coord-action-row {
+  display: none;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.page-coord-controls.preview-active .coord-action-row {
+  display: flex;
+}
+
+.coord-action-btn {
+  flex: 1;
+  padding: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.coord-action-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.coord-action-btn.primary {
+  background: white;
+  color: #f39c12;
+}
+
+.coord-action-btn.primary:hover {
+  background: #ecf0f1;
+}
+
+/* Manual Buttons (Page-specific) */
+.page-coord-controls .coord-buttons {
+  gap: 4px;
+  justify-content: center;
+}
+
+.page-coord-controls .coord-btn {
+  width: 32px;
+  height: 28px;
+  font-size: 11px;
+}
+
+/* Cancel Button */
+.coord-cancel-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e74c3c;
+  border: 2px solid white;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.page-coord-controls.preview-active .coord-cancel-btn {
+  display: flex;
+}
+
+.coord-cancel-btn:hover {
+  background: #c0392b;
+}
+
+/* Preview Mode Indicator */
+.page-wrapper.preview-mode {
+  outline: 3px solid #f39c12;
+  outline-offset: -3px;
+}
+
+.page-wrapper.preview-mode::before {
+  content: 'PREVIEW';
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #f39c12;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 99;
+  letter-spacing: 1px;
+}
