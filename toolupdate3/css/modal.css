@@ -1,4 +1,4 @@
-/* Modal Base */
+/* ===== MODAL BASE ===== */
 .modal {
   display: none;
   position: fixed;
@@ -19,7 +19,7 @@
   to { opacity: 1; }
 }
 
-/* Modal Content */
+/* ===== MODAL CONTENT ===== */
 .modal-content {
   background: var(--bg-dark);
   border-radius: 12px;
@@ -38,9 +38,12 @@
 
 .modal-content::-webkit-scrollbar { width: 8px; }
 .modal-content::-webkit-scrollbar-track { background: var(--bg-darker); }
-.modal-content::-webkit-scrollbar-thumb { background: var(--gray-dark); border-radius: 4px; }
+.modal-content::-webkit-scrollbar-thumb { 
+  background: var(--gray-dark); 
+  border-radius: 4px; 
+}
 
-/* Modal Header */
+/* ===== MODAL HEADER ===== */
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -76,12 +79,12 @@
   color: #e74c3c;
 }
 
-/* Modal Body */
+/* ===== MODAL BODY ===== */
 .modal-body {
   padding: 24px;
 }
 
-/* Split Options */
+/* ===== SPLIT OPTIONS ===== */
 .split-option {
   margin-bottom: 16px;
   padding: 16px;
@@ -120,7 +123,7 @@
   font-size: 13px;
 }
 
-/* Option Inputs */
+/* ===== OPTION INPUTS ===== */
 .option-input {
   margin-top: 12px;
   padding-top: 12px;
@@ -165,7 +168,7 @@
   margin-top: 4px;
 }
 
-/* Modal Info */
+/* ===== MODAL INFO ===== */
 .modal-info {
   margin-top: 24px;
   padding: 16px;
@@ -185,7 +188,7 @@
   font-weight: 600;
 }
 
-/* Modal Footer */
+/* ===== MODAL FOOTER ===== */
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -198,7 +201,7 @@
   min-width: 100px;
 }
 
-/* Responsive */
+/* ===== RESPONSIVE ===== */
 @media (max-width: 640px) {
   .modal-content {
     width: 95%;
@@ -215,7 +218,9 @@
   }
 }
 
-/* Print */
+/* ===== PRINT ===== */
 @media print {
-  .modal { display: none !important; }
+  .modal { 
+    display: none !important; 
+  }
 }

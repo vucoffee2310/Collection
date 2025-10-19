@@ -1,7 +1,7 @@
-/* Global Coordinate Controls */
-.coord-order-wrapper { 
+/* ===== GLOBAL COORDINATE CONTROLS ===== */
+.coord-order-wrapper {
   display: flex;
-  gap: 8px; 
+  gap: 8px;
   flex-wrap: nowrap;
   align-items: center;
 }
@@ -55,25 +55,25 @@
   justify-content: center;
 }
 
-.coord-btn:hover { 
-  background: var(--blue); 
-  border-color: var(--blue); 
-  transform: scale(1.1); 
+.coord-btn:hover {
+  background: var(--blue);
+  border-color: var(--blue);
+  transform: scale(1.1);
 }
 
-.coord-btn.used { 
-  background: var(--gray); 
-  border-color: var(--gray-dark); 
-  opacity: 0.5; 
-  cursor: not-allowed; 
+.coord-btn.used {
+  background: var(--gray);
+  border-color: var(--gray-dark);
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.coord-btn.used:hover { 
-  transform: none; 
-  background: var(--gray); 
+.coord-btn.used:hover {
+  transform: none;
+  background: var(--gray);
 }
 
-/* Page Coordinate Controls */
+/* ===== PAGE COORDINATE CONTROLS ===== */
 .page-coord-controls {
   position: absolute;
   top: 10px;
@@ -82,7 +82,7 @@
   background: rgba(44, 62, 80, 0.95);
   padding: 10px;
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
   min-width: 180px;
 }
 
@@ -144,6 +144,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
 }
 
 .coord-reload-btn:hover {
@@ -199,6 +200,7 @@
   cursor: pointer;
   background: rgba(255, 255, 255, 0.2);
   color: white;
+  transition: background 0.2s;
 }
 
 .coord-action-btn:hover {
@@ -243,6 +245,7 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  transition: background 0.2s;
 }
 
 .page-coord-controls.preview-active .coord-cancel-btn {

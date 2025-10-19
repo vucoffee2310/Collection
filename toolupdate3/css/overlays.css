@@ -1,4 +1,4 @@
-/* Overlay Base */
+/* ===== OVERLAY BASE ===== */
 .overlay {
   position: absolute;
   background: var(--overlay-bg);
@@ -14,15 +14,17 @@
   border-radius: 3px;
   display: flex;
   align-items: center;
+  /* Let browser calculate padding naturally */
+  padding: 0.1vw 0.1vw;
 }
 
-.overlay:hover { 
-  box-shadow: 0 0 12px rgba(52, 152, 219, 0.8); 
-  transform: scale(1.01); 
-  z-index: 200; 
+.overlay:hover {
+  box-shadow: 0 0 12px rgba(52, 152, 219, 0.8);
+  transform: scale(1.01);
+  z-index: 200;
 }
 
-/* Overlay Text */
+/* ===== OVERLAY TEXT ===== */
 .overlay-text {
   width: 100%;
   text-align: justify;
@@ -36,24 +38,24 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* Layout Variants */
-.overlay.single-line-layout { 
-  justify-content: flex-start; 
+/* ===== LAYOUT VARIANTS ===== */
+.overlay.single-line-layout {
+  justify-content: flex-start;
 }
 
-.overlay.single-line-layout .overlay-text { 
-  width: auto; 
-  text-align: left; 
+.overlay.single-line-layout .overlay-text {
+  width: auto;
+  text-align: left;
 }
 
 /* Merged Text Blocks */
-.merged-text-block:not(:last-child) { 
-  margin-bottom: var(--paragraph-spacing); 
+.merged-text-block:not(:last-child) {
+  margin-bottom: var(--paragraph-spacing);
 }
 
 /* Vertical Text */
-.overlay.vertical-text { 
-  justify-content: center; 
+.overlay.vertical-text {
+  justify-content: center;
 }
 
 .overlay.vertical-text .overlay-text {
@@ -64,14 +66,14 @@
   line-height: 1;
 }
 
-/* Delete Button */
+/* ===== DELETE BUTTON ===== */
 .delete-overlay-btn {
   position: absolute;
-  top: -1px; 
+  top: -1px;
   right: -1px;
-  width: 22px; 
+  width: 22px;
   height: 22px;
-  border: 1px solid rgba(255,255,255,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   background: rgba(211, 84, 0, 0.8);
   color: white;
@@ -90,13 +92,13 @@
   align-items: center;
 }
 
-.overlay:hover .delete-overlay-btn { 
-  opacity: 1; 
-  visibility: visible; 
-  transform: scale(1); 
+.overlay:hover .delete-overlay-btn {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
 }
 
-.delete-overlay-btn:hover { 
-  background: rgba(231, 76, 60, 1); 
-  transform: scale(1.1); 
+.delete-overlay-btn:hover {
+  background: rgba(231, 76, 60, 1);
+  transform: scale(1.1);
 }

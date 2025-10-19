@@ -1,77 +1,81 @@
 import { CONFIG } from '../config.js';
 
 export class CoordinateManager {
-    constructor(stateManager) {
-        this.state = stateManager;
-        this.current = '';
+  constructor(stateManager) {
+    this.state = stateManager;
+    this.currentOrder = '';
+    this.el = {
+      display: document.getElementById('coord-display'),
+      buttons: document.querySelectorAll('#controls .coord-btn')
+    };
+  }
+  
+  initialize() {
+    this.state.setGlobalCoordinateOrder(CONFIG.DEFAULT_COORDINATE_ORDER);
+    this._updateDisplay(CONFIG.DEFAULT_COORDINATE_ORDER);
+    this.el.buttons?.forEach(btn => 
+      btn.addEventListener('click', () => this._addCoordinate(btn.dataset.coord))
+    );
+  }
+  
+  _addCoordinate(letter) {
+    if (this.currentOrder.includes(letter) || this.currentOrder.length >= 4) return;
+    
+    this.currentOrder += letter;
+    this._updateDisplay(this.currentOrder);
+    
+    this.el.buttons.forEach(b => {
+      if (b.dataset.coord === letter) b.classList.add('used');
+    });
+    
+    if (this.currentOrder.length === 4) {
+      setTimeout(() => this._applyOrder(), 300);
+    }
+  }
+  
+  _updateDisplay(order) {
+    if (this.el.display) {
+      this.el.display.textContent = order || '____';
+      this.el.display.style.borderColor = order.length === 4 ? 'var(--blue)' : 'var(--gray-dark)';
+    }
+  }
+  
+  async _applyOrder() {
+    const order = this.currentOrder.toUpperCase().trim();
+    
+    // Validate using Set for O(1) lookup
+    const chars = new Set(order.split(''));
+    const required = new Set(['T', 'L', 'B', 'R']);
+    
+    if (chars.size !== 4 || ![...required].every(c => chars.has(c))) {
+      alert('Invalid coordinate order: must contain T, L, B, R exactly once');
+      this._reset();
+      return;
     }
     
-    initialize() {
-        this.state.setGlobalCoordinateOrder(CONFIG.DEFAULT_COORDINATE_ORDER);
-        this._updateDisplay(CONFIG.DEFAULT_COORDINATE_ORDER);
-        
-        document.querySelectorAll('#controls .coord-btn').forEach(btn =>
-            btn.onclick = () => this._addCoord(btn.dataset.coord));
+    try {
+      this.state.setGlobalCoordinateOrder(order);
+      document.dispatchEvent(new CustomEvent('coordinateOrderChanged'));
+      this._reset();
+      this._updateDisplay(order);
+    } catch (error) {
+      alert(`Invalid coordinate order: ${error.message}`);
+      this._reset();
     }
-    
-    _addCoord(letter) {
-        if (this.current.includes(letter)) return;
-        
-        this.current += letter;
-        this._updateDisplay(this.current);
-        
-        const btn = Array.from(document.querySelectorAll('#controls .coord-btn'))
-            .find(b => b.dataset.coord === letter);
-        if (btn) btn.classList.add('used');
-        
-        if (this.current.length === 4) {
-            setTimeout(() => this._apply(), 300);
-        }
-    }
-    
-    _updateDisplay(order) {
-        const display = document.getElementById('coord-display');
-        if (display) {
-            display.textContent = order || '____';
-            display.style.borderColor = order.length === 4 ? 'var(--blue)' : 'var(--gray-dark)';
-        }
-    }
-    
-    _clear() {
-        this.current = '';
-        this._updateDisplay('');
-        document.querySelectorAll('#controls .coord-btn').forEach(b => b.classList.remove('used'));
-    }
-    
-    async _apply() {
-        const order = this.current.trim();
-        if (order.length !== 4) return;
-        
-        try {
-            if (!this.validateCoordinateOrder(order)) {
-                throw new Error('Invalid coordinate order');
-            }
-            
-            const normalized = order.toUpperCase();
-            this.state.setGlobalCoordinateOrder(normalized);
-            document.dispatchEvent(new CustomEvent('coordinateOrderChanged'));
-            
-            this._clear();
-            this._updateDisplay(normalized);
-        } catch (e) {
-            alert(`Invalid coordinate order: ${e.message}`);
-            this._clear();
-        }
-    }
-    
-    validateCoordinateOrder(order) {
-        if (order.length !== 4) return false;
-        const chars = order.toUpperCase().split('');
-        return ['T', 'L', 'B', 'R'].every(req => chars.includes(req)) && 
-               new Set(chars).size === 4;
-    }
-    
-    normalizeCoordinateOrder(order) {
-        return order.toUpperCase().trim();
-    }
+  }
+  
+  _reset() {
+    this.currentOrder = '';
+    this.el.buttons?.forEach(btn => btn.classList.remove('used'));
+  }
+  
+  validateCoordinateOrder(order) {
+    if (order.length !== 4) return false;
+    const chars = new Set(order.toUpperCase().split(''));
+    return chars.size === 4 && ['T', 'L', 'B', 'R'].every(c => chars.has(c));
+  }
+  
+  normalizeCoordinateOrder(order) {
+    return order.toUpperCase().trim();
+  }
 }
