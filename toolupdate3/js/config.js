@@ -24,17 +24,15 @@ export const CONFIG = {
   
   DEFAULT_COORDINATE_ORDER: 'TLBR',
   
-  // Only the 6 most common coordinate orderings (covers 98% of use cases)
   COORDINATE_ORDERINGS: [
-    'TLBR', // Top-Left-Bottom-Right (Default - most common)
-    'LTRB', // Left-Top-Right-Bottom (x1,y1,x2,y2 - common)
-    'LBRT', // Left-Bottom-Right-Top (Bottom-origin - PostScript/PDF)
-    'BLTR', // Bottom-Left-Top-Right (Canvas coords)
-    'TRBL', // Top-Right-Bottom-Left (RTL languages)
-    'TBRL', // Top-Bottom-Right-Left (vertical text)
+    'TLBR',
+    'LTRB',
+    'LBRT',
+    'BLTR',
+    'TRBL',
+    'TBRL',
   ].map(order => ({ order, name: order.split('').join('-') })),
   
-  // Condensed color palettes - [bg, text, border, opacity]
   COLOR_PALETTES: {
     cream: [[254, 250, 234], [60, 50, 40], [230, 220, 200], 97],
     sepia: [[244, 237, 219], [74, 59, 44], [220, 210, 190], 96],

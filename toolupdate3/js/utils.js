@@ -20,12 +20,10 @@ export const throttle = (fn, limit = 100) => {
   };
 };
 
-// Simplified UI update - single RAF + setTimeout is sufficient
 export const forceUIUpdate = () => new Promise(resolve => {
   requestAnimationFrame(() => setTimeout(resolve, 0));
 });
 
-// Button state manager - simplified closure approach
 export const createButtonHandler = (btn, asyncFn) => async () => {
   if (btn.disabled) return;
   
@@ -44,7 +42,7 @@ export const createButtonHandler = (btn, asyncFn) => async () => {
   }
 };
 
-// Coordinate parsing - simplified without cache for <1000 items
+// Coordinate parsing
 const coordMap = { T: 0, L: 1, B: 2, R: 3 };
 
 export const parseCoords = (str, order = CONFIG.DEFAULT_COORDINATE_ORDER) => {
@@ -69,6 +67,8 @@ export const coordinatesToOrder = (tlbr, order = CONFIG.DEFAULT_COORDINATE_ORDER
 export const checkOverflow = (el, tol = 1) => 
   el.scrollHeight > el.clientHeight + tol || el.scrollWidth > el.clientWidth + tol;
 
+export const toPx = (v) => `${v}px`;
+
 export const calculateOverlayPosition = ({
   coords, containerWidth, containerHeight, minHeight = 0, coordOrder
 }) => {
@@ -84,8 +84,6 @@ export const calculateOverlayPosition = ({
   };
 };
 
-export const toPercent = (v, t) => t > 0 ? `${(v / t) * 100}%` : '0%';
-
 // File utilities
 export const readFile = (file, method) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -94,7 +92,7 @@ export const readFile = (file, method) => new Promise((resolve, reject) => {
   reader[method](file);
 });
 
-// Page specification parser - merged validation
+// Page specification parser
 export const parsePageSpec = (spec, maxPage = Infinity) => {
   if (!spec || typeof spec !== 'string') return [];
   

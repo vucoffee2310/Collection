@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { checkOverflow } from '../utils.js';
+import { checkOverflow, toPx } from '../utils.js';
 
 export class FontSizeCalculator {
   constructor() {
@@ -41,19 +41,9 @@ export class FontSizeCalculator {
   }
   
   _apply(overlay, px) {
-    const wrapper = overlay.closest('.page-wrapper');
     const txt = overlay.querySelector('.overlay-text');
-    
     if (txt) txt.style.fontSize = '';
-    
-    if (wrapper) {
-      const base = parseFloat(getComputedStyle(wrapper).fontSize);
-      if (base > 0) {
-        overlay.style.fontSize = `${(px / base) * 100}%`;
-        return;
-      }
-    }
-    overlay.style.fontSize = `${px}px`;
+    overlay.style.fontSize = toPx(px);
   }
   
   _findOptimal(txt, cont) {
@@ -65,11 +55,11 @@ export class FontSizeCalculator {
     
     let guess = Math.max(MIN, Math.min(MAX, Math.sqrt(area / len) * 1.8));
     
-    txt.style.fontSize = `${guess}px`;
+    txt.style.fontSize = toPx(guess);
     
     if (!checkOverflow(cont, 0.5)) {
       let upperBound = Math.min(MAX, guess * 1.5);
-      txt.style.fontSize = `${upperBound}px`;
+      txt.style.fontSize = toPx(upperBound);
       if (checkOverflow(cont, 0.5)) {
         return this._binarySearch(txt, cont, guess, upperBound);
       }
@@ -87,7 +77,7 @@ export class FontSizeCalculator {
     
     for (let i = 0; i < maxIter && high - low > tol; i++) {
       const mid = (low + high) / 2;
-      txt.style.fontSize = `${mid}px`;
+      txt.style.fontSize = toPx(mid);
       
       if (checkOverflow(cont, 0.5)) {
         high = mid;

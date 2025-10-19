@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { calculateOverlayPosition, toPercent, debounce } from '../utils.js';
+import { calculateOverlayPosition, toPx, debounce } from '../utils.js';
 
 export class OverlayRenderer {
   constructor(state, fontCalc) {
@@ -11,7 +11,6 @@ export class OverlayRenderer {
     const pageData = data[`page_${page}`];
     if (!pageData) return;
     
-    // Remove old overlays
     wrapper.querySelectorAll('.overlay').forEach(el => el.remove());
     
     const coordOrder = this.state.getPageCoordinateOrder(page);
@@ -34,7 +33,6 @@ export class OverlayRenderer {
   _create(coords, info, page, w, h, coordOrder) {
     if (w <= 0 || h <= 0) return document.createElement('div');
     
-    // IMPROVED: More precise positioning calculation
     const pos = calculateOverlayPosition({
       coords,
       containerWidth: w,
@@ -47,21 +45,13 @@ export class OverlayRenderer {
     overlay.dataset.coords = coords;
     overlay.dataset.pageNum = page;
     
-    // Determine layout classes
     const isVertical = pos.width > 0 && (pos.height / pos.width) > CONFIG.OVERLAY.VERTICAL_THRESHOLD;
     const isSingleLine = !info.text.includes('<div') && !info.text.includes('\n');
     
     overlay.className = `overlay${isVertical ? ' vertical-text' : ''}${isSingleLine ? ' single-line-layout' : ''}`;
     
-    // IMPROVED: More precise positioning with sub-pixel accuracy
-    const left = toPercent(pos.left, w);
-    const top = toPercent(pos.top, h);
-    const width = toPercent(pos.width, w);
-    const height = toPercent(pos.height, h);
+    overlay.style.cssText = `left:${toPx(pos.left)};top:${toPx(pos.top)};width:${toPx(pos.width)};height:${toPx(pos.height)}`;
     
-    overlay.style.cssText = `left:${left};top:${top};width:${width};height:${height}`;
-    
-    // Create text element
     const txt = document.createElement('span');
     txt.className = 'overlay-text';
     txt.contentEditable = true;
@@ -72,7 +62,6 @@ export class OverlayRenderer {
       txt.textContent = info.text;
     }
     
-    // Debounced text update
     const updateText = debounce(e => {
       const o = e.target.closest('.overlay');
       if (!o) return;
@@ -87,7 +76,6 @@ export class OverlayRenderer {
     
     txt.addEventListener('blur', updateText);
     
-    // Delete button
     const del = document.createElement('button');
     del.className = 'delete-overlay-btn';
     del.innerHTML = '&times;';

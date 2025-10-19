@@ -1,4 +1,4 @@
-import { forceUIUpdate } from '../utils.js';
+import { forceUIUpdate, toPx } from '../utils.js';
 
 export class Exporters {
   constructor(pdf) {
@@ -6,7 +6,6 @@ export class Exporters {
   }
   
   async _canvasToDataURL(canvas, format = 'image/webp', quality = 0.85) {
-    // Use OffscreenCanvas if available for better performance
     if ('OffscreenCanvas' in window && canvas instanceof HTMLCanvasElement) {
       const offscreen = canvas.transferControlToOffscreen?.();
       if (offscreen) canvas = offscreen;
@@ -28,27 +27,52 @@ export class Exporters {
     });
   }
   
-  _extractOverlayHTML(overlay, baseVw) {
+  _extractOverlayHTML(overlay, wrapper) {
     const overlayStyle = getComputedStyle(overlay);
     const textEl = overlay.querySelector('.overlay-text');
     if (!textEl) return '';
     
     const textStyle = getComputedStyle(textEl);
-    const fontSize = parseFloat(overlay.style.fontSize) || 100;
-    const fontSizePercent = ((fontSize / 100) * baseVw / baseVw) * 100;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const overlayRect = overlay.getBoundingClientRect();
+    
+    const left = overlayRect.left - wrapperRect.left;
+    const top = overlayRect.top - wrapperRect.top;
+    const width = overlayRect.width;
+    const height = overlayRect.height;
+    const fontSize = parseFloat(textStyle.fontSize);
+    const borderWidth = parseFloat(overlayStyle.borderWidth) || 1;
+    const borderRadius = parseFloat(overlayStyle.borderRadius) || 3;
+    const padding = parseFloat(overlayStyle.padding) || 1;
     
     const styles = [
-      `left:${overlay.style.left}`,
-      `top:${overlay.style.top}`,
-      `width:${overlay.style.width}`,
-      `height:${overlay.style.height}`,
+      `position:absolute`,
+      `left:${toPx(left)}`,
+      `top:${toPx(top)}`,
+      `width:${toPx(width)}`,
+      `height:${toPx(height)}`,
       `background-color:${overlayStyle.backgroundColor}`,
-      `border-color:${overlayStyle.borderColor}`,
+      `border:${toPx(borderWidth)} solid ${overlayStyle.borderColor}`,
+      `border-radius:${toPx(borderRadius)}`,
       `color:${textStyle.color}`,
-      `font-size:${fontSizePercent}%`
+      `font-size:${toPx(fontSize)}`,
+      `font-family:${textStyle.fontFamily}`,
+      `line-height:${textStyle.lineHeight}`,
+      `padding:${toPx(padding)}`,
+      `display:flex`,
+      `flex-direction:column`,
+      `justify-content:${overlayStyle.justifyContent || 'flex-start'}`,
+      `align-items:${overlayStyle.alignItems || 'center'}`,
+      `white-space:pre-wrap`,
+      `word-wrap:break-word`,
+      `overflow:hidden`
     ].join(';');
     
-    return `<div class="overlay" style="${styles}"><div class="overlay-text">${textEl.innerHTML || ''}</div></div>`;
+    const textAlign = textStyle.textAlign || 'justify';
+    const alignSelf = textStyle.alignSelf || 'stretch';
+    const textWidth = textStyle.width;
+    
+    return `<div class="overlay" style="${styles}"><div class="overlay-text" style="width:${textWidth};text-align:${textAlign};align-self:${alignSelf}">${textEl.innerHTML || ''}</div></div>`;
   }
   
   async _generatePageHTML(wrapper, pageNum) {
@@ -56,17 +80,18 @@ export class Exporters {
     if (!canvas) return '';
     
     const imageData = await this._canvasToDataURL(canvas);
-    const baseVw = wrapper.clientWidth / 100;
     
     const overlaysHTML = Array.from(wrapper.querySelectorAll('.overlay'))
-      .map(ov => this._extractOverlayHTML(ov, baseVw))
+      .map(ov => this._extractOverlayHTML(ov, wrapper))
       .filter(html => html)
       .join('\n    ');
     
     const aspectRatio = canvas.width / canvas.height;
+    const width = wrapper.clientWidth;
+    const height = wrapper.clientHeight;
     
-    return `<div class="page-wrapper" style="aspect-ratio:${aspectRatio}">
-    <img src="${imageData}" class="bg-image" alt="PDF Page ${pageNum}" loading="lazy">
+    return `<div class="page-wrapper" style="position:relative;width:${toPx(width)};height:${toPx(height)};aspect-ratio:${aspectRatio};margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,0.3);line-height:0">
+    <img src="${imageData}" class="bg-image" alt="PDF Page ${pageNum}" loading="lazy" style="display:block;width:100%;height:auto">
     ${overlaysHTML}
 </div>`;
   }
@@ -74,7 +99,7 @@ export class Exporters {
   async _generateBodyHTML(indicator) {
     const wrappers = Array.from(document.querySelectorAll('.page-wrapper'));
     const total = wrappers.length;
-    const batchSize = 10; // Increased from 3
+    const batchSize = 10;
     const pageHTMLs = [];
     
     for (let i = 0; i < total; i += batchSize) {
@@ -100,7 +125,7 @@ export class Exporters {
     
     const spacing = getComputedStyle(document.body).getPropertyValue('--paragraph-spacing') || '0.4em';
     
-    const css = `${fontFace}*{box-sizing:border-box}body{margin:0;background:#e9e9e9}main{margin:0 auto;max-width:100%}.page-wrapper{position:relative;width:100%;height:auto;margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,.3);line-height:0;font-size:1vw}.bg-image{display:block;width:100%;height:auto}.overlay{position:absolute;border:.1vw solid;font-family:'Bookerly',serif;line-height:1.15;overflow:hidden;display:flex;align-items:center;white-space:pre-wrap;word-wrap:break-word;border-radius:.3vw}.overlay-text{width:100%;text-align:justify}.merged-text-block:not(:last-child){margin-bottom:${spacing}}`;
+    const css = `${fontFace}*{box-sizing:border-box}body{margin:0;background:#e9e9e9}main{margin:0 auto;max-width:100%}.page-wrapper{position:relative;margin:0 auto 10px;box-shadow:0 2px 10px rgba(0,0,0,.3);line-height:0}.bg-image{display:block;width:100%;height:auto}.overlay{position:absolute;border:1px solid;font-family:'Bookerly',serif;line-height:1.15;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;white-space:pre-wrap;word-wrap:break-word;border-radius:3px;padding:1px}.overlay-text{width:100%;text-align:justify;align-self:stretch}.merged-text-block:not(:last-child){margin-bottom:${spacing}}`;
     
     return `<!DOCTYPE html>
 <html lang="en">
