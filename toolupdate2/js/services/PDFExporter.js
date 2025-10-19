@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import { yieldToMain, PageSpecParser, withErrorHandling, forceUIUpdate } from '../utils.js';
 
 export class PDFExporter {
     constructor(pdf) { 
@@ -7,63 +8,22 @@ export class PDFExporter {
         this.imageBlobCache = new Map();
     }
 
-    // Parse RGBA color from CSS string
     _rgba(str) {
         const [r = 0, g = 0, b = 0, a = 1] = (str?.match(/(\d+(\.\d+)?)/g) || []).map(Number);
         return { r, g, b, a };
     }
 
-    // Determine font style from weight and style
     _fontStyle(weight, style) {
         const bold = weight === 'bold' || Number(weight) >= 700;
         const italic = style === 'italic' || style === 'oblique';
         return bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal';
     }
 
-    // Extract EXACT measurements from HTML overlay (no calibration needed)
-    _getExactProps(overlay, wrapper) {
-        const wrapperWidth = wrapper.clientWidth;
-        const wrapperHeight = wrapper.clientHeight;
-        
-        const overlayStyle = getComputedStyle(overlay);
-        const textElement = overlay.querySelector('.overlay-text');
-        const textStyle = getComputedStyle(textElement);
-
-        // Get exact pixel positions from computed style
-        const rect = overlay.getBoundingClientRect();
-        const wrapperRect = wrapper.getBoundingClientRect();
-        
-        // Calculate exact positions relative to wrapper
-        const x = rect.left - wrapperRect.left;
-        const y = rect.top - wrapperRect.top;
-        const w = overlay.offsetWidth;
-        const h = overlay.offsetHeight;
-
-        return {
-            x,
-            y,
-            w,
-            h,
-            bg: this._rgba(overlayStyle.backgroundColor),
-            border: this._rgba(overlayStyle.borderColor),
-            borderW: parseFloat(overlayStyle.borderTopWidth),
-            borderR: parseFloat(overlayStyle.borderTopLeftRadius),
-            opacity: parseFloat(overlayStyle.opacity),
-            pad: {
-                top: parseFloat(overlayStyle.paddingTop),
-                left: parseFloat(overlayStyle.paddingLeft),
-                right: parseFloat(overlayStyle.paddingRight),
-                bottom: parseFloat(overlayStyle.paddingBottom),
-            },
-            txt: this._rgba(textStyle.color),
-            fontSize: parseFloat(textStyle.fontSize),
-            fontStyle: this._fontStyle(textStyle.fontWeight, textStyle.fontStyle),
-            align: textStyle.textAlign === 'justify' ? 'justify' : 'left',
-            lineH: parseFloat(textStyle.lineHeight),
-        };
+    _cleanup() {
+        this.canvasCache.clear();
+        this.imageBlobCache.clear();
     }
 
-    // Get page canvas from cache or render it
     async _getPageCanvas(wrapper, pageNum, scale) {
         const cacheKey = `${pageNum}_${scale}`;
         
@@ -82,7 +42,6 @@ export class PDFExporter {
         return canvas;
     }
 
-    // Convert canvas to data URL asynchronously
     async _canvasToDataURL(canvas, pageNum, quality = 0.92) {
         const cacheKey = `blob_${pageNum}`;
         
@@ -109,7 +68,40 @@ export class PDFExporter {
         return dataURL;
     }
 
-    // Prepare all data for a single page
+    _getExactProps(overlay, wrapper) {
+        const overlayStyle = getComputedStyle(overlay);
+        const textElement = overlay.querySelector('.overlay-text');
+        const textStyle = getComputedStyle(textElement);
+
+        const rect = overlay.getBoundingClientRect();
+        const wrapperRect = wrapper.getBoundingClientRect();
+        
+        const x = rect.left - wrapperRect.left;
+        const y = rect.top - wrapperRect.top;
+        const w = overlay.offsetWidth;
+        const h = overlay.offsetHeight;
+
+        return {
+            x, y, w, h,
+            bg: this._rgba(overlayStyle.backgroundColor),
+            border: this._rgba(overlayStyle.borderColor),
+            borderW: parseFloat(overlayStyle.borderTopWidth),
+            borderR: parseFloat(overlayStyle.borderTopLeftRadius),
+            opacity: parseFloat(overlayStyle.opacity),
+            pad: {
+                top: parseFloat(overlayStyle.paddingTop),
+                left: parseFloat(overlayStyle.paddingLeft),
+                right: parseFloat(overlayStyle.paddingRight),
+                bottom: parseFloat(overlayStyle.paddingBottom),
+            },
+            txt: this._rgba(textStyle.color),
+            fontSize: parseFloat(textStyle.fontSize),
+            fontStyle: this._fontStyle(textStyle.fontWeight, textStyle.fontStyle),
+            align: textStyle.textAlign === 'justify' ? 'justify' : 'left',
+            lineH: parseFloat(textStyle.lineHeight),
+        };
+    }
+
     async _preparePageData(wrapper, pageNum) {
         const canvas = await this._getPageCanvas(wrapper, pageNum, CONFIG.PDF.SCALE);
         const imageData = await this._canvasToDataURL(canvas, pageNum);
@@ -127,7 +119,6 @@ export class PDFExporter {
         };
     }
 
-    // Get exact text measurements from HTML
     _measureTextInHTML(textElement) {
         const blocks = textElement.querySelectorAll('.merged-text-block');
         const measurements = [];
@@ -152,7 +143,6 @@ export class PDFExporter {
                 totalHeight += rect.height + parseFloat(blockStyle.marginBottom);
             });
             
-            // Remove last margin
             if (measurements.length > 0) {
                 totalHeight -= measurements[measurements.length - 1].margin;
             }
@@ -174,13 +164,11 @@ export class PDFExporter {
         return { measurements, totalHeight };
     }
 
-    // Calculate how many lines text will take in PDF
     _calculatePDFLines(pdf, text, maxWidth) {
         if (!text.trim()) return [];
         return pdf.splitTextToSize(text, maxWidth);
     }
 
-    // Draw overlay backgrounds and borders
     _drawOverlayBackgrounds(pdf, overlayProps) {
         overlayProps.forEach(p => {
             if (p.bg.a > 0) {
@@ -197,14 +185,12 @@ export class PDFExporter {
         });
     }
 
-    // Draw overlay text matching HTML exactly
     _drawOverlayText(pdf, overlayProps, overlayElements) {
         overlayElements.forEach((overlay, idx) => {
             const props = overlayProps[idx];
             const textElement = overlay.querySelector('.overlay-text');
             if (!textElement) return;
 
-            // Set text properties
             pdf.setFont(CONFIG.FONT.NAME, props.fontStyle);
             pdf.setFontSize(props.fontSize);
             pdf.setTextColor(props.txt.r, props.txt.g, props.txt.b);
@@ -213,23 +199,17 @@ export class PDFExporter {
             const maxWidth = props.w - props.pad.left - props.pad.right;
             if (maxWidth <= 0) return;
 
-            // Get exact measurements from HTML
             const { measurements, totalHeight } = this._measureTextInHTML(textElement);
             if (measurements.length === 0) return;
 
-            // Calculate vertical centering to match HTML's align-items: center
             const availableHeight = props.h - props.pad.top - props.pad.bottom;
             const verticalOffset = Math.max(0, (availableHeight - totalHeight) / 2);
             
-            // Start position (matching HTML flex centering exactly)
             let curY = props.y + props.pad.top + verticalOffset;
 
             if (measurements[0].isSimple) {
-                // Simple single text
                 const lines = this._calculatePDFLines(pdf, measurements[0].text, maxWidth);
                 const lineHeight = props.lineH;
-                
-                // Add first line ascent for proper baseline
                 curY += props.fontSize * 0.85;
                 
                 pdf.text(lines, props.x + props.pad.left, curY, {
@@ -238,13 +218,9 @@ export class PDFExporter {
                     lineHeightFactor: lineHeight / props.fontSize
                 });
             } else {
-                // Multiple text blocks
                 measurements.forEach(measure => {
                     const lines = this._calculatePDFLines(pdf, measure.text, maxWidth - measure.indent);
-                    const numLines = lines.length;
                     const lineHeight = props.lineH;
-                    
-                    // Position at block start + baseline offset
                     const blockY = curY + props.fontSize * 0.85;
                     
                     pdf.text(lines, props.x + props.pad.left + measure.indent, blockY, {
@@ -252,48 +228,30 @@ export class PDFExporter {
                         lineHeightFactor: lineHeight / props.fontSize
                     });
                     
-                    // Move to next block (using exact HTML measurement)
                     curY += measure.height + measure.margin;
                 });
             }
         });
     }
 
-    // Add a complete page to the PDF
     _addPageToPDF(pdf, pageData, isFirst) {
         const { imageData, overlayProps, overlayElements, wrapperWidth, wrapperHeight } = pageData;
         
-        // Add new page if not first
         if (!isFirst) {
             pdf.addPage([wrapperWidth, wrapperHeight], wrapperWidth > wrapperHeight ? 'l' : 'p');
         }
         
-        // Add background image
         pdf.addImage(imageData, 'JPEG', 0, 0, wrapperWidth, wrapperHeight);
         
         const opaque = new jspdf.GState({ opacity: 1 });
         
-        // Draw overlay backgrounds and borders
         this._drawOverlayBackgrounds(pdf, overlayProps);
         pdf.setGState(opaque);
         
-        // Draw overlay text
         this._drawOverlayText(pdf, overlayProps, overlayElements);
         pdf.setGState(opaque);
     }
 
-    // Yield control to browser
-    _yieldToMain() {
-        return new Promise(resolve => {
-            if ('scheduler' in window && 'yield' in window.scheduler) {
-                window.scheduler.yield().then(resolve);
-            } else {
-                setTimeout(resolve, 0);
-            }
-        });
-    }
-
-    // Embed font into PDF
     async _embedFont(pdf) {
         const font = await this.pdf.loadFont();
         if (font) {
@@ -304,93 +262,308 @@ export class PDFExporter {
         }
     }
 
-    // Convert all pages to image data
-    async _convertAllPages(wrappers, totalPages, indicator) {
-        const batchSize = 3;
-        const allPageData = [];
-        
-        for (let i = 0; i < totalPages; i += batchSize) {
-            const batch = Array.from(wrappers).slice(i, i + batchSize);
-            const endPage = Math.min(i + batchSize, totalPages);
-            
-            indicator.textContent = `Converting pages ${i + 1}-${endPage} of ${totalPages}...`;
-            
-            const batchData = await Promise.all(
-                batch.map((wrapper, idx) => this._preparePageData(wrapper, i + idx + 1))
-            );
-            
-            allPageData.push(...batchData);
-            await this._yieldToMain();
-        }
-        
-        return allPageData;
+    async _createPDFInstance(wrapper) {
+        const pdf = new jspdf.jsPDF({
+            orientation: wrapper.clientWidth > wrapper.clientHeight ? 'l' : 'p',
+            unit: 'pt',
+            format: [wrapper.clientWidth, wrapper.clientHeight],
+            compress: true
+        });
+        await this._embedFont(pdf);
+        return pdf;
     }
 
-    // Build the PDF from prepared page data
-    async _buildPDF(pdf, allPageData, totalPages, indicator) {
-        await this._yieldToMain();
-        
-        for (let i = 0; i < allPageData.length; i++) {
-            if (i % 5 === 0) {
-                indicator.textContent = `Adding page ${i + 1}/${totalPages} to PDF...`;
-                await this._yieldToMain();
+    _getWrappers() {
+        const wrappers = document.querySelectorAll('.page-wrapper:not(.page-placeholder)');
+        if (!wrappers.length) throw new Error('No pages rendered');
+        return Array.from(wrappers);
+    }
+
+    async _exportCombinedPDF(pageNumbers, filename, indicator) {
+        const firstWrapper = document.querySelector(`#page-wrapper-${pageNumbers[0]}`);
+        const pdf = await this._createPDFInstance(firstWrapper);
+
+        let isFirst = true;
+        for (let i = 0; i < pageNumbers.length; i++) {
+            const pageNum = pageNumbers[i];
+            indicator.textContent = `Processing page ${pageNum} (${i + 1}/${pageNumbers.length})...`;
+
+            const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
+            if (!wrapper) continue;
+
+            const pageData = await this._preparePageData(wrapper, pageNum);
+            this._addPageToPDF(pdf, pageData, isFirst);
+            isFirst = false;
+
+            if (i % 5 === 0) await yieldToMain();
+        }
+
+        indicator.textContent = 'Saving PDF...';
+        await yieldToMain();
+        pdf.save(filename);
+    }
+
+    async _exportGroupedPDFs(pageNumbers, filenameBase, groupSize, indicator) {
+        const totalGroups = Math.ceil(pageNumbers.length / groupSize);
+
+        for (let i = 0; i < pageNumbers.length; i += groupSize) {
+            const group = pageNumbers.slice(i, i + groupSize);
+            const groupIndex = Math.floor(i / groupSize) + 1;
+            const startPage = group[0];
+            const endPage = group[group.length - 1];
+
+            indicator.textContent = `Creating file ${groupIndex}/${totalGroups} (pages ${startPage}-${endPage})...`;
+
+            const firstWrapper = document.querySelector(`#page-wrapper-${startPage}`);
+            const pdf = await this._createPDFInstance(firstWrapper);
+
+            let isFirst = true;
+            for (const pageNum of group) {
+                const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
+                if (!wrapper) continue;
+
+                const pageData = await this._preparePageData(wrapper, pageNum);
+                this._addPageToPDF(pdf, pageData, isFirst);
+                isFirst = false;
             }
-            
-            this._addPageToPDF(pdf, allPageData[i], i === 0);
+
+            const filename = `${filenameBase}_pages_${String(startPage).padStart(3, '0')}_to_${String(endPage).padStart(3, '0')}.pdf`;
+            await yieldToMain();
+            pdf.save(filename);
+
+            this._cleanup();
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
     }
 
-    // Clean up caches
-    _cleanup() {
-        this.canvasCache.clear();
-        this.imageBlobCache.clear();
+    async _exportIndividualPDFs(pageNumbers, filenameBase, indicator) {
+        for (let i = 0; i < pageNumbers.length; i++) {
+            const pageNum = pageNumbers[i];
+            indicator.textContent = `Exporting page ${pageNum} (${i + 1}/${pageNumbers.length})...`;
+
+            const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
+            if (!wrapper) continue;
+
+            const pdf = await this._createPDFInstance(wrapper);
+            const pageData = await this._preparePageData(wrapper, pageNum);
+            this._addPageToPDF(pdf, pageData, true);
+
+            const filename = `${filenameBase}_page_${String(pageNum).padStart(3, '0')}.pdf`;
+            await yieldToMain();
+            pdf.save(filename);
+
+            if (i % 3 === 0) {
+                this._cleanup();
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
     }
 
-    // Main export function
+    async _exportPages(config, ui) {
+        const { 
+            pageNumbers,
+            filename,
+            combinePages,
+            groupSize,
+            progressPrefix
+        } = config;
+
+        return withErrorHandling(async () => {
+            const wrappers = this._getWrappers();
+            const indicator = ui.showSavingIndicator(`${progressPrefix}...`);
+            
+            // Force UI to update before processing
+            await forceUIUpdate();
+
+            try {
+                indicator.textContent = 'Loading font...';
+                await this._embedFont(new jspdf.jsPDF());
+
+                if (combinePages) {
+                    await this._exportCombinedPDF(pageNumbers, filename, indicator);
+                } else if (groupSize) {
+                    await this._exportGroupedPDFs(pageNumbers, filename, groupSize, indicator);
+                } else {
+                    await this._exportIndividualPDFs(pageNumbers, filename, indicator);
+                }
+
+                this._cleanup();
+                return true;
+
+            } finally {
+                ui.removeSavingIndicator(indicator);
+            }
+        }, 'Export failed');
+    }
+
     async save(name, ui) {
-        const indicator = ui.showSavingIndicator('Initializing export...');
-        
-        try {
-            // Get all rendered pages
-            const wrappers = document.querySelectorAll('.page-wrapper:not(.page-placeholder)');
-            if (!wrappers.length) throw new Error('No pages rendered.');
+        const wrappers = this._getWrappers();
+        const totalPages = wrappers.length;
+        const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
-            const totalPages = wrappers.length;
-            const firstWrapper = wrappers[0];
+        return this._exportPages({
+            pageNumbers,
+            filename: `${name}_export.pdf`,
+            combinePages: true,
+            progressPrefix: 'Exporting all pages'
+        }, ui);
+    }
 
-            // Initialize PDF with exact dimensions from HTML
-            const pdf = new jspdf.jsPDF({ 
-                orientation: firstWrapper.clientWidth > firstWrapper.clientHeight ? 'l' : 'p', 
-                unit: 'pt', 
-                format: [firstWrapper.clientWidth, firstWrapper.clientHeight],
-                compress: true
+    async saveSinglePage(pageNum, name, ui) {
+        return this._exportPages({
+            pageNumbers: [pageNum],
+            filename: `${name}_page_${String(pageNum).padStart(3, '0')}.pdf`,
+            combinePages: true,
+            progressPrefix: `Exporting page ${pageNum}`
+        }, ui);
+    }
+
+    async splitPDF(name, ui) {
+        const wrappers = this._getWrappers();
+        const pageNumbers = Array.from({ length: wrappers.length }, (_, i) => i + 1);
+
+        const confirmed = confirm(
+            `Split ${pageNumbers.length} pages into individual files?\n\n` +
+            `This will download ${pageNumbers.length} separate PDFs.\n\n` +
+            `Continue?`
+        );
+
+        if (!confirmed) return;
+
+        return this._exportPages({
+            pageNumbers,
+            filename: name,
+            combinePages: false,
+            progressPrefix: `Splitting ${pageNumbers.length} pages`
+        }, ui);
+    }
+
+    async splitByNumberOfFiles(numFiles, name, ui) {
+        const wrappers = this._getWrappers();
+        const totalPages = wrappers.length;
+        const pagesPerFile = Math.ceil(totalPages / numFiles);
+        const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+        const confirmed = confirm(
+            `Split ${totalPages} pages into ${numFiles} files?\n\n` +
+            `Each file will contain ~${pagesPerFile} pages.\n\n` +
+            `Continue?`
+        );
+
+        if (!confirmed) return;
+
+        return this._exportPages({
+            pageNumbers,
+            filename: name,
+            combinePages: false,
+            groupSize: pagesPerFile,
+            progressPrefix: `Creating ${numFiles} files`
+        }, ui);
+    }
+
+    async splitByPagesPerFile(pagesPerFile, name, ui) {
+        const wrappers = this._getWrappers();
+        const totalPages = wrappers.length;
+        const numFiles = Math.ceil(totalPages / pagesPerFile);
+        const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+        const confirmed = confirm(
+            `Split into groups of ${pagesPerFile} pages?\n\n` +
+            `This will create ${numFiles} files.\n\n` +
+            `Continue?`
+        );
+
+        if (!confirmed) return;
+
+        return this._exportPages({
+            pageNumbers,
+            filename: name,
+            combinePages: false,
+            groupSize: pagesPerFile,
+            progressPrefix: `Creating ${numFiles} files`
+        }, ui);
+    }
+
+    async exportPageRange(startPage, endPage, name, ui) {
+        if (startPage > endPage) {
+            alert('Start page must be ≤ end page');
+            return;
+        }
+
+        const pageNumbers = Array.from(
+            { length: endPage - startPage + 1 }, 
+            (_, i) => startPage + i
+        );
+
+        return this._exportPages({
+            pageNumbers,
+            filename: `${name}_pages_${String(startPage).padStart(3, '0')}_to_${String(endPage).padStart(3, '0')}.pdf`,
+            combinePages: true,
+            progressPrefix: `Exporting pages ${startPage}-${endPage}`
+        }, ui);
+    }
+
+    async exportSpecificPages(pageSpec, name, ui) {
+        const pageNumbers = PageSpecParser.parse(pageSpec);
+
+        if (pageNumbers.length === 0) {
+            alert('Invalid page specification.\n\nExamples:\n• "1,5,10"\n• "1-5,10,15-20"');
+            return;
+        }
+
+        const wrappers = this._getWrappers();
+        const validPages = PageSpecParser.validate(pageNumbers, wrappers.length);
+
+        if (validPages.length !== pageNumbers.length) {
+            const invalid = pageNumbers.filter(p => !validPages.includes(p));
+            alert(`Invalid pages: ${invalid.join(', ')}\n\nMax page: ${wrappers.length}`);
+            return;
+        }
+
+        const confirmed = confirm(
+            `Export ${validPages.length} specific pages?\n\n` +
+            `Pages: ${PageSpecParser.format(validPages)}\n\n` +
+            `Continue?`
+        );
+
+        if (!confirmed) return;
+
+        const filename = validPages.length === 1
+            ? `${name}_page_${String(validPages[0]).padStart(3, '0')}.pdf`
+            : `${name}_selected_${validPages.length}_pages.pdf`;
+
+        return this._exportPages({
+            pageNumbers: validPages,
+            filename,
+            combinePages: true,
+            progressPrefix: `Exporting ${validPages.length} pages`
+        }, ui);
+    }
+
+    async savePageAsImage(pageNum, name, format = 'png') {
+        return withErrorHandling(async () => {
+            const wrapper = document.querySelector(`#page-wrapper-${pageNum}`);
+            if (!wrapper) throw new Error(`Page ${pageNum} not found`);
+
+            const canvas = wrapper.querySelector('canvas');
+            if (!canvas) throw new Error(`Page ${pageNum} not rendered`);
+
+            const blob = await new Promise((resolve, reject) => {
+                canvas.toBlob(
+                    (b) => b ? resolve(b) : reject(new Error('Canvas to Blob failed')),
+                    `image/${format}`,
+                    0.95
+                );
             });
 
-            // Load and embed font
-            indicator.textContent = 'Loading font...';
-            await this._embedFont(pdf);
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `${name}_page_${String(pageNum).padStart(3, '0')}.${format}`;
+            anchor.click();
 
-            // Phase 1: Convert all canvases to images
-            indicator.textContent = 'Converting pages to images...';
-            const allPageData = await this._convertAllPages(wrappers, totalPages, indicator);
-
-            // Phase 2: Build PDF document
-            indicator.textContent = 'Building PDF document...';
-            await this._buildPDF(pdf, allPageData, totalPages, indicator);
-
-            // Phase 3: Save file
-            indicator.textContent = 'Saving PDF file...';
-            await this._yieldToMain();
-            pdf.save(`${name}_export.pdf`);
-            
-            // Cleanup
-            this._cleanup();
-            
-        } catch (e) {
-            console.error('PDF Export Error:', e);
-            alert(`Could not save as PDF: ${e.message}`);
-        } finally {
-            ui.removeSavingIndicator(indicator);
-        }
+            URL.revokeObjectURL(url);
+            return true;
+        }, 'Image export failed');
     }
 }

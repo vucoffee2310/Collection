@@ -1,4 +1,4 @@
-import { readFile } from '../utils.js';
+import { readFile, forceUIUpdate } from '../utils.js';
 
 export class Exporters {
     constructor(pdf) {
@@ -6,7 +6,6 @@ export class Exporters {
         this.canvasCache = new Map();
     }
 
-    // Yield control back to browser for responsiveness
     _yieldToMain() {
         return new Promise(resolve => {
             if ('scheduler' in window && 'yield' in window.scheduler) {
@@ -17,7 +16,6 @@ export class Exporters {
         });
     }
 
-    // Convert canvas to data URL asynchronously with caching
     async _canvasToDataURL(canvas, pageNum, format = 'image/webp', quality = 0.85) {
         if (this.canvasCache.has(pageNum)) {
             return this.canvasCache.get(pageNum);
@@ -36,7 +34,6 @@ export class Exporters {
         return dataURL;
     }
 
-    // Extract overlay properties for HTML export
     _extractOverlayStyles(overlay, baseVw) {
         const overlayStyle = getComputedStyle(overlay);
         const textElement = overlay.querySelector('.overlay-text');
@@ -58,7 +55,6 @@ export class Exporters {
         };
     }
 
-    // Generate HTML for a single overlay
     _overlayToHTML(overlay, baseVw) {
         const styles = this._extractOverlayStyles(overlay, baseVw);
         if (!styles) return '';
@@ -71,18 +67,16 @@ export class Exporters {
         return `<div class="overlay" style="${styleString}"><div class="overlay-text">${textElement.innerHTML || ''}</div></div>`;
     }
 
-    // Generate all overlays HTML for a page wrapper
     _generateOverlaysHTML(wrapper) {
         const baseVw = wrapper.clientWidth / 100;
         const overlays = Array.from(wrapper.querySelectorAll('.overlay'));
         
         return overlays
             .map(overlay => this._overlayToHTML(overlay, baseVw))
-            .filter(html => html) // Remove empty strings
+            .filter(html => html)
             .join('\n    ');
     }
 
-    // Generate HTML for a single page
     async _generatePageHTML(wrapper, pageNum) {
         const canvas = wrapper.querySelector('canvas');
         if (!canvas) return '';
@@ -97,11 +91,10 @@ export class Exporters {
 </div>`;
     }
 
-    // Generate body HTML for all pages
     async _generateBodyHTML(indicator) {
         const wrappers = Array.from(document.querySelectorAll('.page-wrapper'));
         const totalPages = wrappers.length;
-        const batchSize = 3; // Smaller batches for better responsiveness
+        const batchSize = 3;
         const pageHTMLs = [];
 
         for (let i = 0; i < totalPages; i += batchSize) {
@@ -115,19 +108,17 @@ export class Exporters {
             );
 
             pageHTMLs.push(...batchResults);
-            await this._yieldToMain(); // Yield to browser
+            await this._yieldToMain();
         }
 
         return pageHTMLs.filter(html => html).join('\n');
     }
 
-    // Build complete HTML document
     _buildHTMLDocument(title, fontBase64, bodyHTML) {
         const fontFace = fontBase64 
             ? `@font-face{font-family:'Bookerly';src:url(data:font/ttf;base64,${fontBase64}) format('truetype');}`
             : '';
 
-        // Get current paragraph spacing from live element
         const mergedBlock = document.querySelector('.merged-text-block');
         const paragraphSpacing = mergedBlock 
             ? getComputedStyle(mergedBlock).marginBottom 
@@ -149,7 +140,6 @@ export class Exporters {
 </html>`;
     }
 
-    // Download file to user's system
     _downloadFile(content, filename, mimeType = 'text/html') {
         const blob = new Blob([content], { type: mimeType });
         const url = URL.createObjectURL(blob);
@@ -159,33 +149,27 @@ export class Exporters {
         anchor.download = filename;
         anchor.click();
         
-        // Clean up
         URL.revokeObjectURL(url);
     }
 
-    // Main HTML export function
     async html(name, pageManager) {
         const indicator = pageManager.showSavingIndicator('Initializing HTML export...');
+        await forceUIUpdate();
         
         try {
-            // Load font
             indicator.textContent = 'Loading font...';
             const fontBase64 = await this.pdf.loadFont();
             
-            // Generate body HTML
             const bodyHTML = await this._generateBodyHTML(indicator);
             
-            // Build complete HTML document
             indicator.textContent = 'Building HTML document...';
             await this._yieldToMain();
             const htmlDocument = this._buildHTMLDocument(name, fontBase64, bodyHTML);
             
-            // Download file
             indicator.textContent = 'Saving file...';
             await this._yieldToMain();
             this._downloadFile(htmlDocument, `${name}_view.html`);
             
-            // Cleanup
             this.canvasCache.clear();
             
         } catch (error) {
@@ -196,25 +180,22 @@ export class Exporters {
         }
     }
 
-    // Print export function
     async print(pageManager) {
         const indicator = pageManager.showSavingIndicator('Preparing for print...');
+        await forceUIUpdate();
         
         try {
-            // Ensure all pages are rendered
             await this.pdf.renderAllQueuedPages();
-            
-            // Small delay to ensure rendering is complete
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // Trigger print dialog
+            pageManager.removeSavingIndicator(indicator);
+            await forceUIUpdate();
+            
             window.print();
             
         } catch (error) {
             console.error('Print Error:', error);
             alert('Could not prepare for print. See console for details.');
-        } finally {
-            pageManager.removeSavingIndicator(indicator);
         }
     }
 }

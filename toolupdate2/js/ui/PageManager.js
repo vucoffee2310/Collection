@@ -1,10 +1,13 @@
 export class PageManager {
     constructor() {
         this.container = document.querySelector('#pdf-container');
+        this.currentIndicator = null;
     }
     
     showLoading(msg) {
-        if (this.container) this.container.innerHTML = `<div class="loading">${msg}</div>`;
+        if (this.container) {
+            this.container.innerHTML = `<div class="loading">${msg}</div>`;
+        }
     }
     
     updatePageInfo(msg) {
@@ -26,20 +29,63 @@ export class PageManager {
         w.id = `page-wrapper-${n}`;
         w.dataset.pageNum = n;
         w.style.aspectRatio = `${vp.width} / ${vp.height}`;
-        w.innerHTML = `<span>Loading page ${n}...</span>`;
+        w.innerHTML = `
+            <span>Loading page ${n}...</span>
+            <div class="page-export-controls">
+                <button class="page-export-btn" data-page="${n}" title="Export page ${n} as individual PDF">
+                    💾 Save Page ${n}
+                </button>
+            </div>
+        `;
+        
+        const exportBtn = w.querySelector('.page-export-btn');
+        exportBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const pageNum = parseInt(e.target.dataset.page);
+            document.dispatchEvent(new CustomEvent('exportSinglePage', { 
+                detail: { pageNum } 
+            }));
+        });
+        
         this.container?.appendChild(w);
         return w;
     }
     
-    showSavingIndicator(msg = 'Saving... Please wait.') {
-        const d = document.createElement('div');
-        d.className = 'saving-indicator';
-        d.textContent = msg;
-        document.body.appendChild(d);
-        return d;
+    /**
+     * Show saving indicator with immediate display
+     */
+    showSavingIndicator(msg = 'Processing...') {
+        // Remove any existing indicator first
+        if (this.currentIndicator) {
+            this.currentIndicator.remove();
+        }
+        
+        const indicator = document.createElement('div');
+        indicator.className = 'saving-indicator';
+        indicator.innerHTML = `
+            <div class="saving-content">
+                <div class="saving-spinner"></div>
+                <div class="saving-message">${msg}</div>
+            </div>
+        `;
+        
+        document.body.appendChild(indicator);
+        this.currentIndicator = indicator;
+        
+        // Force immediate display with reflow
+        indicator.offsetHeight;
+        indicator.classList.add('active');
+        
+        return indicator;
     }
     
-    removeSavingIndicator(ind) { 
-        ind?.remove(); 
+    removeSavingIndicator(ind) {
+        if (ind) {
+            ind.classList.remove('active');
+            setTimeout(() => ind.remove(), 200);
+        }
+        if (ind === this.currentIndicator) {
+            this.currentIndicator = null;
+        }
     }
 }
