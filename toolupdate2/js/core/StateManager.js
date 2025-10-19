@@ -9,14 +9,27 @@ export class StateManager {
         this.pageCoordinateOverrides = {};
     }
     
+    // Initialize overlay data from JSON
     initialize(json) {
         this.overlayData = Object.fromEntries(
-            Object.entries(json).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([c, t]) => [c, { text: t.trim(), fontSize: 'auto' }]))])
+            Object.entries(json).map(([pageKey, overlays]) => [
+                pageKey, 
+                Object.fromEntries(
+                    Object.entries(overlays).map(([coords, text]) => [
+                        coords, 
+                        { text: text.trim(), fontSize: 'auto' }
+                    ])
+                )
+            ])
         );
     }
     
-    setActivePalette(key) { this.activePalette = key; }
+    // Palette management
+    setActivePalette(key) { 
+        this.activePalette = key; 
+    }
     
+    // Global coordinate order management
     setGlobalCoordinateOrder(order) {
         this.globalCoordinateOrder = order;
     }
@@ -25,6 +38,7 @@ export class StateManager {
         return this.globalCoordinateOrder;
     }
     
+    // Page-specific coordinate order management
     getPageCoordinateOrder(pageNum) {
         return this.pageCoordinateOverrides[pageNum] || this.globalCoordinateOrder;
     }
@@ -42,34 +56,53 @@ export class StateManager {
     }
     
     applyCoordinateOrderToAllPages(order) {
-        const pageKeys = Object.keys(this.overlayData);
-        pageKeys.forEach(pk => {
-            const pageNum = pk.replace('page_', '');
+        Object.keys(this.overlayData).forEach(pageKey => {
+            const pageNum = pageKey.replace('page_', '');
             this.setPageCoordinateOrder(pageNum, order);
         });
     }
 
-    expandAllOverlays(amt) {
-        for (const pk in this.overlayData) {
-            const pageNum = pk.replace('page_', '');
+    // Expand all overlays by a given amount while maintaining coordinate format
+    expandAllOverlays(amount) {
+        Object.keys(this.overlayData).forEach(pageKey => {
+            const pageNum = pageKey.replace('page_', '');
             const coordOrder = this.getPageCoordinateOrder(pageNum);
             
-            this.overlayData[pk] = Object.fromEntries(
-                Object.entries(this.overlayData[pk]).map(([cs, val]) => {
-                    const [t, l, b, r] = Utils.parseCoords(cs, coordOrder);
-                    return [JSON.stringify([t - amt, l - amt, b + amt, r + amt]), val];
+            this.overlayData[pageKey] = Object.fromEntries(
+                Object.entries(this.overlayData[pageKey]).map(([coords, data]) => {
+                    // Parse coordinates using page's order to get TLBR
+                    const [top, left, bottom, right] = Utils.parseCoords(coords, coordOrder);
+                    
+                    // Expand in TLBR format
+                    const expandedTLBR = [
+                        top - amount, 
+                        left - amount, 
+                        bottom + amount, 
+                        right + amount
+                    ];
+                    
+                    // Convert back to original coordinate order format
+                    const expandedCoords = Utils.coordinatesToOrder(expandedTLBR, coordOrder);
+                    
+                    return [JSON.stringify(expandedCoords), data];
                 })
             );
+        });
+    }
+
+    // Update overlay text content
+    updateOverlayText(pageNum, coords, text) {
+        const pageKey = `page_${pageNum}`;
+        if (this.overlayData[pageKey]?.[coords]) {
+            this.overlayData[pageKey][coords].text = text;
         }
     }
 
-    updateOverlayText(page, coords, text) {
-        const pk = `page_${page}`;
-        if (this.overlayData[pk]?.[coords]) this.overlayData[pk][coords].text = text;
-    }
-
-    deleteOverlay(page, coords) {
-        const pk = `page_${page}`;
-        if (this.overlayData[pk]?.[coords]) delete this.overlayData[pk][coords];
+    // Delete an overlay
+    deleteOverlay(pageNum, coords) {
+        const pageKey = `page_${pageNum}`;
+        if (this.overlayData[pageKey]?.[coords]) {
+            delete this.overlayData[pageKey][coords];
+        }
     }
 }
