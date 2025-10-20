@@ -1,0 +1,246 @@
+/* ===== OVERLAY BASE ===== */
+.overlay {
+  position: absolute;
+  background: var(--overlay-bg);
+  border: 1px solid var(--overlay-border);
+  color: var(--overlay-text);
+  font-family: 'Open Sans', serif;
+  line-height: 1.15;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  z-index: 10;
+  border-radius: 3px;
+  padding: 1px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.overlay:hover {
+  box-shadow: 0 0 12px rgba(52, 152, 219, 0.8);
+  transform: scale(1.01);
+  z-index: 200;
+}
+
+/* ===== OVERLAY TEXT ===== */
+.overlay-text {
+  width: 100%;
+  text-align: justify;
+  cursor: text;
+  user-select: text;
+  align-self: stretch;
+}
+
+.overlay-text[contenteditable="true"]:focus {
+  outline: 2px solid var(--blue);
+  box-shadow: 0 0 10px var(--blue);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ===== LAYOUT VARIANTS ===== */
+.overlay.single-line-layout {
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay.single-line-layout .overlay-text {
+  width: auto;
+  text-align: left;
+  align-self: center;
+}
+
+/* Merged Text Blocks */
+.merged-text-block:not(:last-child) {
+  margin-bottom: var(--paragraph-spacing);
+}
+
+/* Vertical Text */
+.overlay.vertical-text {
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay.vertical-text .overlay-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1;
+  align-self: center;
+}
+
+/* ===== CONTENT TYPE STYLES ===== */
+
+/* Code Blocks - Simple with font-weight 600 */
+.overlay.content-code {
+  font-family: 'Courier New', Consolas, Monaco, monospace !important;
+  font-weight: 600 !important;
+  padding: 6px;
+  justify-content: flex-start;
+  align-items: flex-start;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.overlay.content-code .overlay-text {
+  width: 100% !important;
+  text-align: left !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  font-family: 'Courier New', Consolas, Monaco, monospace !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  padding: 2px !important;
+}
+
+/* Lists */
+.overlay.content-list {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.overlay.content-list .overlay-text {
+  text-align: left;
+  width: 100%;
+}
+
+.list-item {
+  margin-bottom: 0.4em;
+  text-align: left;
+  line-height: 1.3;
+}
+
+.list-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Tables - ✨ IMPROVED */
+.overlay.content-table {
+  overflow: auto;
+  padding: 4px;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.overlay.content-table .overlay-text {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  text-align: left;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px; /* ✨ Increased from 9px to 10px */
+  line-height: 1.4; /* ✨ Increased from 1.3 */
+  border: 1px solid var(--overlay-border);
+  color: var(--overlay-text);
+  table-layout: auto; /* ✨ Allow flexible column widths */
+}
+
+.data-table th,
+.data-table td {
+  padding: 4px 6px; /* ✨ Slightly more padding */
+  border: 1px solid var(--overlay-border);
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word; /* ✨ Break long words */
+  min-width: 30px; /* ✨ Minimum cell width */
+}
+
+.data-table th {
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.15);
+  white-space: normal; /* ✨ Allow wrapping in headers */
+  font-size: 10px; /* ✨ Explicit header size */
+}
+
+.data-table td {
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 10px; /* ✨ Explicit cell size */
+}
+
+.data-table tr:nth-child(even) td {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* ✨ NEW: Numeric cell alignment */
+.data-table td:has(> :only-child:is(:is(number, .number))) {
+  text-align: right;
+}
+
+/* Images */
+.overlay.content-image {
+  justify-content: center;
+  align-items: center;
+  background: rgba(100, 100, 100, 0.3);
+  border-style: dashed;
+}
+
+.image-placeholder {
+  font-style: italic;
+  opacity: 0.6;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ===== DELETE BUTTON ===== */
+.delete-overlay-btn {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: rgba(211, 84, 0, 0.8);
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  z-index: 210;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.8);
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay:hover .delete-overlay-btn {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+}
+
+.delete-overlay-btn:hover {
+  background: rgba(231, 76, 60, 1);
+  transform: scale(1.1);
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .delete-overlay-btn {
+    display: none !important;
+  }
+  
+  .overlay.content-code,
+  .overlay.content-table {
+    overflow: visible;
+  }
+  
+  .overlay.content-code .overlay-text {
+    overflow: visible;
+    white-space: pre-wrap;
+  }
+  
+  .data-table {
+    page-break-inside: avoid;
+  }
+}
