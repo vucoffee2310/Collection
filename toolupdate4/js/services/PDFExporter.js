@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { parsePageSpec, formatPageList, withErrorHandling, forceUIUpdate } from '../utils.js';
+import { parsePageSpec, formatPageList, validateRange, withErrorHandling, forceUIUpdate } from '../utils.js';
 
 export class PDFExporter {
   constructor(pdf) {
@@ -56,6 +56,63 @@ export class PDFExporter {
     return 0.78;
   }
   
+  // ✨ NEW: Extract cell text preserving line breaks
+  _extractCellText(cell) {
+    const html = cell.innerHTML.trim();
+    const withNewlines = html.replace(/<br\s*\/?>/gi, '\n');
+    const temp = document.createElement('div');
+    temp.innerHTML = withNewlines;
+    return temp.textContent || '';
+  }
+  
+  // ✨ NEW: Extract complete table layout from DOM
+  _extractTableLayout(table, wrapper) {
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const tableRect = table.getBoundingClientRect();
+    
+    const rows = Array.from(table.querySelectorAll('tr'));
+    
+    return {
+      x: tableRect.left - wrapperRect.left,
+      y: tableRect.top - wrapperRect.top,
+      width: tableRect.width,
+      height: tableRect.height,
+      rows: rows.map(row => {
+        const rowRect = row.getBoundingClientRect();
+        const cells = Array.from(row.querySelectorAll('th, td'));
+        
+        return {
+          y: rowRect.top - wrapperRect.top,
+          height: rowRect.height,
+          isHeader: row.querySelector('th') !== null,
+          cells: cells.map(cell => {
+            const cellRect = cell.getBoundingClientRect();
+            const cellStyle = getComputedStyle(cell);
+            
+            return {
+              x: cellRect.left - wrapperRect.left,
+              y: cellRect.top - wrapperRect.top,
+              width: cellRect.width,
+              height: cellRect.height,
+              paddingTop: parseFloat(cellStyle.paddingTop) || 0,
+              paddingLeft: parseFloat(cellStyle.paddingLeft) || 0,
+              paddingRight: parseFloat(cellStyle.paddingRight) || 0,
+              paddingBottom: parseFloat(cellStyle.paddingBottom) || 0,
+              text: this._extractCellText(cell),
+              fontSize: parseFloat(cellStyle.fontSize),
+              fontWeight: cellStyle.fontWeight,
+              textAlign: cellStyle.textAlign,
+              verticalAlign: cellStyle.verticalAlign,
+              backgroundColor: cellStyle.backgroundColor,
+              borderColor: cellStyle.borderColor,
+              borderWidth: parseFloat(cellStyle.borderWidth) || 0
+            };
+          })
+        };
+      })
+    };
+  }
+  
   _extractOverlay(overlay, wrapper) {
     const textEl = overlay.querySelector('.overlay-text');
     if (!textEl) return null;
@@ -69,7 +126,16 @@ export class PDFExporter {
     const isSingleLine = overlay.classList.contains('single-line-layout');
     const isCode = overlay.classList.contains('content-code');
     const isList = overlay.classList.contains('content-list');
-    const isTable = overlay.classList.contains('content-table'); // ✨ NEW
+    const isTable = overlay.classList.contains('content-table');
+    
+    // ✨ Extract table layout from DOM if it's a table
+    let tableLayout = null;
+    if (isTable) {
+      const table = textEl.querySelector('.data-table');
+      if (table) {
+        tableLayout = this._extractTableLayout(table, wrapper);
+      }
+    }
     
     return {
       x: oRect.left - wRect.left,
@@ -88,7 +154,7 @@ export class PDFExporter {
         parseFloat(oStyle.paddingBottom) || 0
       ],
       txt: this._rgba(tStyle.color),
-      fontSize: parseFloat(tStyle.fontSize),
+      fontSize: parseFloat(oStyle.fontSize),
       fontStyle: this._fontStyle(tStyle.fontWeight, tStyle.fontStyle),
       fontWeight: parseFloat(tStyle.fontWeight) || 400,
       align: tStyle.textAlign,
@@ -104,27 +170,10 @@ export class PDFExporter {
       isCode,
       isList,
       isTable,
-      tableData: isTable ? this._extractTableData(textElement) : null
+      tableLayout  // ✨ Use layout instead of raw data
     };
   }
-
-  // ✨ NEW: Extract list items for PDF
-  _extractListItems(textElement) {
-    const listItems = textElement.querySelectorAll('.list-item');
-    
-    if (listItems.length > 0) {
-      // Structured list
-      return Array.from(listItems).map(item => item.textContent.trim());
-    } else {
-      // Plain text with bullets
-      return textElement.textContent
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line)
-        .map(line => line.replace(/^[•\-\*]\s*/, '')); // Remove bullet chars
-    }
-  }
-    
+  
   _getLinePositionsWithSpacing(element, wrapperRect) {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
     const range = document.createRange();
@@ -304,24 +353,148 @@ export class PDFExporter {
     
     pdf.restoreGraphicsState();
   }
-
-  _extractTableData(textElement) {
-    const table = textElement.querySelector('.data-table');
-    if (!table) return null;
+  
+  _extractListItems(textElement) {
+    const listItems = textElement.querySelectorAll('.list-item');
     
-    const rows = Array.from(table.querySelectorAll('tr'));
-    return rows.map(row => {
-      const cells = Array.from(row.querySelectorAll('th, td'));
-      return cells.map(cell => {
-        // Get innerHTML and convert <br> to \n
-        const html = cell.innerHTML.trim();
-        const withNewlines = html.replace(/<br\s*\/?>/gi, '\n');
-        // Decode HTML entities
-        const temp = document.createElement('div');
-        temp.innerHTML = withNewlines;
-        return temp.textContent || '';
+    if (listItems.length > 0) {
+      return Array.from(listItems).map(item => item.textContent.trim());
+    } else {
+      return textElement.textContent
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line)
+        .map(line => line.replace(/^[•\-\*]\s*/, ''));
+    }
+  }
+  
+  _drawList(pdf, o) {
+    const items = this._extractListItems(o.textElement);
+    const bulletChar = '•';
+    const indent = o.fontSize * 0.5;
+    const lineSpacing = o.lineHeight || o.fontSize * 1.3;
+    
+    let currentY = o.y + o.pad[0] + o.fontSize;
+    
+    items.forEach(item => {
+      pdf.text(bulletChar, o.x + o.pad[1], currentY, { baseline: 'alphabetic' });
+      
+      const maxWidth = o.w - o.pad[1] - o.pad[2] - indent - (o.fontSize * 0.5);
+      const lines = pdf.splitTextToSize(item, maxWidth);
+      
+      lines.forEach((line, idx) => {
+        const xPos = o.x + o.pad[1] + indent + (o.fontSize * 0.5);
+        pdf.text(line, xPos, currentY + (idx * lineSpacing), { baseline: 'alphabetic' });
+      });
+      
+      currentY += lines.length * lineSpacing;
+    });
+  }
+  
+  // ✨ UPDATED: Draw table using DOM measurements with consistent palette colors
+  _drawTable(pdf, o) {
+    if (!o.tableLayout) return;
+    
+    const layout = o.tableLayout;
+    
+    // ✨ Use overlay's border color for ALL table borders (consistent with palette)
+    const tableBorderColor = o.border; // From overlay (palette-aware)
+    const textColor = o.txt; // From overlay (palette-aware)
+    
+    layout.rows.forEach((row, rowIdx) => {
+      const isHeader = row.isHeader;
+      
+      // Draw row background using exact measured position and size
+      if (isHeader) {
+        pdf.setFillColor(0, 0, 0);
+        pdf.setGState(new jspdf.GState({ opacity: 0.15 }));
+        pdf.rect(layout.x, row.y, layout.width, row.height, 'F');
+        pdf.setGState(new jspdf.GState({ opacity: o.opacity }));
+      } else if (rowIdx % 2 === 1) {
+        pdf.setFillColor(0, 0, 0);
+        pdf.setGState(new jspdf.GState({ opacity: 0.05 }));
+        pdf.rect(layout.x, row.y, layout.width, row.height, 'F');
+        pdf.setGState(new jspdf.GState({ opacity: o.opacity }));
+      }
+      
+      // Draw each cell using exact measured dimensions
+      row.cells.forEach(cell => {
+        // Set font
+        pdf.setFont(
+          CONFIG.FONT.NAME, 
+          isHeader ? 'bold' : 'normal'
+        );
+        pdf.setFontSize(cell.fontSize);
+        pdf.setTextColor(...textColor.slice(0, 3)); // ✨ Use overlay text color
+        
+        // Calculate text area within cell
+        const textX = cell.x + cell.paddingLeft;
+        const textWidth = cell.width - cell.paddingLeft - cell.paddingRight;
+        
+        // Split text for wrapping (using actual cell width)
+        const lines = cell.text.split('\n');
+        let wrappedLines = [];
+        lines.forEach(line => {
+          const wrapped = pdf.splitTextToSize(line, textWidth);
+          wrappedLines.push(...wrapped);
+        });
+        
+        // Calculate vertical positioning based on actual cell height
+        const lineHeight = cell.fontSize * 1.4;
+        const totalTextHeight = wrappedLines.length * lineHeight;
+        
+        let textY;
+        if (cell.verticalAlign === 'middle') {
+          textY = cell.y + (cell.height - totalTextHeight) / 2;
+        } else if (cell.verticalAlign === 'bottom') {
+          textY = cell.y + cell.height - totalTextHeight - cell.paddingBottom;
+        } else {
+          textY = cell.y + cell.paddingTop;
+        }
+        
+        // Draw each line
+        wrappedLines.forEach((line, lineIdx) => {
+          const y = textY + (lineIdx * lineHeight);
+          
+          // Text alignment
+          let x = textX;
+          if (cell.textAlign === 'center') {
+            const textWidth = pdf.getTextWidth(line);
+            x = cell.x + (cell.width - textWidth) / 2;
+          } else if (cell.textAlign === 'right') {
+            const textWidth = pdf.getTextWidth(line);
+            x = cell.x + cell.width - textWidth - cell.paddingRight;
+          }
+          
+          pdf.text(line, x, y, { baseline: 'top' });
+        });
+        
+        // ✨ Draw cell borders using overlay border color (palette-aware)
+        pdf.setDrawColor(...tableBorderColor.slice(0, 3));
+        pdf.setLineWidth(cell.borderWidth);
+        
+        // Right border
+        pdf.line(
+          cell.x + cell.width, 
+          cell.y, 
+          cell.x + cell.width, 
+          cell.y + cell.height
+        );
+        
+        // Bottom border
+        pdf.line(
+          cell.x, 
+          cell.y + cell.height, 
+          cell.x + cell.width, 
+          cell.y + cell.height
+        );
       });
     });
+    
+    // ✨ Draw outer table border using overlay border color (palette-aware)
+    pdf.setDrawColor(...tableBorderColor.slice(0, 3));
+    pdf.setLineWidth(1);
+    pdf.rect(layout.x, layout.y, layout.width, layout.height);
   }
   
   _drawText(pdf, overlays) {
@@ -330,7 +503,7 @@ export class PDFExporter {
     overlays.forEach(o => {
       if (!o.textElement) return;
       
-      // ✨ Handle tables separately
+      // Handle tables separately
       if (o.isTable) {
         this._drawTable(pdf, o);
         return;
@@ -362,130 +535,7 @@ export class PDFExporter {
     
     pdf.setGState(opaque);
   }
-
-  _drawTable(pdf, o) {
-    if (!o.tableData || !o.tableData.length) return;
-    
-    pdf.setFont(CONFIG.FONT.NAME, 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(...o.txt.slice(0, 3));
-    pdf.setGState(new jspdf.GState({ opacity: o.opacity }));
-    
-    const numCols = Math.max(...o.tableData.map(row => row.length));
-    const colWidth = (o.w - o.pad[1] - o.pad[2]) / numCols;
-    const minRowHeight = 12;
-    
-    let currentY = o.y + o.pad[0];
-    
-    o.tableData.forEach((row, rowIdx) => {
-      const isHeader = rowIdx === 0;
-      
-      // Calculate row height based on cell content with newlines
-      let maxLines = 1;
-      row.forEach(cell => {
-        const cellMaxWidth = colWidth - 4;
-        const cellLines = String(cell).split('\n'); // Split on actual \n in data
-        let totalLines = 0;
-        cellLines.forEach(line => {
-          const wrapped = pdf.splitTextToSize(line, cellMaxWidth);
-          totalLines += wrapped.length;
-        });
-        maxLines = Math.max(maxLines, totalLines);
-      });
-      
-      const rowHeight = Math.max(minRowHeight, maxLines * 9);
-      
-      // Draw row background
-      if (isHeader) {
-        pdf.setFillColor(0, 0, 0);
-        pdf.setGState(new jspdf.GState({ opacity: 0.15 }));
-        pdf.rect(o.x + o.pad[1], currentY, o.w - o.pad[1] - o.pad[2], rowHeight, 'F');
-        pdf.setGState(new jspdf.GState({ opacity: o.opacity }));
-      } else if (rowIdx % 2 === 1) {
-        pdf.setFillColor(0, 0, 0);
-        pdf.setGState(new jspdf.GState({ opacity: 0.05 }));
-        pdf.rect(o.x + o.pad[1], currentY, o.w - o.pad[1] - o.pad[2], rowHeight, 'F');
-        pdf.setGState(new jspdf.GState({ opacity: o.opacity }));
-      }
-      
-      // Draw cells
-      row.forEach((cell, colIdx) => {
-        const cellX = o.x + o.pad[1] + (colIdx * colWidth);
-        const cellMaxWidth = colWidth - 4;
-        
-        if (isHeader) {
-          pdf.setFont(CONFIG.FONT.NAME, 'bold');
-        } else {
-          pdf.setFont(CONFIG.FONT.NAME, 'normal');
-        }
-        
-        // Handle multi-line cells (split on \n in original data)
-        let cellY = currentY + 6;
-        const cellLines = String(cell).split('\n');
-        cellLines.forEach(line => {
-          const wrapped = pdf.splitTextToSize(line, cellMaxWidth);
-          wrapped.forEach(wrappedLine => {
-            pdf.text(wrappedLine, cellX + 2, cellY, { baseline: 'top' });
-            cellY += 8;
-          });
-        });
-      });
-      
-      // Draw borders
-      pdf.setDrawColor(...o.border.slice(0, 3));
-      pdf.setLineWidth(0.5);
-      
-      // Horizontal line
-      pdf.line(
-        o.x + o.pad[1], 
-        currentY + rowHeight,
-        o.x + o.w - o.pad[2],
-        currentY + rowHeight
-      );
-      
-      // Vertical lines
-      for (let col = 0; col <= numCols; col++) {
-        const x = o.x + o.pad[1] + (col * colWidth);
-        pdf.line(x, currentY, x, currentY + rowHeight);
-      }
-      
-      currentY += rowHeight;
-    });
-    
-    // Draw table border
-    pdf.rect(
-      o.x + o.pad[1],
-      o.y + o.pad[0],
-      o.w - o.pad[1] - o.pad[2],
-      currentY - o.y - o.pad[0]
-    );
-  }
   
-  _drawList(pdf, o) {
-    const items = this._extractListItems(o.textElement);
-    const bulletChar = '•';
-    const indent = o.fontSize * 0.5;
-    const lineSpacing = o.lineHeight || o.fontSize * 1.3;
-    
-    let currentY = o.y + o.pad[0] + o.fontSize;
-    
-    items.forEach(item => {
-      // Draw bullet
-      pdf.text(bulletChar, o.x + o.pad[1], currentY, { baseline: 'alphabetic' });
-      
-      // Draw text (with wrapping if needed)
-      const maxWidth = o.w - o.pad[1] - o.pad[2] - indent - (o.fontSize * 0.5);
-      const lines = pdf.splitTextToSize(item, maxWidth);
-      
-      lines.forEach((line, idx) => {
-        const xPos = o.x + o.pad[1] + indent + (o.fontSize * 0.5);
-        pdf.text(line, xPos, currentY + (idx * lineSpacing), { baseline: 'alphabetic' });
-      });
-      
-      currentY += lines.length * lineSpacing;
-    });
-  }
-
   async _preparePage(wrapper, pageNum) {
     let canvas = wrapper.querySelector('canvas');
     if (!canvas) {

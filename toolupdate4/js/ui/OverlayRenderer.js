@@ -21,7 +21,8 @@ export class OverlayRenderer {
       const overlay = this._createOverlay(coords, info, page, dims, coordOrder);
       frag.appendChild(overlay);
       
-      if ([CONFIG.CONTENT_TYPES.TEXT, CONFIG.CONTENT_TYPES.LIST, CONFIG.CONTENT_TYPES.CODE].includes(info.type)) {
+      // Queue for font size calculation (all except images)
+      if ([CONFIG.CONTENT_TYPES.TEXT, CONFIG.CONTENT_TYPES.LIST, CONFIG.CONTENT_TYPES.CODE, CONFIG.CONTENT_TYPES.TABLE].includes(info.type)) {
         toCalculate.push(overlay);
       }
     });
@@ -62,6 +63,7 @@ export class OverlayRenderer {
     if (isSingleLine) classes.push('single-line-layout');
     overlay.className = classes.join(' ');
     
+    // Tables need fixed height for overflow scrolling
     const useFixedHeight = type === CONFIG.CONTENT_TYPES.TABLE;
     
     overlay.style.cssText = `
@@ -90,7 +92,6 @@ export class OverlayRenderer {
       
       const contentType = overlay.dataset.contentType;
       
-      // ✨ FIXED: For tables, extract back to JSON
       let newText;
       if (contentType === CONFIG.CONTENT_TYPES.TABLE) {
         newText = this._extractTableToJSON(e.target);
@@ -104,7 +105,8 @@ export class OverlayRenderer {
       
       this.state.updateOverlayText(overlay.dataset.pageNum, overlay.dataset.coords, newText);
       
-      if ([CONFIG.CONTENT_TYPES.TEXT, CONFIG.CONTENT_TYPES.LIST, CONFIG.CONTENT_TYPES.CODE].includes(contentType)) {
+      // Recalculate font size after edit
+      if ([CONFIG.CONTENT_TYPES.TEXT, CONFIG.CONTENT_TYPES.LIST, CONFIG.CONTENT_TYPES.CODE, CONFIG.CONTENT_TYPES.TABLE].includes(contentType)) {
         this.fontCalc.calculateOptimalSize(overlay);
       }
     }, 500));
@@ -143,7 +145,6 @@ export class OverlayRenderer {
           .join('');
       },
       
-      // ✨ FIXED: Parse JSON to get 2D array
       [CONFIG.CONTENT_TYPES.TABLE]: () => this._formatTable(text, info.tableData),
       
       [CONFIG.CONTENT_TYPES.IMAGE]: () => '<div class="image-placeholder">[Image]</div>',
@@ -157,12 +158,9 @@ export class OverlayRenderer {
     return (formatters[type] || formatters[CONFIG.CONTENT_TYPES.TEXT])();
   }
   
-  // ✨ FIXED: Format table from 2D array
   _formatTable(text, tableData) {
-    // Try to use tableData first (original array)
     let data = tableData;
     
-    // If not available, try to parse from text (JSON string)
     if (!data) {
       try {
         data = JSON.parse(text);
@@ -174,14 +172,12 @@ export class OverlayRenderer {
     
     if (!Array.isArray(data) || !data.length) return text;
     
-    // Generate HTML table from 2D array
     return `<table class="data-table">
       ${data.map((row, rowIdx) => {
         if (!Array.isArray(row)) return '';
         
         const tag = rowIdx === 0 ? 'th' : 'td';
         const cells = row.map(cell => {
-          // ✨ Convert cell content: escape HTML, then convert \n to <br>
           const escaped = escapeHtml(String(cell || ''));
           const withBreaks = escaped.replace(/\n/g, '<br>');
           return `<${tag}>${withBreaks || '&nbsp;'}</${tag}>`;
@@ -192,7 +188,6 @@ export class OverlayRenderer {
     </table>`;
   }
   
-  // ✨ NEW: Extract HTML table back to 2D array JSON
   _extractTableToJSON(textElement) {
     const table = textElement.querySelector('.data-table');
     if (!table) return '[]';
@@ -201,10 +196,8 @@ export class OverlayRenderer {
     const data = rows.map(row => {
       const cells = Array.from(row.querySelectorAll('th, td'));
       return cells.map(cell => {
-        // Get innerHTML to preserve <br> tags, then convert to \n
         const html = cell.innerHTML.trim();
         const withNewlines = html.replace(/<br\s*\/?>/gi, '\n');
-        // Remove HTML tags and decode entities
         const temp = document.createElement('div');
         temp.innerHTML = withNewlines;
         return temp.textContent || '';

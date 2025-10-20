@@ -396,33 +396,33 @@ main {
 
 .data-table {
   width: 100%;
+  height: 100%;
   border-collapse: collapse;
-  font-size: 10px;
+  font-size: inherit;
   line-height: 1.4;
-  border: 1px solid currentColor;
-  table-layout: auto;
+  border: 1px solid currentColor; /* ✨ Inherits overlay border color */
+  color: inherit; /* ✨ Inherits overlay text color */
+  table-layout: fixed;
 }
 
 .data-table th,
 .data-table td {
-  padding: 4px 6px;
-  border: 1px solid currentColor;
+  padding: 6px 8px;
+  border: 1px solid currentColor; /* ✨ Inherits overlay border color */
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   word-break: break-word;
-  min-width: 30px;
+  font-size: inherit;
 }
 
 .data-table th {
   font-weight: 700;
   background: rgba(0, 0, 0, 0.15);
   white-space: normal;
-  font-size: 10px;
 }
 
 .data-table td {
   background: rgba(0, 0, 0, 0.05);
-  font-size: 10px;
 }
 
 .data-table tr:nth-child(even) td {
@@ -507,7 +507,7 @@ main {
   }
   
   .data-table {
-    font-size: 9px;
+    font-size: inherit;
   }
   
   .data-table th,
