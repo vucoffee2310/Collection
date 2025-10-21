@@ -1,178 +1,250 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PDF Overlay Editor</title>
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/controls.css">
-  <link rel="stylesheet" href="css/overlays.css">
-  <link rel="stylesheet" href="css/coordinates.css">
-  <link rel="stylesheet" href="css/modal.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-</head>
-<body>
-  <header id="controls">
-    <div class="control-bar">
-      <label for="file-input" class="btn">PDF</label>
-      <input type="file" id="file-input" accept=".pdf" hidden>
-      <span id="pdf-file-name" class="filename">No file</span>
-      
-      <label for="json-input" class="btn">JSON</label>
-      <input type="file" id="json-input" accept=".json" hidden>
-      <span id="json-file-name" class="filename">Default</span>
-      
-      <span class="sep">|</span>
-      
-      <span class="label">Coord</span>
-      <div id="coord-display" class="coord-display">TLBR</div>
-      <button class="coord-btn" data-coord="T">T</button>
-      <button class="coord-btn" data-coord="L">L</button>
-      <button class="coord-btn" data-coord="B">B</button>
-      <button class="coord-btn" data-coord="R">R</button>
-      
-      <span class="sep">|</span>
-      
-      <span class="label">Palette</span>
-      <div id="palette-container"></div>
-      
-      <span class="sep">|</span>
-      
-      <div class="slider-compact">
-        <span class="slider-label">Opacity</span>
-        <input type="range" id="opacity-slider" min="1" max="100" value="97">
-        <span id="opacity-value">97%</span>
-      </div>
-      
-      <div class="slider-compact">
-        <span class="slider-label">Text</span>
-        <input type="range" id="brightness-slider" min="0" max="100" value="50">
-        <span id="brightness-value">50%</span>
-      </div>
-      
-      <div class="slider-compact">
-        <span class="slider-label">Space</span>
-        <input type="range" id="spacing-slider" min="10" max="100" value="30">
-        <span id="spacing-value">0.3em</span>
-      </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Overlay Editor</title>
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/controls.css" />
+    <link rel="stylesheet" href="css/overlays.css" />
+    <link rel="stylesheet" href="css/coordinates.css" />
+    <link rel="stylesheet" href="css/modal.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  </head>
+  <body>
+    <header id="controls">
+      <div class="control-bar">
+        <label for="file-input" class="btn">PDF</label>
+        <input type="file" id="file-input" accept=".pdf" hidden />
+        <span id="pdf-file-name" class="filename">No file</span>
 
-      <div class="checkbox-compact" title="Boost table cell sizes without overflow">
-        <input type="checkbox" id="exaggeration-toggle" checked>
-        <label for="exaggeration-toggle" class="label">Exaggeration</label>
-      </div>
-      
-      <span class="sep">|</span>
+        <label for="json-input" class="btn">JSON</label>
+        <input type="file" id="json-input" accept=".json" hidden />
+        <span id="json-file-name" class="filename">Default</span>
 
-      <div class="checkbox-compact" title="Equalize row heights for uniform cell scaling">
-        <input type="checkbox" id="equal-rows-toggle" checked>
-        <label for="equal-rows-toggle" class="label">Equal Rows</label>
-      </div>
+        <span class="sep">|</span>
 
-      <span class="sep">|</span>
-      
-      <input type="number" id="expand-amount" value="5" min="1" step="0.5">
-      <button id="expand-all-btn" class="btn">Expand</button>
-      
-      <span class="sep">|</span>
-      
-      <button id="split-pdf-btn" class="btn">Split</button>
-      <button id="save-print-btn" class="btn">Print</button>
-      <button id="save-direct-pdf-btn" class="btn">PDF</button>
-      <button id="save-html-btn" class="btn btn-primary">HTML</button>
-      
-      <span class="sep">|</span>
-      
-      <span id="page-info" class="page-info">No PDF</span>
-      
-      <button id="theme-toggle" class="btn btn-icon" title="Toggle theme">◐</button>
+        <span class="label">Coord</span>
+        <div id="coord-display" class="coord-display">TLBR</div>
+        <button class="coord-btn" data-coord="T">T</button>
+        <button class="coord-btn" data-coord="L">L</button>
+        <button class="coord-btn" data-coord="B">B</button>
+        <button class="coord-btn" data-coord="R">R</button>
+
+        <span class="sep">|</span>
+
+        <span class="label">Palette</span>
+        <div id="palette-container"></div>
+
+        <span class="sep">|</span>
+
+        <div class="slider-compact">
+          <span class="slider-label">Opacity</span>
+          <input
+            type="range"
+            id="opacity-slider"
+            min="1"
+            max="100"
+            value="97"
+          />
+          <span id="opacity-value">97%</span>
+        </div>
+
+        <div class="slider-compact">
+          <span class="slider-label">Text</span>
+          <input
+            type="range"
+            id="brightness-slider"
+            min="0"
+            max="100"
+            value="50"
+          />
+          <span id="brightness-value">50%</span>
+        </div>
+
+        <div class="slider-compact">
+          <span class="slider-label">Space</span>
+          <input
+            type="range"
+            id="spacing-slider"
+            min="10"
+            max="100"
+            value="30"
+          />
+          <span id="spacing-value">0.3em</span>
+        </div>
+
+        <div
+          class="checkbox-compact"
+          title="Boost table cell sizes without overflow"
+        >
+          <input type="checkbox" id="exaggeration-toggle" checked />
+          <label for="exaggeration-toggle" class="label">Exaggeration</label>
+        </div>
+
+        <span class="sep">|</span>
+
+        <div
+          class="checkbox-compact"
+          title="Equalize row heights for uniform cell scaling"
+        >
+          <input type="checkbox" id="equal-rows-toggle" checked />
+          <label for="equal-rows-toggle" class="label">Equal Rows</label>
+        </div>
+
+        <span class="sep">|</span>
+
+        <input type="number" id="expand-amount" value="5" min="1" step="0.5" />
+        <button id="expand-all-btn" class="btn">Expand</button>
+
+        <span class="sep">|</span>
+
+        <button id="split-pdf-btn" class="btn">Split</button>
+        <button id="save-print-btn" class="btn">Print</button>
+        <button id="save-direct-pdf-btn" class="btn">PDF</button>
+        <button id="save-html-btn" class="btn btn-primary">HTML</button>
+
+        <span class="sep">|</span>
+
+        <span id="page-info" class="page-info">No PDF</span>
+
+        <button id="theme-toggle" class="btn btn-icon" title="Toggle theme">
+          ◐
+        </button>
+      </div>
+    </header>
+
+    <main id="pdf-container">
+      <div class="loading">Select a PDF file to begin</div>
+    </main>
+
+    <div id="split-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Split PDF Options</h2>
+          <button class="modal-close" id="modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="split-option">
+            <input
+              type="radio"
+              id="split-all"
+              name="split-mode"
+              value="all"
+              checked
+            />
+            <label for="split-all">
+              <strong>Split All Pages</strong>
+              <span class="option-desc"
+                >Export each page as individual PDF</span
+              >
+            </label>
+          </div>
+
+          <div class="split-option">
+            <input
+              type="radio"
+              id="split-by-files"
+              name="split-mode"
+              value="by-files"
+            />
+            <label for="split-by-files">
+              <strong>Split by Number of Files</strong>
+              <span class="option-desc">Divide PDF into N equal files</span>
+            </label>
+            <div class="option-input">
+              <label>Number of files:</label>
+              <input type="number" id="num-files" min="2" max="100" value="5" />
+            </div>
+          </div>
+
+          <div class="split-option">
+            <input
+              type="radio"
+              id="split-by-pages"
+              name="split-mode"
+              value="by-pages"
+            />
+            <label for="split-by-pages">
+              <strong>Split by Pages Per File</strong>
+              <span class="option-desc">Group every N pages together</span>
+            </label>
+            <div class="option-input">
+              <label>Pages per file:</label>
+              <input
+                type="number"
+                id="pages-per-file"
+                min="1"
+                max="100"
+                value="10"
+              />
+            </div>
+          </div>
+
+          <div class="split-option">
+            <input
+              type="radio"
+              id="split-range"
+              name="split-mode"
+              value="range"
+            />
+            <label for="split-range">
+              <strong>Export Page Range</strong>
+              <span class="option-desc">Export consecutive pages</span>
+            </label>
+            <div class="option-input">
+              <label>From:</label>
+              <input type="number" id="range-start" min="1" value="1" />
+              <label>To:</label>
+              <input type="number" id="range-end" min="1" value="10" />
+            </div>
+          </div>
+
+          <div class="split-option">
+            <input
+              type="radio"
+              id="split-custom"
+              name="split-mode"
+              value="custom"
+            />
+            <label for="split-custom">
+              <strong>Export Specific Pages</strong>
+              <span class="option-desc">Choose individual pages</span>
+            </label>
+            <div class="option-input">
+              <label>Pages (comma-separated):</label>
+              <input
+                type="text"
+                id="custom-pages"
+                placeholder="e.g., 1,5,10,15-20"
+              />
+              <span class="input-hint"
+                >Examples: "1,5,10" or "1-5,10,15-20"</span
+              >
+            </div>
+          </div>
+
+          <div class="modal-info">
+            <p>
+              <strong>Total pages:</strong>
+              <span id="modal-total-pages">0</span>
+            </p>
+            <p>
+              <strong>Estimated output:</strong>
+              <span id="modal-estimate">-</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn" id="modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="modal-export">Export</button>
+        </div>
+      </div>
     </div>
-  </header>
 
-  <main id="pdf-container">
-    <div class="loading">Select a PDF file to begin</div>
-  </main>
-
-  <div id="split-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Split PDF Options</h2>
-        <button class="modal-close" id="modal-close">&times;</button>
-      </div>
-      
-      <div class="modal-body">
-        <div class="split-option">
-          <input type="radio" id="split-all" name="split-mode" value="all" checked>
-          <label for="split-all">
-            <strong>Split All Pages</strong>
-            <span class="option-desc">Export each page as individual PDF</span>
-          </label>
-        </div>
-
-        <div class="split-option">
-          <input type="radio" id="split-by-files" name="split-mode" value="by-files">
-          <label for="split-by-files">
-            <strong>Split by Number of Files</strong>
-            <span class="option-desc">Divide PDF into N equal files</span>
-          </label>
-          <div class="option-input">
-            <label>Number of files:</label>
-            <input type="number" id="num-files" min="2" max="100" value="5">
-          </div>
-        </div>
-
-        <div class="split-option">
-          <input type="radio" id="split-by-pages" name="split-mode" value="by-pages">
-          <label for="split-by-pages">
-            <strong>Split by Pages Per File</strong>
-            <span class="option-desc">Group every N pages together</span>
-          </label>
-          <div class="option-input">
-            <label>Pages per file:</label>
-            <input type="number" id="pages-per-file" min="1" max="100" value="10">
-          </div>
-        </div>
-
-        <div class="split-option">
-          <input type="radio" id="split-range" name="split-mode" value="range">
-          <label for="split-range">
-            <strong>Export Page Range</strong>
-            <span class="option-desc">Export consecutive pages</span>
-          </label>
-          <div class="option-input">
-            <label>From:</label>
-            <input type="number" id="range-start" min="1" value="1">
-            <label>To:</label>
-            <input type="number" id="range-end" min="1" value="10">
-          </div>
-        </div>
-
-        <div class="split-option">
-          <input type="radio" id="split-custom" name="split-mode" value="custom">
-          <label for="split-custom">
-            <strong>Export Specific Pages</strong>
-            <span class="option-desc">Choose individual pages</span>
-          </label>
-          <div class="option-input">
-            <label>Pages (comma-separated):</label>
-            <input type="text" id="custom-pages" placeholder="e.g., 1,5,10,15-20">
-            <span class="input-hint">Examples: "1,5,10" or "1-5,10,15-20"</span>
-          </div>
-        </div>
-
-        <div class="modal-info">
-          <p><strong>Total pages:</strong> <span id="modal-total-pages">0</span></p>
-          <p><strong>Estimated output:</strong> <span id="modal-estimate">-</span></p>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn" id="modal-cancel">Cancel</button>
-        <button class="btn btn-primary" id="modal-export">Export</button>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="js/main.js"></script>
-</body>
+    <script type="module" src="js/main.js"></script>
+  </body>
 </html>
