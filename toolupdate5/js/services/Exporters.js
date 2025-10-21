@@ -94,11 +94,12 @@ main{margin:0 auto;max-width:100%;padding:20px 0;}
 .list-item:last-child{margin-bottom:0;}
 .overlay.content-table{overflow:auto;padding:4px;justify-content:flex-start;align-items:flex-start;}
 .overlay.content-table .overlay-text{width:100%;height:100%;overflow:auto;text-align:left;line-height:1.25;}
-/* Global table scaler */
 .table-fit{display:inline-block;transform-origin:top left;}
+.cell-fit{display:inline-block;transform-origin:top left;}
 .data-table{width:100%;height:100%;border-collapse:collapse;font-size:inherit;line-height:inherit;border:1px solid;border-color:inherit;color:inherit;table-layout:fixed;}
+.data-table colgroup col{box-sizing:border-box;}
 .data-table th,.data-table td{padding:6px 8px;border:1px solid;border-color:inherit;text-align:left;vertical-align:middle;word-break:break-word;font-size:inherit;overflow:hidden;position:relative;}
-.data-table th{font-weight:700;background:rgba(0,0,0,.15);}
+.data-table th{font-weight:700;background:rgba(0,0,0,.15);white-space:normal;}
 .data-table td{background:rgba(0,0,0,.05);}
 .data-table tr:nth-child(even) td{background:rgba(0,0,0,.08);}
 .image-placeholder{font-style:italic;opacity:.6;user-select:none;pointer-events:none;}
