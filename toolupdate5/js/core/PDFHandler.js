@@ -4,6 +4,7 @@ export class PDFHandler {
   constructor() {
     this.pdfDoc = null;
     this.fontPromise = null;
+    this.codeFontPromise = null;
     this.renderQueue = new Map();
     this.observer = null;
     this.cache = new Map(); // Unified cache for pages and images
@@ -45,6 +46,32 @@ export class PDFHandler {
     })();
     
     return this.fontPromise;
+  }
+  
+  async loadCodeFont() {
+    if (this.codeFontPromise) return this.codeFontPromise;
+    
+    this.codeFontPromise = (async () => {
+      try {
+        const res = await fetch(CONFIG.CODE_FONT.URL);
+        if (!res.ok) throw new Error(`Font not found: ${CONFIG.CODE_FONT.URL}`);
+        
+        const blob = await res.blob();
+        const reader = new FileReader();
+        
+        return new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.error('Code font load failed:', e);
+        alert(`Error: Could not load "${CONFIG.CODE_FONT.FILE}". PDF will use default font for code.`);
+        return null;
+      }
+    })();
+    
+    return this.codeFontPromise;
   }
   
   async loadPDF(data) {

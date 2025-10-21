@@ -51,6 +51,10 @@
   align-self: center;
 }
 
+.merged-text-block {
+  text-indent: 1.5em;
+}
+
 .merged-text-block:not(:last-child) {
   margin-bottom: var(--paragraph-spacing);
 }
@@ -73,7 +77,7 @@
 
 /* Code Blocks */
 .overlay.content-code {
-  font-family: 'Courier New', Consolas, Monaco, monospace !important;
+  font-family: 'JetBrains Mono', 'Courier New', Consolas, Monaco, monospace !important;
   font-weight: 600 !important;
   padding: 6px;
   justify-content: flex-start;
@@ -87,7 +91,7 @@
   text-align: left !important;
   white-space: pre-wrap !important;
   word-wrap: break-word !important;
-  font-family: 'Courier New', Consolas, Monaco, monospace !important;
+  font-family: 'JetBrains Mono', 'Courier New', Consolas, Monaco, monospace !important;
   font-weight: 600 !important;
   line-height: 1.4 !important;
   padding: 2px !important;

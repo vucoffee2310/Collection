@@ -40,7 +40,7 @@ export class PDFExporter {
       const ctx = canvas.getContext('2d');
       ctx.font = `${fontSize}px ${fontFamily}`;
       
-      const metrics = ctx.measureText('Ãáº¢ÃƒÃ€áº Ä‚áº®áº²áº´áº°áº¶Ã‚áº¤áº¨áºªáº¦áº¬Ã‰áººáº¼Ãˆáº¸ÃŠáº¾á»‚á»„á»€á»†gpqy');
+      const metrics = ctx.measureText('áàảãạĂăắằẳẵặÂâấầẩẫậéèẻẽẹÊêếềểễệíìỉĩịóòỏõọÔôốồổỗộƠơớờởỡợúùủũụƯưứừửữựýỳỷỹỵÁÀẢÃẠẮẰẲẴẶẤẦẨẪẬÉÈẺẼẸẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌỐỒỔỖỘỚỜỞỠỢÚÙỦŨỤỨỪỬỮỰÝỲỶỸỴ');
       
       if (metrics.actualBoundingBoxAscent !== undefined && metrics.actualBoundingBoxDescent !== undefined) {
         const ratio = metrics.actualBoundingBoxAscent / 
@@ -504,7 +504,7 @@ export class PDFExporter {
       
       let fontName, fontStyle;
       if (o.isCode) {
-        fontName = 'courier';
+        fontName = CONFIG.CODE_FONT?.NAME || 'courier';
         fontStyle = o.fontWeight >= 500 ? 'bold' : 'normal';
       } else {
         fontName = CONFIG.FONT.NAME;
@@ -561,24 +561,31 @@ export class PDFExporter {
   }
   
   async _embedFont(pdf) {
-    const font = await this.pdf.loadFont();
-    if (!font) {
-      console.warn('Font not loaded, PDF will use default font');
-      return;
-    }
-    
-    try {
-      pdf.addFileToVFS(CONFIG.FONT.FILE, font);
+    const embed = async (fontConfig, loader) => {
+      if (!fontConfig) return;
+      const fontData = await loader();
+      if (!fontData) {
+        console.warn(`Font "${fontConfig.NAME}" not loaded, PDF will use default font.`);
+        return;
+      }
       
-      ['normal', 'bold', 'italic', 'bolditalic'].forEach(style => {
-        pdf.addFont(CONFIG.FONT.FILE, CONFIG.FONT.NAME, style);
-      });
-      
-      console.log(`Font "${CONFIG.FONT.NAME}" loaded successfully`);
-    } catch (e) {
-      console.error('Failed to embed font:', e);
-      alert('Warning: Could not embed custom font in PDF. Default font will be used.');
-    }
+      try {
+        pdf.addFileToVFS(fontConfig.FILE, fontData);
+        ['normal', 'bold', 'italic', 'bolditalic'].forEach(style => {
+          pdf.addFont(fontConfig.FILE, fontConfig.NAME, style);
+        });
+        console.log(`Font "${fontConfig.NAME}" embedded successfully`);
+      } catch (e) {
+        console.error(`Failed to embed font "${fontConfig.NAME}":`, e);
+        alert(`Warning: Could not embed font "${fontConfig.NAME}" in PDF.`);
+      }
+    };
+
+    // Embed both main and code fonts
+    await Promise.all([
+      embed(CONFIG.FONT, () => this.pdf.loadFont()),
+      embed(CONFIG.CODE_FONT, () => this.pdf.loadCodeFont())
+    ]);
   }
   
   async _createPDF(wrapper) {

@@ -4,6 +4,11 @@ export const CONFIG = {
     FILE: 'OpenSans_SemiCondensed-Medium.ttf',
     URL: './OpenSans_SemiCondensed-Medium.ttf'
   },
+  CODE_FONT: {
+    NAME: 'JetBrains Mono',
+    FILE: 'JetBrainsMono-Medium.ttf',
+    URL: './JetBrainsMono-Medium.ttf'
+  },
   
   PDF: { 
     WORKER_SRC: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', 

@@ -2,9 +2,9 @@ import { forceUIUpdate, toPx } from '../utils.js';
 import { CONFIG } from '../config.js';
 
 export class Exporters {
-  constructor(pdf){ this.pdf = pdf; }
+  constructor(pdf) { this.pdf = pdf; }
 
-  async _canvasToDataURL(canvas, format='image/webp', quality=0.85){
+  async _canvasToDataURL(canvas, format = 'image/webp', quality = 0.85) {
     return await new Promise((resolve, reject) => {
       canvas.toBlob(blob => {
         if (!blob) return reject(new Error('Canvas to Blob failed'));
@@ -13,36 +13,36 @@ export class Exporters {
     });
   }
 
-  _extractOverlayHTML(overlay, wrapper){
+  _extractOverlayHTML(overlay, wrapper) {
     const os = getComputedStyle(overlay), textEl = overlay.querySelector('.overlay-text'); if (!textEl) return '';
     const ts = getComputedStyle(textEl), wr = wrapper.getBoundingClientRect(), or = overlay.getBoundingClientRect();
     const left = or.left - wr.left, top = or.top - wr.top, width = or.width, height = or.height;
 
     const fs = parseFloat(ts.fontSize), bw = parseFloat(os.borderWidth) || 1, br = parseFloat(os.borderRadius) || 3, pad = parseFloat(os.padding) || 1;
     const overlayStyles = [
-      `position:absolute`,`left:${toPx(left)}`,`top:${toPx(top)}`,`width:${toPx(width)}`,`height:${toPx(height)}`,
-      `background-color:${os.backgroundColor}`,`border:${toPx(bw)} solid ${os.borderColor}`,`border-radius:${toPx(br)}`,
-      `color:${ts.color}`,`font-size:${toPx(fs)}`,`font-family:${ts.fontFamily}`,`font-weight:${ts.fontWeight}`,`font-style:${ts.fontStyle}`,
-      `line-height:${ts.lineHeight}`,`padding:${toPx(pad)}`,`opacity:${os.opacity}`,`display:flex`,`flex-direction:column`,`overflow:hidden`,`white-space:pre-wrap`,`word-wrap:break-word`
+      `position:absolute`, `left:${toPx(left)}`, `top:${toPx(top)}`, `width:${toPx(width)}`, `height:${toPx(height)}`,
+      `background-color:${os.backgroundColor}`, `border:${toPx(bw)} solid ${os.borderColor}`, `border-radius:${toPx(br)}`,
+      `color:${ts.color}`, `font-size:${toPx(fs)}`, `font-family:${ts.fontFamily}`, `font-weight:${ts.fontWeight}`, `font-style:${ts.fontStyle}`,
+      `line-height:${ts.lineHeight}`, `padding:${toPx(pad)}`, `opacity:${os.opacity}`, `display:flex`, `flex-direction:column`, `overflow:hidden`, `white-space:pre-wrap`, `word-wrap:break-word`
     ];
     const cls = ['overlay'];
     const add = c => { if (overlay.classList.contains(c)) cls.push(c); };
-    ['vertical-text','single-line-layout','content-code','content-list','content-table'].forEach(add);
+    ['vertical-text', 'single-line-layout', 'content-code', 'content-list', 'content-table'].forEach(add);
 
-    const textStyles = [`text-align:${ts.textAlign}`,`letter-spacing:${ts.letterSpacing}`,`word-spacing:${ts.wordSpacing}`];
-    if (overlay.classList.contains('content-table')) textStyles.push(`width:100%`,`height:100%`,`overflow:auto`,`text-align:left`);
-    else if (overlay.classList.contains('content-code')) textStyles.push(`width:100%`,`text-align:left`,`white-space:pre-wrap`,`font-family:'Courier New',Consolas,Monaco,monospace`,`font-weight:500`,`line-height:1.4`);
-    else if (overlay.classList.contains('content-list')) textStyles.push(`width:100%`,`text-align:left`);
-    else if (overlay.classList.contains('vertical-text')) textStyles.push(`writing-mode:vertical-rl`,`transform:rotate(180deg)`,`white-space:nowrap`,`text-align:center`,`line-height:1`,`align-self:center`);
-    else if (overlay.classList.contains('single-line-layout')) textStyles.push(`width:auto`,`text-align:left`,`align-self:center`);
-    else textStyles.push(`width:100%`,`align-self:stretch`);
+    const textStyles = [`text-align:${ts.textAlign}`, `letter-spacing:${ts.letterSpacing}`, `word-spacing:${ts.wordSpacing}`];
+    if (overlay.classList.contains('content-table')) textStyles.push(`width:100%`, `height:100%`, `overflow:auto`, `text-align:left`);
+    else if (overlay.classList.contains('content-code')) textStyles.push(`width:100%`, `text-align:left`, `white-space:pre-wrap`, `line-height:1.4`);
+    else if (overlay.classList.contains('content-list')) textStyles.push(`width:100%`, `text-align:left`);
+    else if (overlay.classList.contains('vertical-text')) textStyles.push(`writing-mode:vertical-rl`, `transform:rotate(180deg)`, `white-space:nowrap`, `text-align:center`, `line-height:1`, `align-self:center`);
+    else if (overlay.classList.contains('single-line-layout')) textStyles.push(`width:auto`, `text-align:left`, `align-self:center`);
+    else textStyles.push(`width:100%`, `align-self:stretch`);
 
     return `<div class="${cls.join(' ')}" style="${overlayStyles.join(';')}">
   <div class="overlay-text" style="${textStyles.join(';')}">${textEl.innerHTML || ''}</div>
 </div>`;
   }
 
-  async _generatePageHTML(wrapper, pageNum){
+  async _generatePageHTML(wrapper, pageNum) {
     const c = wrapper.querySelector('canvas'); if (!c) return '';
     const img = await this._canvasToDataURL(c);
     const overlaysHTML = Array.from(wrapper.querySelectorAll('.overlay')).map(ov => this._extractOverlayHTML(ov, wrapper)).filter(Boolean).join('\n    ');
@@ -54,26 +54,30 @@ export class Exporters {
 </div>`;
   }
 
-  async _generateBodyHTML(indicator){
+  async _generateBodyHTML(indicator) {
     const wrappers = Array.from(document.querySelectorAll('.page-wrapper'));
     const total = wrappers.length, batch = 10, out = [];
-    for (let i=0;i<total;i+=batch){
-      const seg = wrappers.slice(i, i+batch);
-      indicator.textContent = `Processing pages ${i+1}-${Math.min(i+batch,total)} of ${total}...`;
-      const htmls = await Promise.all(seg.map((w, idx) => this._generatePageHTML(w, i+idx+1)));
+    for (let i = 0; i < total; i += batch) {
+      const seg = wrappers.slice(i, i + batch);
+      indicator.textContent = `Processing pages ${i + 1}-${Math.min(i + batch, total)} of ${total}...`;
+      const htmls = await Promise.all(seg.map((w, idx) => this._generatePageHTML(w, i + idx + 1)));
       out.push(...htmls);
       if (i % 30 === 0) await new Promise(r => setTimeout(r, 0));
     }
     return out.filter(Boolean).join('\n');
   }
 
-  _buildCSS(fontBase64){
-    const fontFace = fontBase64
-      ? `@font-face{font-family:'${CONFIG.FONT.NAME}';src:url(data:font/ttf;base64,${fontBase64}) format('truetype');font-weight:100 900;font-style:normal;font-display:swap;}`
+  _buildCSS(fonts) {
+    const mainFontFace = fonts.mainFontBase64
+      ? `@font-face{font-family:'${CONFIG.FONT.NAME}';src:url(data:font/ttf;base64,${fonts.mainFontBase64}) format('truetype');font-weight:100 900;font-style:normal;font-display:swap;}`
       : `/* Font not embedded */`;
+    const codeFontFace = fonts.codeFontBase64
+      ? `@font-face{font-family:'${CONFIG.CODE_FONT.NAME}';src:url(data:font/ttf;base64,${fonts.codeFontBase64}) format('truetype');font-weight:100 900;font-style:normal;font-display:swap;}`
+      : `/* Code font not embedded */`;
     const spacing = getComputedStyle(document.body).getPropertyValue('--paragraph-spacing') || '0.4em';
 
-    return `${fontFace}
+    return `${mainFontFace}
+${codeFontFace}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{margin:0;background:#e9e9e9;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
 main{margin:0 auto;max-width:100%;padding:20px 0;}
@@ -86,8 +90,8 @@ main{margin:0 auto;max-width:100%;padding:20px 0;}
 .overlay.single-line-layout .overlay-text{width:auto;text-align:left;align-self:center;}
 .overlay.vertical-text{justify-content:center;align-items:center;}
 .overlay.vertical-text .overlay-text{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;text-align:center;line-height:1;align-self:center;}
-.overlay.content-code{font-family:'Courier New',Consolas,Monaco,monospace;font-weight:500;padding:6px;overflow-y:auto;justify-content:flex-start;align-items:flex-start;}
-.overlay.content-code .overlay-text{width:100%;text-align:left;white-space:pre-wrap;font-family:'Courier New',Consolas,Monaco,monospace;font-weight:500;line-height:1.4;}
+.overlay.content-code{font-family:'${CONFIG.CODE_FONT.NAME}', 'Courier New',Consolas,Monaco,monospace;font-weight:600;padding:6px;overflow-y:auto;justify-content:flex-start;align-items:flex-start;}
+.overlay.content-code .overlay-text{width:100%;text-align:left;white-space:pre-wrap;font-family:'${CONFIG.CODE_FONT.NAME}', 'Courier New',Consolas,Monaco,monospace;font-weight:600;line-height:1.4;}
 .overlay.content-list{justify-content:flex-start;align-items:flex-start;}
 .overlay.content-list .overlay-text{width:100%;text-align:left;}
 .list-item{margin-bottom:.4em;text-align:left;line-height:1.3;}
@@ -103,6 +107,7 @@ main{margin:0 auto;max-width:100%;padding:20px 0;}
 .data-table td{background:rgba(0,0,0,.05);}
 .data-table tr:nth-child(even) td{background:rgba(0,0,0,.08);}
 .image-placeholder{font-style:italic;opacity:.6;user-select:none;pointer-events:none;}
+.merged-text-block{text-indent:1.5em;}
 .merged-text-block:not(:last-child){margin-bottom:${spacing};}
 @media print{
   body{background:none;} main{margin:0;padding:0;}
@@ -120,19 +125,21 @@ main{margin:0 auto;max-width:100%;padding:20px 0;}
 }`;
   }
 
-  _buildHTMLDocument(title, fontBase64, body){
-    const css = this._buildCSS(fontBase64);
+  _buildHTMLDocument(title, fonts, body) {
+    const css = this._buildCSS(fonts);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${title} - View</title><style>${css}</style></head><body><main>${body}</main></body></html>`;
   }
 
-  async html(name, ui){
+  async html(name, ui) {
     const ind = ui.showSavingIndicator('Initializing HTML export...'); await forceUIUpdate();
     try {
-      ind.textContent = 'Loading font...';
-      const fontBase64 = await this.pdf.loadFont();
+      ind.textContent = 'Loading fonts...';
+      const mainFontBase64 = await this.pdf.loadFont();
+      const codeFontBase64 = await this.pdf.loadCodeFont();
+      const fonts = { mainFontBase64, codeFontBase64 };
       const body = await this._generateBodyHTML(ind);
       ind.textContent = 'Building document...';
-      const doc = this._buildHTMLDocument(name, fontBase64, body);
+      const doc = this._buildHTMLDocument(name, fonts, body);
       ind.textContent = 'Saving file...';
       const blob = new Blob([doc], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
@@ -146,9 +153,9 @@ main{margin:0 auto;max-width:100%;padding:20px 0;}
     }
   }
 
-  async print(ui){
+  async print(ui) {
     const ind = ui.showSavingIndicator('Preparing for print...'); await forceUIUpdate();
-    try { await this.pdf.renderAllQueuedPages(); await new Promise(r=>setTimeout(r,100)); ui.removeSavingIndicator(ind); await forceUIUpdate(); window.print(); }
-    catch (e){ console.error('Print Error:', e); alert('Could not prepare for print. See console for details.'); }
+    try { await this.pdf.renderAllQueuedPages(); await new Promise(r => setTimeout(r, 100)); ui.removeSavingIndicator(ind); await forceUIUpdate(); window.print(); }
+    catch (e) { console.error('Print Error:', e); alert('Could not prepare for print. See console for details.'); }
   }
 }
