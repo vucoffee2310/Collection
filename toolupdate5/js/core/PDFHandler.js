@@ -73,9 +73,13 @@ export class PDFHandler {
       
       await page.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
       
+      // Preserve export controls
+      const exportControls = wrapper.querySelector('.page-export-controls');
+
       wrapper.innerHTML = '';
       wrapper.classList.remove('page-placeholder');
       wrapper.appendChild(canvas);
+      if (exportControls) wrapper.appendChild(exportControls);
       wrapper.dataset.rendered = 'true';
     } catch (e) {
       wrapper.innerHTML = `<span>Error loading page ${pageNum}</span>`;

@@ -56,7 +56,7 @@ export class PDFExporter {
     return 0.78;
   }
   
-  // ✨ NEW: Extract cell text preserving line breaks
+  // ✨ Extract cell text preserving line breaks
   _extractCellText(cell) {
     const html = cell.innerHTML.trim();
     const withNewlines = html.replace(/<br\s*\/?>/gi, '\n');
@@ -65,7 +65,7 @@ export class PDFExporter {
     return temp.textContent || '';
   }
   
-  // ✨ NEW: Extract complete table layout from DOM
+  // ✨ Extract complete table layout from DOM
   _extractTableLayout(table, wrapper) {
     const wrapperRect = wrapper.getBoundingClientRect();
     const tableRect = table.getBoundingClientRect();
@@ -78,12 +78,19 @@ export class PDFExporter {
       width: tableRect.width,
       height: tableRect.height,
       rows: rows.map(row => {
-        const rowRect = row.getBoundingClientRect();
         const cells = Array.from(row.querySelectorAll('th, td'));
-        
+        const rowRectFromCells = (() => {
+          if (!cells.length) return { top: 0, bottom: 0 };
+          const rects = cells.map(c => c.getBoundingClientRect());
+          return {
+            top: Math.min(...rects.map(r => r.top)),
+            bottom: Math.max(...rects.map(r => r.bottom))
+          };
+        })();
+
         return {
-          y: rowRect.top - wrapperRect.top,
-          height: rowRect.height,
+          y: rowRectFromCells.top - wrapperRect.top,
+          height: rowRectFromCells.bottom - rowRectFromCells.top,
           isHeader: row.querySelector('th') !== null,
           cells: cells.map(cell => {
             const cellRect = cell.getBoundingClientRect();
@@ -100,6 +107,9 @@ export class PDFExporter {
               paddingBottom: parseFloat(cellStyle.paddingBottom) || 0,
               text: this._extractCellText(cell),
               fontSize: parseFloat(cellStyle.fontSize),
+              lineHeight: (cellStyle.lineHeight === 'normal' || !parseFloat(cellStyle.lineHeight))
+                ? (parseFloat(cellStyle.fontSize) * 1.25)
+                : parseFloat(cellStyle.lineHeight),
               fontWeight: cellStyle.fontWeight,
               textAlign: cellStyle.textAlign,
               verticalAlign: cellStyle.verticalAlign,
@@ -372,6 +382,7 @@ export class PDFExporter {
     const items = this._extractListItems(o.textElement);
     const bulletChar = '•';
     const indent = o.fontSize * 0.5;
+    // keep consistency with on-screen line-height if possible
     const lineSpacing = o.lineHeight || o.fontSize * 1.3;
     
     let currentY = o.y + o.pad[0] + o.fontSize;
@@ -404,7 +415,7 @@ export class PDFExporter {
     layout.rows.forEach((row, rowIdx) => {
       const isHeader = row.isHeader;
       
-      // Draw row background using exact measured position and size
+      // Row backgrounds (header + alternate)
       if (isHeader) {
         pdf.setFillColor(0, 0, 0);
         pdf.setGState(new jspdf.GState({ opacity: 0.15 }));
@@ -439,17 +450,18 @@ export class PDFExporter {
           wrappedLines.push(...wrapped);
         });
         
-        // Calculate vertical positioning based on actual cell height
-        const lineHeight = cell.fontSize * 1.4;
+        // Use captured cell-specific line-height if available
+        const lineHeight = cell.lineHeight || (cell.fontSize * 1.25);
         const totalTextHeight = wrappedLines.length * lineHeight;
         
+        // Vertical alignment
         let textY;
         if (cell.verticalAlign === 'middle') {
           textY = cell.y + (cell.height - totalTextHeight) / 2;
         } else if (cell.verticalAlign === 'bottom') {
-          textY = cell.y + cell.height - totalTextHeight - cell.paddingBottom;
+          textY = cell.y + cell.height - totalTextHeight - (cell.paddingBottom || 0);
         } else {
-          textY = cell.y + cell.paddingTop;
+          textY = cell.y + (cell.paddingTop || 0);
         }
         
         // Draw each line
@@ -459,11 +471,11 @@ export class PDFExporter {
           // Text alignment
           let x = textX;
           if (cell.textAlign === 'center') {
-            const textWidth = pdf.getTextWidth(line);
-            x = cell.x + (cell.width - textWidth) / 2;
+            const w = pdf.getTextWidth(line);
+            x = cell.x + (cell.width - w) / 2;
           } else if (cell.textAlign === 'right') {
-            const textWidth = pdf.getTextWidth(line);
-            x = cell.x + cell.width - textWidth - cell.paddingRight;
+            const w = pdf.getTextWidth(line);
+            x = cell.x + cell.width - w - (cell.paddingRight || 0);
           }
           
           pdf.text(line, x, y, { baseline: 'top' });
