@@ -378,13 +378,13 @@ export class PDFExporter {
         .split('\n')
         .map(line => line.trim())
         .filter(line => line)
-        .map(line => line.replace(/^[â€¢\-\*]\s*/, ''));
+        .map(line => line.replace(/^[*\-\*]\s*/, ''));
     }
   }
   
   _drawList(pdf, o) {
     const items = this._extractListItems(o.textElement);
-    const bulletChar = 'â€¢';
+    const bulletChar = '*';
     const indent = o.fontSize * 0.5;
     const lineSpacing = o.lineHeight || o.fontSize * 1.3;
     
