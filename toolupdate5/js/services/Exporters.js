@@ -1,5 +1,5 @@
-import { forceUIUpdate, toPx } from '../utils.js';
-import { CONFIG } from '../config.js';
+import { forceUIUpdate, toPx } from "../utils.js";
+import { CONFIG } from "../config.js";
 
 export class Exporters {
   constructor(pdf) {
@@ -13,12 +13,12 @@ export class Exporters {
    * @param {number} [quality=0.85] The image quality for lossy formats.
    * @returns {Promise<string>} A promise that resolves with the data URL.
    */
-  async _canvasToDataURL(canvas, format = 'image/webp', quality = 0.85) {
+  async _canvasToDataURL(canvas, format = "image/webp", quality = 0.85) {
     return new Promise((resolve, reject) => {
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            return reject(new Error('Canvas to Blob conversion failed.'));
+            return reject(new Error("Canvas to Blob conversion failed."));
           }
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
@@ -26,7 +26,7 @@ export class Exporters {
           reader.readAsDataURL(blob);
         },
         format,
-        quality
+        quality,
       );
     });
   }
@@ -38,8 +38,8 @@ export class Exporters {
    * @returns {string} The generated HTML for the overlay.
    */
   _extractOverlayHTML(overlay, wrapper) {
-    const textElement = overlay.querySelector('.overlay-text');
-    if (!textElement) return '';
+    const textElement = overlay.querySelector(".overlay-text");
+    if (!textElement) return "";
 
     const overlayComputedStyle = getComputedStyle(overlay);
     const textComputedStyle = getComputedStyle(textElement);
@@ -79,9 +79,15 @@ export class Exporters {
       `word-wrap: break-word`,
     ];
 
-    const classes = ['overlay'];
-    const classChecks = ['vertical-text', 'single-line-layout', 'content-code', 'content-list', 'content-table'];
-    classChecks.forEach(c => {
+    const classes = ["overlay"];
+    const classChecks = [
+      "vertical-text",
+      "single-line-layout",
+      "content-code",
+      "content-list",
+      "content-table",
+    ];
+    classChecks.forEach((c) => {
       if (overlay.classList.contains(c)) {
         classes.push(c);
       }
@@ -93,23 +99,40 @@ export class Exporters {
       `word-spacing: ${textComputedStyle.wordSpacing}`,
     ];
 
-    if (overlay.classList.contains('content-table')) {
-      textStyles.push(`width: 100%`, `height: 100%`, `overflow: auto`, `text-align: left`);
-    } else if (overlay.classList.contains('content-code')) {
-      textStyles.push(`width: 100%`, `text-align: left`, `white-space: pre-wrap`, `line-height: 1.4`);
-    } else if (overlay.classList.contains('content-list')) {
+    if (overlay.classList.contains("content-table")) {
+      textStyles.push(
+        `width: 100%`,
+        `height: 100%`,
+        `overflow: auto`,
+        `text-align: left`,
+      );
+    } else if (overlay.classList.contains("content-code")) {
+      textStyles.push(
+        `width: 100%`,
+        `text-align: left`,
+        `white-space: pre-wrap`,
+        `line-height: 1.4`,
+      );
+    } else if (overlay.classList.contains("content-list")) {
       textStyles.push(`width: 100%`, `text-align: left`);
-    } else if (overlay.classList.contains('vertical-text')) {
-      textStyles.push(`writing-mode: vertical-rl`, `transform: rotate(180deg)`, `white-space: nowrap`, `text-align: center`, `line-height: 1`, `align-self: center`);
-    } else if (overlay.classList.contains('single-line-layout')) {
+    } else if (overlay.classList.contains("vertical-text")) {
+      textStyles.push(
+        `writing-mode: vertical-rl`,
+        `transform: rotate(180deg)`,
+        `white-space: nowrap`,
+        `text-align: center`,
+        `line-height: 1`,
+        `align-self: center`,
+      );
+    } else if (overlay.classList.contains("single-line-layout")) {
       textStyles.push(`width: auto`, `text-align: left`, `align-self: center`);
     } else {
       textStyles.push(`width: 100%`, `align-self: stretch`);
     }
 
     return `
-<div class="${classes.join(' ')}" style="${overlayStyles.join('; ')}">
-  <div class="overlay-text" style="${textStyles.join('; ')}">${textElement.innerHTML || ''}</div>
+<div class="${classes.join(" ")}" style="${overlayStyles.join("; ")}">
+  <div class="overlay-text" style="${textStyles.join("; ")}">${textElement.innerHTML || ""}</div>
 </div>`;
   }
 
@@ -120,14 +143,14 @@ export class Exporters {
    * @returns {Promise<string>} A promise resolving to the page's HTML.
    */
   async _generatePageHTML(wrapper, pageNum) {
-    const canvas = wrapper.querySelector('canvas');
-    if (!canvas) return '';
+    const canvas = wrapper.querySelector("canvas");
+    if (!canvas) return "";
 
     const imageDataUrl = await this._canvasToDataURL(canvas);
-    const overlaysHTML = Array.from(wrapper.querySelectorAll('.overlay'))
-      .map(overlay => this._extractOverlayHTML(overlay, wrapper))
+    const overlaysHTML = Array.from(wrapper.querySelectorAll(".overlay"))
+      .map((overlay) => this._extractOverlayHTML(overlay, wrapper))
       .filter(Boolean)
-      .join('\n    ');
+      .join("\n    ");
 
     const aspectRatio = canvas.width / canvas.height;
     const { clientWidth, clientHeight } = wrapper;
@@ -145,7 +168,7 @@ export class Exporters {
    * @returns {Promise<string>} A promise resolving to the body HTML.
    */
   async _generateBodyHTML(indicator) {
-    const wrappers = Array.from(document.querySelectorAll('.page-wrapper'));
+    const wrappers = Array.from(document.querySelectorAll(".page-wrapper"));
     const totalPages = wrappers.length;
     const BATCH_SIZE = 10;
     const outputHTML = [];
@@ -156,16 +179,18 @@ export class Exporters {
       const endPage = Math.min(i + BATCH_SIZE, totalPages);
       indicator.textContent = `Processing pages ${startPage}-${endPage} of ${totalPages}...`;
 
-      const htmlPromises = segment.map((wrapper, index) => this._generatePageHTML(wrapper, i + index + 1));
+      const htmlPromises = segment.map((wrapper, index) =>
+        this._generatePageHTML(wrapper, i + index + 1),
+      );
       const htmls = await Promise.all(htmlPromises);
       outputHTML.push(...htmls);
 
       // Yield to the main thread every few batches to keep the UI responsive
       if (i % 30 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
     }
-    return outputHTML.filter(Boolean).join('\n');
+    return outputHTML.filter(Boolean).join("\n");
   }
 
   /**
@@ -194,7 +219,9 @@ export class Exporters {
         }`
       : `/* Code font not embedded */`;
 
-    const paragraphSpacing = getComputedStyle(document.body).getPropertyValue('--paragraph-spacing') || '0.4em';
+    const paragraphSpacing =
+      getComputedStyle(document.body).getPropertyValue("--paragraph-spacing") ||
+      "0.4em";
 
     return `
       ${mainFontFace}
@@ -278,31 +305,31 @@ export class Exporters {
    * @param {object} ui The UI service for showing indicators.
    */
   async html(name, ui) {
-    const indicator = ui.showSavingIndicator('Initializing HTML export...');
+    const indicator = ui.showSavingIndicator("Initializing HTML export...");
     await forceUIUpdate();
     try {
-      indicator.textContent = 'Loading fonts...';
+      indicator.textContent = "Loading fonts...";
       const mainFontBase64 = await this.pdf.loadFont();
       const codeFontBase64 = await this.pdf.loadCodeFont();
       const fonts = { mainFontBase64, codeFontBase64 };
 
       const bodyContent = await this._generateBodyHTML(indicator);
 
-      indicator.textContent = 'Building document...';
+      indicator.textContent = "Building document...";
       const doc = this._buildHTMLDocument(name, fonts, bodyContent);
 
-      indicator.textContent = 'Saving file...';
-      const blob = new Blob([doc], { type: 'text/html' });
+      indicator.textContent = "Saving file...";
+      const blob = new Blob([doc], { type: "text/html" });
       const url = URL.createObjectURL(blob);
 
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = `${name}_view.html`;
       link.click();
 
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('HTML Export Error:', error);
+      console.error("HTML Export Error:", error);
       alert(`Error saving as HTML: ${error.message}`);
     } finally {
       ui.removeSavingIndicator(indicator);
@@ -314,20 +341,20 @@ export class Exporters {
    * @param {object} ui The UI service for showing indicators.
    */
   async print(ui) {
-    const indicator = ui.showSavingIndicator('Preparing for print...');
+    const indicator = ui.showSavingIndicator("Preparing for print...");
     await forceUIUpdate();
     try {
       await this.pdf.renderAllQueuedPages();
       // Brief delay to ensure all content is painted before printing.
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       ui.removeSavingIndicator(indicator);
       await forceUIUpdate(); // Ensure indicator is gone before print dialog.
 
       window.print();
     } catch (error) {
-      console.error('Print Error:', error);
-      alert('Could not prepare for print. See console for details.');
+      console.error("Print Error:", error);
+      alert("Could not prepare for print. See console for details.");
     }
   }
 }
