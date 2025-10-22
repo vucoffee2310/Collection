@@ -22,22 +22,6 @@
       console.log("[Debug Window] 🔍 Loaded at:", window.location.href);
       console.log("[Debug Window] Protocol:", window.location.protocol);
       console.log("[Debug Window] Has opener:", !!window.opener);
-      if (window.location.protocol === "file:") {
-        document.body.innerHTML = `
-             <div style="padding: 40px; background: #fff3cd; border: 3px solid #ffc107; margin: 20px; border-radius: 8px;">
-                 <h1 style="color: #856404;">⚠️ Running from file:// protocol</h1>
-                 <p style="font-size: 16px;">The debug extension requires a web server to work properly.</p>
-                 <h2>Quick Fix:</h2>
-                 <ol style="font-size: 14px; line-height: 1.8;">
-                     <li>Open terminal in the <code>segment-mapper</code> folder</li>
-                     <li>Run: <code>python -m http.server 8000</code></li>
-                     <li>Open: <code>http://localhost:8000/mapper-app/index.html</code></li>
-                 </ol>
-                 <p><strong>Current location:</strong> <code>${window.location.href}</code></p>
-             </div>
-             `;
-        throw new Error("Running from file:// protocol - need web server");
-      }
     </script>
     <div class="debug-container">
       <!-- Compact Header -->
@@ -94,3 +78,4 @@
     <script type="module" src="js/debugger-core.js"></script>
   </body>
 </html>
+
