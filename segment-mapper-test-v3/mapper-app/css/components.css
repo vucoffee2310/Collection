@@ -3,54 +3,54 @@
    ================================= */
 
 /* Empty State */
-.empty { 
-    padding: 30px; 
-    text-align: center; 
-    color: #999;
-    background: #f9f9f9; 
-    border: 1px dashed #ccc;
-    border-radius: 4px;
-    font-style: italic;
+.empty {
+  padding: 30px;
+  text-align: center;
+  color: #999;
+  background: #f9f9f9;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  font-style: italic;
 }
 
 /* Details/Summary Accordion */
-details { 
-    margin-bottom: 10px; 
+details {
+  margin-bottom: 10px;
 }
 
-summary { 
-    cursor: pointer; 
-    font-weight: bold; 
-    padding: 8px 10px; 
-    background: #f0f0f0; 
-    border-radius: 3px;
-    user-select: none;
-    transition: background 0.2s;
+summary {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 8px 10px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  user-select: none;
+  transition: background 0.2s;
 }
 
 summary:hover {
-    background: #e0e0e0;
+  background: #e0e0e0;
 }
 
 summary::-webkit-details-marker {
-    margin-right: 8px;
+  margin-right: 8px;
 }
 
 /* Pre-formatted Code Blocks */
 .details-pre {
-    background: #f9f9f9; 
-    border: 1px solid #ddd; 
-    padding: 10px;
-    font-size: 12px; 
-    font-family: 'Courier New', monospace; 
-    white-space: pre-wrap;
-    word-break: break-all; 
-    margin-top: 5px; 
-    max-height: 250px; 
-    overflow: auto;
-    border-radius: 3px;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 10px;
+  font-size: 12px;
+  font-family: "Courier New", monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 5px;
+  max-height: 250px;
+  overflow: auto;
+  border-radius: 3px;
 }
 
 .details-pre.stream-data {
-    white-space: pre-line;
+  white-space: pre-line;
 }

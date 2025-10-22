@@ -1,116 +1,136 @@
 export class Parser {
-    static extractContentForMapping(fullPromptText) {
-        const codeBlockMatch = fullPromptText.match(/```([\s\S]*?)```/);
-        if (!codeBlockMatch || !codeBlockMatch[1]) return null;
-        const codeBlockContent = codeBlockMatch[1];
-        const parts = codeBlockContent.split('---');
-        if (parts.length >= 3) return parts[2].trim();
-        return null;
+  static extractContentForMapping(fullPromptText) {
+    const codeBlockMatch = fullPromptText.match(/```([\s\S]*?)```/);
+    if (!codeBlockMatch || !codeBlockMatch[1]) return null;
+    const codeBlockContent = codeBlockMatch[1];
+    const parts = codeBlockContent.split("---");
+    if (parts.length >= 3) return parts[2].trim();
+    return null;
+  }
+
+  static parseWithUniqueMarkers(text) {
+    const regex = /\(([a-z])\)\s*/gi;
+    const segments = [];
+    const markerCounts = {};
+    const matches = [];
+
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      matches.push({
+        marker: match[1].toLowerCase(),
+        pos: match.index,
+        endPos: regex.lastIndex,
+      });
     }
 
-    static parseWithUniqueMarkers(text) {
-        const regex = /\(([a-z])\)\s*/gi;
-        const segments = [];
-        const markerCounts = {};
-        const matches = [];
+    for (let i = 0; i < matches.length; i++) {
+      const current = matches[i];
+      const next = matches[i + 1];
+      const baseMarker = current.marker;
+      const textStart = current.endPos;
+      const textEnd = next ? next.pos : text.length;
+      const content = text.substring(textStart, textEnd).trim();
 
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-            matches.push({ marker: match[1].toLowerCase(), pos: match.index, endPos: regex.lastIndex });
-        }
+      // FIXED: Always increment counter and create segment
+      if (!markerCounts[baseMarker]) markerCounts[baseMarker] = 0;
+      const index = markerCounts[baseMarker]++;
 
-        for (let i = 0; i < matches.length; i++) {
-            const current = matches[i];
-            const next = matches[i + 1];
-            const baseMarker = current.marker;
-            const textStart = current.endPos;
-            const textEnd = next ? next.pos : text.length;
-            const content = text.substring(textStart, textEnd).trim();
-
-            // FIXED: Always increment counter and create segment
-            if (!markerCounts[baseMarker]) markerCounts[baseMarker] = 0;
-            const index = markerCounts[baseMarker]++;
-            
-            // Create segment even if content is empty (to maintain index alignment)
-            segments.push({ marker: `${baseMarker}-${index}`, text: content || '' });
-        }
-        return segments;
+      // Create segment even if content is empty (to maintain index alignment)
+      segments.push({ marker: `${baseMarker}-${index}`, text: content || "" });
     }
+    return segments;
+  }
 }
 
 export class StreamingParser {
-    constructor() { this.reset(); }
-    reset() {
-        this.buffer = ''; this.segments = []; this.markerCounts = {}; this.pendingMarker = null;
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.buffer = "";
+    this.segments = [];
+    this.markerCounts = {};
+    this.pendingMarker = null;
+  }
+  feed(chunk) {
+    this.buffer += chunk;
+    return this.extract();
+  }
+  extract() {
+    const regex = /\(([a-z])\)\s*/gi;
+    const newSegments = [];
+    const matches = [];
+    let match;
+    while ((match = regex.exec(this.buffer)) !== null) {
+      matches.push({
+        marker: match[1].toLowerCase(),
+        pos: match.index,
+        endPos: regex.lastIndex,
+      });
     }
-    feed(chunk) { this.buffer += chunk; return this.extract(); }
-    extract() {
-        const regex = /\(([a-z])\)\s*/gi;
-        const newSegments = [];
-        const matches = [];
-        let match;
-        while ((match = regex.exec(this.buffer)) !== null) {
-            matches.push({ marker: match[1].toLowerCase(), pos: match.index, endPos: regex.lastIndex });
-        }
-        
-        for (let i = 0; i < matches.length - 1; i++) {
-            const current = matches[i];
-            const next = matches[i + 1];
-            const baseMarker = current.marker;
-            const content = this.buffer.substring(current.endPos, next.pos).trim();
-            
-            // FIXED: Always increment counter and create segment
-            if (!this.markerCounts[baseMarker]) this.markerCounts[baseMarker] = 0;
-            const index = this.markerCounts[baseMarker]++;
-            
-            // Create segment even if empty
-            const seg = { marker: `${baseMarker}-${index}`, text: content || '' };
-            this.segments.push(seg);
-            newSegments.push(seg);
-        }
-        
-        if (matches.length > 0) {
-            const lastMatch = matches[matches.length - 1];
-            this.pendingMarker = lastMatch.marker;
-            this.buffer = this.buffer.substring(lastMatch.pos);
-        } else { 
-            this.buffer = ''; 
-        }
-        return newSegments;
+
+    for (let i = 0; i < matches.length - 1; i++) {
+      const current = matches[i];
+      const next = matches[i + 1];
+      const baseMarker = current.marker;
+      const content = this.buffer.substring(current.endPos, next.pos).trim();
+
+      // FIXED: Always increment counter and create segment
+      if (!this.markerCounts[baseMarker]) this.markerCounts[baseMarker] = 0;
+      const index = this.markerCounts[baseMarker]++;
+
+      // Create segment even if empty
+      const seg = { marker: `${baseMarker}-${index}`, text: content || "" };
+      this.segments.push(seg);
+      newSegments.push(seg);
     }
-    
-    finalize() {
-        if (this.buffer && this.pendingMarker) {
-            const regex = /\(([a-z])\)\s*/i;
-            const match = this.buffer.match(regex);
-            if (match) {
-                const baseMarker = match[1].toLowerCase();
-                const content = this.buffer.substring(match[0].length).trim();
-                
-                // FIXED: Always increment counter and create segment
-                if (!this.markerCounts[baseMarker]) this.markerCounts[baseMarker] = 0;
-                const index = this.markerCounts[baseMarker]++;
-                
-                // Create segment even if empty
-                const seg = { marker: `${baseMarker}-${index}`, text: content || '' };
-                this.segments.push(seg);
-                return [seg];
-            }
-        }
-        return [];
+
+    if (matches.length > 0) {
+      const lastMatch = matches[matches.length - 1];
+      this.pendingMarker = lastMatch.marker;
+      this.buffer = this.buffer.substring(lastMatch.pos);
+    } else {
+      this.buffer = "";
     }
-    
-    getPending() {
-        if (this.buffer && this.pendingMarker) {
-            const regex = /\(([a-z])\)\s*/i;
-            const match = this.buffer.match(regex);
-            if (match) {
-                const baseMarker = match[1].toLowerCase();
-                const content = this.buffer.substring(match[0].length).trim();
-                const index = this.markerCounts[baseMarker] || 0;
-                return { marker: `${baseMarker}-${index}`, text: content || '...', partial: true };
-            }
-        }
-        return null;
+    return newSegments;
+  }
+
+  finalize() {
+    if (this.buffer && this.pendingMarker) {
+      const regex = /\(([a-z])\)\s*/i;
+      const match = this.buffer.match(regex);
+      if (match) {
+        const baseMarker = match[1].toLowerCase();
+        const content = this.buffer.substring(match[0].length).trim();
+
+        // FIXED: Always increment counter and create segment
+        if (!this.markerCounts[baseMarker]) this.markerCounts[baseMarker] = 0;
+        const index = this.markerCounts[baseMarker]++;
+
+        // Create segment even if empty
+        const seg = { marker: `${baseMarker}-${index}`, text: content || "" };
+        this.segments.push(seg);
+        return [seg];
+      }
     }
+    return [];
+  }
+
+  getPending() {
+    if (this.buffer && this.pendingMarker) {
+      const regex = /\(([a-z])\)\s*/i;
+      const match = this.buffer.match(regex);
+      if (match) {
+        const baseMarker = match[1].toLowerCase();
+        const content = this.buffer.substring(match[0].length).trim();
+        const index = this.markerCounts[baseMarker] || 0;
+        return {
+          marker: `${baseMarker}-${index}`,
+          text: content || "...",
+          partial: true,
+        };
+      }
+    }
+    return null;
+  }
 }

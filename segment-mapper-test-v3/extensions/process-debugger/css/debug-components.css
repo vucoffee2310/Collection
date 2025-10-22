@@ -6,13 +6,13 @@
 /* JSON Display specific to debugger */
 .summary-json,
 .json-display {
-    background: #2d2d2d;
-    color: #f8f8f8;
-    padding: 12px;
-    border-radius: var(--radius-md);
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-smaller);
-    line-height: 1.6;
-    overflow-x: auto;
-    margin-bottom: var(--spacing-sm);
+  background: #2d2d2d;
+  color: #f8f8f8;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-smaller);
+  line-height: 1.6;
+  overflow-x: auto;
+  margin-bottom: var(--spacing-sm);
 }

@@ -4,35 +4,43 @@
 
 /* Stats as simple text blocks */
 .stats-row {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 .stat-item {
-    text-align: center;
-    line-height: 1.2;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .stat-number {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--color-text);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .stat-label {
-    font-size: var(--font-size-smaller);
-    color: var(--color-text-muted);
-    text-transform: uppercase;
+  font-size: var(--font-size-smaller);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
 }
 
 /* Color coding for specific stats */
-.stat-item.info .stat-number { color: var(--color-info); }
-.stat-item.matched .stat-number { color: var(--color-success); }
-.stat-item.orphan .stat-number { color: var(--color-error); }
-.stat-item.gap .stat-number { color: var(--color-warning); }
+.stat-item.info .stat-number {
+  color: var(--color-info);
+}
+.stat-item.matched .stat-number {
+  color: var(--color-success);
+}
+.stat-item.orphan .stat-number {
+  color: var(--color-error);
+}
+.stat-item.gap .stat-number {
+  color: var(--color-warning);
+}
 
 .controls-row {
-    display: flex;
-    gap: var(--spacing-sm);
+  display: flex;
+  gap: var(--spacing-sm);
 }

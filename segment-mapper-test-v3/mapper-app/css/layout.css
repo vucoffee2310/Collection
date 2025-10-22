@@ -4,179 +4,179 @@
 
 /* App-level Header (Shared & Unified Style) */
 .app-header {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    padding: 15px 20px;
-    gap: 20px;
-    flex-wrap: wrap;
-    background: #fff;
-    border-bottom: 2px solid #ddd; /* Unified mapper-style border */
-    z-index: 10;
-    position: sticky;
-    top: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  gap: 20px;
+  flex-wrap: wrap;
+  background: #fff;
+  border-bottom: 2px solid #ddd; /* Unified mapper-style border */
+  z-index: 10;
+  position: sticky;
+  top: 0;
 }
 
 #appTitle {
-    margin: 0;
-    margin-right: auto; /* Pushes other content to the right */
-    color: #333;
-    font-size: 24px; /* Matches original mapper h1 */
-    font-weight: normal;
+  margin: 0;
+  margin-right: auto; /* Pushes other content to the right */
+  color: #333;
+  font-size: 24px; /* Matches original mapper h1 */
+  font-weight: normal;
 }
 
 .app-controls {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 10px;
 }
 
 /* Debug Header Content Styling (Now simplified) */
 .debug-header-content {
-    display: none; /* Hidden by default */
-    align-items: center;
-    gap: 20px;
+  display: none; /* Hidden by default */
+  align-items: center;
+  gap: 20px;
 }
 
 /* --- View-Switching Logic --- */
 body.debug-view-active .debug-header-content {
-    display: flex; /* Show debug header content */
+  display: flex; /* Show debug header content */
 }
 
 body.debug-view-active #generateBtn {
-    display: none; /* Hide generate button in debug view */
+  display: none; /* Hide generate button in debug view */
 }
 
 /* App Container for views */
 .app-container {
-    flex: 1;
-    overflow: hidden;
-    position: relative;
-    background: #f4f4f4;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: #f4f4f4;
 }
 
 /* View switching */
 .view {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    overflow-y: auto;
-    padding: 20px; /* Consistent padding for all views */
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px; /* Consistent padding for all views */
 }
 
 .view.active-view {
-    display: block;
+  display: block;
 }
 
 /* Main Container Grid (for Mapper View) */
 .main-container {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 20px;
-    height: 100%;
-    overflow: hidden;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Column Layout (Mapper view only) */
-.content-column, 
+.content-column,
 .sidebar-column {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 0; /* Padding is now on the .view container */
-    overflow-y: auto;
-    overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0; /* Padding is now on the .view container */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Panel Component */
-.panel { 
-    border: 1px solid #ccc; 
-    padding: 15px;
-    background: #fff; 
-    border-radius: 5px;
-    flex-shrink: 0;
+.panel {
+  border: 1px solid #ccc;
+  padding: 15px;
+  background: #fff;
+  border-radius: 5px;
+  flex-shrink: 0;
 }
 
 /* Input Group */
-.input-group { 
-    display: flex; 
-    flex-direction: column; 
+.input-group {
+  display: flex;
+  flex-direction: column;
 }
 
-.input-area { 
-    width: 100%; 
-    min-height: 250px; 
-    max-height: 500px;
-    padding: 8px; 
-    border: 1px solid #999;
-    font-family: monospace; 
-    font-size: 11px; 
-    resize: vertical;
-    border-radius: 3px;
+.input-area {
+  width: 100%;
+  min-height: 250px;
+  max-height: 500px;
+  padding: 8px;
+  border: 1px solid #999;
+  font-family: monospace;
+  font-size: 11px;
+  resize: vertical;
+  border-radius: 3px;
 }
 
 .input-area:focus {
-    outline: none;
-    border-color: #666;
+  outline: none;
+  border-color: #666;
 }
 
 /* Custom Scrollbars */
 .content-column::-webkit-scrollbar,
 .sidebar-column::-webkit-scrollbar,
 .view::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+  width: 10px;
+  height: 10px;
 }
 
 .content-column::-webkit-scrollbar-track,
 .sidebar-column::-webkit-scrollbar-track,
 .view::-webkit-scrollbar-track {
-    background: #f1f1f1;
+  background: #f1f1f1;
 }
 
 .content-column::-webkit-scrollbar-thumb,
 .sidebar-column::-webkit-scrollbar-thumb,
 .view::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 5px;
+  background: #888;
+  border-radius: 5px;
 }
 
 .content-column::-webkit-scrollbar-thumb:hover,
 .sidebar-column::-webkit-scrollbar-thumb:hover,
 .view::-webkit-scrollbar-thumb:hover {
-    background: #555;
+  background: #555;
 }
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-    .main-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto;
-    }
-    
-    .content-column {
-        border-right: none;
-        border-bottom: 2px solid #ddd;
-    }
+  .main-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .content-column {
+    border-right: none;
+    border-bottom: 2px solid #ddd;
+  }
 }
 
 @media (max-width: 768px) {
-    .app-header {
-        padding: 10px 15px;
-    }
-    
-    #appTitle {
-        font-size: 20px;
-    }
-    
-    .view {
-        padding: 15px;
-    }
-    
-    button {
-        padding: 10px 20px;
-        font-size: 13px;
-    }
+  .app-header {
+    padding: 10px 15px;
+  }
+
+  #appTitle {
+    font-size: 20px;
+  }
+
+  .view {
+    padding: 15px;
+  }
+
+  button {
+    padding: 10px 20px;
+    font-size: 13px;
+  }
 }
