@@ -20,6 +20,7 @@ export class PDFOverlayApp {
     this.pdfName = 'document';
     this.lastPdfData = null;
     this.renderedPages = new Set();
+    this.isOperationRunning = false;
 
     // Services
     this.state = new StateManager();
@@ -66,7 +67,7 @@ export class PDFOverlayApp {
     this.el.fileInput?.addEventListener('change', e => this.handlePDFUpload(e));
     this.el.jsonInput?.addEventListener('change', e => this.handleJSONUpload(e));
 
-    // Buttons (with loading state)
+    // Buttons (with loading state and operation lock)
     const actions = {
       expandBtn: () => this.handleExpandAll(),
       splitPdfBtn: () => this.handleSplitPDF(),
@@ -74,9 +75,23 @@ export class PDFOverlayApp {
       saveDirectPdfBtn: () => this.handleExportPDF(),
       saveHtmlBtn: () => this.handleExportHTML()
     };
+    
     Object.entries(actions).forEach(([key, fn]) => {
       const btn = this.el[key];
-      if (btn) btn.addEventListener('click', createButtonHandler(btn, fn));
+      if (btn) {
+        btn.addEventListener('click', createButtonHandler(btn, async () => {
+          if (this.isOperationRunning) {
+            alert('Please wait for the current operation to complete.');
+            return;
+          }
+          this.isOperationRunning = true;
+          try {
+            await fn();
+          } finally {
+            this.isOperationRunning = false;
+          }
+        }));
+      }
     });
 
     // Custom events
@@ -144,6 +159,14 @@ export class PDFOverlayApp {
     if (!file || !file.name.endsWith('.json')) return;
 
     await withErrorHandling(async () => {
+      if (this.pdf.isLoaded()) {
+        const proceed = confirm(
+          'You are loading new overlay data for the current PDF.\n\n' +
+          'Make sure this JSON matches your loaded PDF.\n\nContinue?'
+        );
+        if (!proceed) return;
+      }
+      
       this.pageManager.updateFileName(this.el.jsonFileName, file.name, 'Using default');
       const jsonText = await readFile(file, 'readAsText');
       await this.processAndLoad(JSON.parse(jsonText));
@@ -155,6 +178,11 @@ export class PDFOverlayApp {
     if (isNaN(amount) || amount <= 0) {
       alert('Please enter a valid positive number');
       return;
+    }
+    if (amount > 100) {
+      if (!confirm(`Expand by ${amount}px? This is quite large and may cause overlaps.`)) {
+        return;
+      }
     }
     this.state.expandAllOverlays(amount);
     await this.render();
@@ -184,14 +212,7 @@ export class PDFOverlayApp {
       alert('Please load a PDF file first.');
       return;
     }
-    const indicator = this.pageManager.showSavingIndicator('Preparing for print...');
-    await forceUIUpdate();
-
-    try {
-      await this.exporters.print(this.pageManager);
-    } finally {
-      this.pageManager.removeSavingIndicator(indicator);
-    }
+    await this.exporters.print(this.pageManager);
   }
 
   async handleExportPDF() {

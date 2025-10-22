@@ -5,8 +5,19 @@ export class PDFRenderer {
     this._baselineCache = new Map();
   }
 
-  _rgba = (str) =>
-    (str?.match(/(\d+(\.\d+)?)/g) || [0, 0, 0, 1]).map(Number).slice(0, 4);
+  // ✅ FIXED: Always return 4 values [r, g, b, a]
+  _rgba = (str) => {
+    const matches = str?.match(/(\d+(\.\d+)?)/g) || [];
+    const values = matches.map(Number);
+    
+    // Ensure we have at least RGB
+    while (values.length < 3) values.push(0);
+    
+    // Add alpha if missing (default to 1.0 for opaque)
+    if (values.length === 3) values.push(1.0);
+    
+    return values.slice(0, 4);
+  };
 
   _fontStyle = (weight, style) => {
     const bold = weight === "bold" || Number(weight) >= 700;
@@ -30,7 +41,7 @@ export class PDFRenderer {
       ctx.font = `${fontSize}px ${fontFamily}`;
 
       const metrics = ctx.measureText(
-        "áàảãạĂăắằẳẵặÂâấầẩẫậéèẻẽẹÊêếềểễệíìỉĩịóòỏõọÔôốồổỗộƠơớờởỡợúùủũụƯưứừửữựýỳỷỹỵÁÀẢÃẠẮẰẲẴẶẤẦẨẪẬÉÈẺẼẸẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌỐỒỔỖỘỚỜỞỠỢÚÙỦŨỤỨỪỬỮỰÝỲỶỸỴ",
+        "áàảãạĂăắằẳẵặÂâấầẩẫậéèẻẽẹÊêếềểễệíìỉĩịóòỏõọÔôốồổỗộƠơớờởỡợúùủũụƯưứừửữựýỳỷỹỵÁÀẢÃẠẮẰẲẴẶẤẦẨẪẬÉÈẺẼẸỐỀỂỄỆÍÌỈĨỊÓÒỎÕỌỐỒỔỖỘỚỜỞỠỢÚÙỦŨỤỨỪỬỮỰÝỲỶỸỴ",
       );
 
       if (
@@ -303,7 +314,9 @@ export class PDFRenderer {
   drawShapes(pdf, overlays) {
     const opaque = new jspdf.GState({ opacity: 1 });
 
+    // Draw backgrounds
     overlays.forEach((o) => {
+      // ✅ FIXED: Now o.bg[3] is always defined
       if (o.bg[3] > 0) {
         pdf.setGState(new jspdf.GState({ opacity: o.opacity * o.bg[3] }));
         pdf.setFillColor(...o.bg.slice(0, 3));
@@ -316,6 +329,7 @@ export class PDFRenderer {
       }
     });
 
+    // Draw borders
     overlays.forEach((o) => {
       if (o.borderW > 0 && o.border[3] > 0) {
         pdf.setGState(new jspdf.GState({ opacity: o.opacity }));

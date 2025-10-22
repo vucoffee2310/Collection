@@ -445,7 +445,7 @@ export class TableLayout {
     const MAX_SCALE_HEADER = 2.0;
     const MAX_SCALE_DATA = 2.5;
     const MIN_SCALE = 1.0;
-    const PADDING = 8;
+    const PADDING = 4;  // ✅ FIXED: Changed from 8 to 4
 
     const rows = table.querySelectorAll("tr");
     

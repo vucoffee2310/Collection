@@ -101,24 +101,23 @@ export class ThemeControls {
     this._applyBrightness();
   }
 
-  _applyOpacity() {
-    const val = parseInt(
-      document.getElementById("opacity-slider")?.value || 97,
-    );
+    _applyOpacity() {
+    const val = parseInt(document.getElementById("opacity-slider")?.value || 97);
     const palette = CONFIG.COLOR_PALETTES[this.state.activePalette];
     if (!palette) return;
 
     const [bg, , border] = palette;
     const r = document.body.style;
+    
     r.setProperty(
-      "--overlay-bg",
-      `rgba(${bg[0]},${bg[1]},${bg[2]},${val / 100})`,
+        '--overlay-bg',
+        `rgba(${bg[0]},${bg[1]},${bg[2]},${val / 100})`
     );
     r.setProperty(
-      "--overlay-border",
-      `rgb(${border[0]},${border[1]},${border[2]})`,
+        '--overlay-border',
+        `rgb(${border[0]},${border[1]},${border[2]})`
     );
-  }
+    }
 
   _applyBrightness() {
     const val = parseInt(

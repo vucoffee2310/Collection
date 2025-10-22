@@ -90,15 +90,19 @@ export class Exporters {
       textStyles.push(
         `width: 100%`,
         `height: 100%`,
-        `overflow: auto`,
+        `overflow: hidden`,
         `text-align: left`,
+        `line-height: 1.25`,
+        `padding: 0`,
       );
     } else if (overlay.classList.contains("content-code")) {
       textStyles.push(
         `width: 100%`,
         `text-align: left`,
         `white-space: pre-wrap`,
+        `word-wrap: break-word`,
         `line-height: 1.4`,
+        `padding: 2px`,
       );
     } else if (overlay.classList.contains("content-list")) {
       textStyles.push(`width: 100%`, `text-align: left`);
@@ -209,19 +213,19 @@ export class Exporters {
       .overlay.vertical-text { justify-content: center; align-items: center; }
       .overlay.vertical-text .overlay-text { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; text-align: center; line-height: 1; align-self: center; }
       .overlay.content-code { font-family: '${CONFIG.CODE_FONT.NAME}', 'Courier New', Consolas, Monaco, monospace; font-weight: 600; padding: 6px; overflow-y: auto; justify-content: flex-start; align-items: flex-start; }
-      .overlay.content-code .overlay-text { width: 100%; text-align: left; white-space: pre-wrap; font-family: '${CONFIG.CODE_FONT.NAME}', 'Courier New', Consolas, Monaco, monospace; font-weight: 600; line-height: 1.4; }
+      .overlay.content-code .overlay-text { width: 100%; text-align: left; white-space: pre-wrap; word-wrap: break-word; font-family: '${CONFIG.CODE_FONT.NAME}', 'Courier New', Consolas, Monaco, monospace; font-weight: 600; line-height: 1.4; padding: 2px; }
       .overlay.content-list { justify-content: flex-start; align-items: flex-start; }
       .overlay.content-list .overlay-text { width: 100%; text-align: left; }
       .list-item { margin-bottom: .4em; text-align: left; line-height: 1.3; }
       .list-item:last-child { margin-bottom: 0; }
-      .overlay.content-table { overflow: auto; padding: 4px; justify-content: flex-start; align-items: flex-start; }
-      .overlay.content-table .overlay-text { width: 100%; height: 100%; overflow: auto; text-align: left; line-height: 1.25; }
-      .cell-scaler { display: inline-block; transform-origin: top left; line-height: 1.25; width: max-content; }
+      .overlay.content-table { overflow: hidden; padding: 4px; justify-content: flex-start; align-items: flex-start; }
+      .overlay.content-table .overlay-text { width: 100%; height: 100%; overflow: hidden; text-align: left; line-height: 1.25; padding: 0; }
+      .cell-scaler { display: inline-block; transform-origin: top left; line-height: 1.25; white-space: normal; word-break: break-word; overflow-wrap: break-word; vertical-align: middle; }
       .data-table th .cell-scaler { white-space: normal; word-break: break-word; max-width: 100%; }
       .data-table td .cell-scaler { white-space: nowrap; }
       .data-table { width: 100%; height: 100%; border-collapse: collapse; font-size: inherit; line-height: inherit; border: 1px solid; border-color: inherit; color: inherit; table-layout: fixed; }
       .data-table colgroup col { box-sizing: border-box; }
-      .data-table th, .data-table td { padding: 8px; border: 1px solid; border-color: inherit; text-align: left; vertical-align: top; word-break: break-word; font-size: inherit; overflow: hidden; position: relative; line-height: 1.25; }
+      .data-table th, .data-table td { padding: 4px; border: 1px solid; border-color: inherit; text-align: left; vertical-align: middle; word-break: break-word; font-size: inherit; overflow: hidden; position: relative; line-height: 1.25; }
       .data-table th { font-weight: 700; background: rgba(0,0,0,.15); white-space: normal; }
       .data-table td { background: rgba(0,0,0,.05); }
       .data-table tr:nth-child(even) td { background: rgba(0,0,0,.08); }

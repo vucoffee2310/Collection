@@ -105,10 +105,6 @@ export class StateManager {
     this.pageOverrides.set(pageNum, order);
   }
 
-  clearPageOverride(pageNum) {
-    this.pageOverrides.delete(pageNum);
-  }
-
   applyCoordinateOrderToAllPages(order) {
     Object.keys(this.overlayData).forEach((pageKey) => {
       const pageNum = pageKey.replace("page_", "");
@@ -157,17 +153,5 @@ export class StateManager {
   deleteOverlay(pageNum, coords) {
     const pageKey = `page_${pageNum}`;
     delete this.overlayData[pageKey]?.[coords];
-  }
-
-  getOverlayType(pageNum, coords) {
-    const pageKey = `page_${pageNum}`;
-    return (
-      this.overlayData[pageKey]?.[coords]?.type || CONFIG.CONTENT_TYPES.TEXT
-    );
-  }
-
-  getTableData(pageNum, coords) {
-    const pageKey = `page_${pageNum}`;
-    return this.overlayData[pageKey]?.[coords]?.tableData;
   }
 }

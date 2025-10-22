@@ -9,17 +9,6 @@ export const debounce = (fn, delay = 300) => {
   };
 };
 
-export const throttle = (fn, limit = 100) => {
-  let inThrottle;
-  return (...args) => {
-    if (!inThrottle) {
-      fn(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-};
-
 export const forceUIUpdate = () =>
   new Promise((resolve) => {
     requestAnimationFrame(() => setTimeout(resolve, 0));
@@ -159,8 +148,3 @@ export const validateRange = (start, end, max) => {
     return { valid: false, error: `End page exceeds total pages (${max})` };
   return { valid: true };
 };
-
-export const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
-export const sanitizeFilename = (filename) =>
-  filename.replace(/[^a-z0-9_-]/gi, "_").substring(0, 200);
