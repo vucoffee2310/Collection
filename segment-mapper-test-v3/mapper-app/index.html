@@ -45,26 +45,6 @@
     />
   </head>
   <body>
-    <!-- Protocol Checker -->
-    <script>
-      console.log("[App] Page loaded. Protocol:", window.location.protocol);
-      if (window.location.protocol === "file:") {
-        document.body.innerHTML = `
-             <div style="padding: 40px; background: #fff3cd; border: 3px solid #ffc107; margin: 20px; border-radius: 8px;">
-                 <h1 style="color: #856404;">⚠️ Running from file:// protocol</h1>
-                 <p style="font-size: 16px;">This application requires a web server to work properly.</p>
-                 <h2>Quick Fix:</h2>
-                 <ol style="font-size: 14px; line-height: 1.8;">
-                     <li>Open a terminal in the project's root folder</li>
-                     <li>Run: <code>python -m http.server 8000</code> (or a similar command)</li>
-                     <li>Open: <code>http://localhost:8000/mapper-app/index.html</code></li>
-                 </ol>
-             </div>
-            `;
-        throw new Error("Running from file:// protocol - need web server");
-      }
-    </script>
-
     <!-- Shared Application Header -->
     <div class="app-header">
       <h1 id="appTitle">AI Segment Mapper</h1>
@@ -168,3 +148,4 @@ url:https://github.com/0342/
     <script src="js/main.js" type="module"></script>
   </body>
 </html>
+
