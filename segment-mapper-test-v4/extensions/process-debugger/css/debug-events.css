@@ -1,0 +1,200 @@
+/**
+ * Debug Events - Styled to match mapper's .panel component
+ */
+
+#timeline-container {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+#timeline-container:empty {
+  display: none;
+}
+
+.timeline-header {
+  margin: 0 0 var(--spacing-md) 0;
+  font-size: var(--font-size-xlarge);
+  font-weight: normal;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border-lighter);
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.timeline-event-count {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-large);
+}
+
+/* Timeline save button */
+.save-marker-btn {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-small);
+  flex-shrink: 0;
+}
+
+.timeline-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--color-text-light);
+  font-style: italic;
+}
+
+/* Timeline */
+.event-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 45px;
+}
+
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 32px;
+  bottom: -20px;
+  width: 2px;
+  background: #dee2e6;
+}
+
+.timeline-item:last-child::before {
+  display: none;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  border: 3px solid var(--color-bg-panel);
+}
+
+/* Timeline marker colors - MATCH MAPPER */
+.timeline-marker.success {
+  background: #28a745; /* 🟢 Green - Matched */
+  color: white;
+}
+.timeline-marker.info {
+  background: #007bff; /* 🔵 Blue - Info/Streaming */
+  color: white;
+}
+.timeline-marker.warning {
+  background: #ffc107; /* 🟡 Yellow - Waiting/Gap */
+  color: #333;
+}
+.timeline-marker.critical {
+  background: #dc3545; /* 🔴 Red - Orphan/Error */
+  color: white;
+}
+
+/* Event cards */
+.event {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  position: relative;
+}
+
+/* Event severity border-left - MATCH MAPPER */
+.event.severity-success {
+  border-left: 4px solid #28a745; /* 🟢 Green */
+}
+.event.severity-info {
+  border-left: 4px solid #007bff; /* 🔵 Blue */
+}
+.event.severity-warning {
+  border-left: 4px solid #ffc107; /* 🟡 Yellow */
+}
+.event.severity-critical {
+  border-left: 4px solid #dc3545; /* 🔴 Red */
+}
+
+.event-number {
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  background: var(--color-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: var(--font-size-smaller);
+  font-weight: bold;
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border-lighter);
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.event-time {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.severity-icon {
+  font-size: var(--font-size-small);
+}
+
+/* Event content */
+.event-content {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.status-text {
+  font-weight: 600;
+  font-size: var(--font-size-small);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
+  margin-top: 8px;
+}
+
+/* Event details */
+.event-details {
+  margin-top: var(--spacing-md);
+  border-top: 1px solid #dee2e6;
+  padding-top: var(--spacing-md);
+}
+
+.details-title {
+  font-size: var(--font-size-small);
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

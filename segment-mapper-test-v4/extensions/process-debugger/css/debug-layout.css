@@ -1,0 +1,14 @@
+/**
+ * Debug Layout - Simplified for unified app style
+ */
+
+.debug-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+/* All header styling is now handled by mapper-app/css/layout.css */
+.header {
+    display: none;
+}

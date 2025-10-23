@@ -1,0 +1,64 @@
+/**
+ * Shared CSS Variables & Global Styles
+ * Single source of truth for design tokens
+ */
+
+:root {
+    /* Colors */
+    --color-primary: #333;
+    --color-primary-hover: #555;
+    --color-bg-main: #f4f4f4;
+    --color-bg-panel: #fff;
+    --color-border: #ccc;
+    --color-border-light: #ddd;
+    --color-border-lighter: #eee;
+    --color-text: #333;
+    --color-text-muted: #666;
+    --color-text-light: #999;
+    
+    /* Status Colors */
+    --color-success: #28a745;
+    --color-success-bg: #f0fff4;
+    --color-success-text: #155724;
+    --color-error: #dc3545;
+    --color-error-bg: #fff5f5;
+    --color-error-text: #721c24;
+    --color-warning: #ffc107;
+    --color-warning-bg: #fffbf0;
+    --color-warning-text: #856404;
+    --color-info: #17a2b8;
+    --color-info-bg: #d1ecf1;
+    --color-info-text: #0c5460;
+    
+    /* Typography */
+    --font-family-base: Arial, sans-serif;
+    --font-family-mono: 'Courier New', monospace;
+    --font-size-base: 14px;
+    --font-size-small: 12px;
+    --font-size-smaller: 11px;
+    --font-size-large: 16px;
+    --font-size-xlarge: 18px;
+    --font-size-xxlarge: 24px;
+    
+    /* Spacing */
+    --spacing-xs: 5px;
+    --spacing-sm: 10px;
+    --spacing-md: 15px;
+    --spacing-lg: 20px;
+    --spacing-xl: 30px;
+    
+    /* Border Radius */
+    --radius-sm: 3px;
+    --radius-md: 4px;
+    --radius-lg: 5px;
+    --radius-xl: 8px;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.15);
+    
+    /* Transitions */
+    --transition-fast: 0.1s;
+    --transition-normal: 0.2s;
+    --transition-slow: 0.3s;
+}

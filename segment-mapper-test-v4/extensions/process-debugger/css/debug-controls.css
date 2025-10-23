@@ -1,0 +1,46 @@
+/**
+ * Debug Controls - Simplified to match mapper style
+ */
+
+/* Stats as simple text blocks */
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.stat-item {
+  text-align: center;
+  line-height: 1.2;
+}
+
+.stat-number {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.stat-label {
+  font-size: var(--font-size-smaller);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+/* Color coding for specific stats - MATCH MAPPER */
+.stat-item.info .stat-number {
+  color: #007bff; /* 🔵 Blue - Info */
+}
+.stat-item.matched .stat-number {
+  color: #28a745; /* 🟢 Green - Matched */
+}
+.stat-item.orphan .stat-number {
+  color: #dc3545; /* 🔴 Red - Orphan */
+}
+.stat-item.gap .stat-number {
+  color: #ffc107; /* 🟡 Yellow - Waiting/Gap */
+}
+
+.controls-row {
+  display: flex;
+  gap: var(--spacing-sm);
+}

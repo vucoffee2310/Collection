@@ -1,0 +1,336 @@
+/* =================================
+   SEGMENT MAPPING DISPLAY - WITH PER-BATCH STICKY TIMELINE ANNOTATION
+   ================================= */
+
+/* === STICKY TIMELINE ANNOTATION === */
+
+.timeline-annotation {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #fff;
+  border-bottom: 1px solid #fff;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.timeline-annotation::before {
+  content: "•";
+  color: #007bff; /* 🔵 Blue - Default/Regular batches */
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Orphan section - Red */
+.timeline-annotation.orphan-section {
+  background: #fff5f5;
+  border-bottom: 1px solid #dc3545;
+}
+
+.timeline-annotation.orphan-section::before {
+  color: #dc3545; /* 🔴 Red - Orphan batches */
+}
+
+/* Optional: Matched section - Green (if you want to distinguish completed batches) */
+.timeline-annotation.matched-section::before {
+  color: #28a745; /* 🟢 Green - All matched */
+}
+
+/* Optional: Waiting section - Yellow (if you want to distinguish waiting batches) */
+.timeline-annotation.waiting-section {
+  background: #fffef8;
+}
+
+.timeline-annotation.waiting-section::before {
+  color: #ffc107; /* 🟡 Yellow - Waiting/gaps */
+}
+
+/* Optional: Streaming section - Blue (explicit) */
+.timeline-annotation.streaming-section::before {
+  color: #007bff; /* 🔵 Blue - Has streaming data */
+}
+
+/* === LAYOUT STRUCTURE === */
+
+/* Batch Groups - Simplified, no collapsing */
+.batch-group {
+  background: white;
+  margin: 0;
+  border: none;
+}
+
+.batch-group:first-child {
+  margin-top: 0;
+}
+
+/* Group Header - Simplified as separator */
+.group-header {
+  display: none; /* Hidden - replaced by per-batch sticky annotation */
+}
+
+/* Group Content */
+.group-content {
+  padding: 0;
+  background: white;
+}
+
+/* === BATCH STRUCTURE === */
+
+.batch {
+  background: white;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  position: relative;
+}
+
+.batch:last-child {
+  border-bottom: none;
+}
+
+/* Batch Header - Simplified as separator */
+.batch-header {
+  display: none; /* Hidden - replaced by sticky annotation */
+}
+
+.batch-content {
+  padding: 12px 0;
+}
+
+/* === PAIR STRUCTURE === */
+
+.pair {
+  background: white;
+  border-left: 4px solid #ccc;
+  margin: 12px 16px;
+  border: 1px solid #e5e5e5;
+  border-left: 4px solid #ccc;
+  scroll-margin-top: 80px; /* Account for sticky header */
+}
+
+.pair:first-child {
+  margin-top: 12px;
+}
+
+.pair:last-child {
+  margin-bottom: 12px;
+}
+
+/* Pair Status Colors - Clear distinction between states */
+.pair.matched {
+  border-left-color: #28a745; /* 🟢 Green - Success, complete */
+}
+.pair.gap {
+  border-left-color: #ffc107; /* 🟡 Yellow - Waiting/stuck, no data yet */
+}
+.pair.partial {
+  border-left-color: #007bff; /* 🔵 Blue - Streaming, data flowing */
+}
+.pair.orphan {
+  border-left-color: #dc3545; /* 🔴 Red - Error, no source match */
+}
+
+/* Pair Header */
+.pair-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.pair-marker {
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  background: #e5e5e5;
+  padding: 4px 10px;
+  border-radius: 3px;
+}
+
+/* === DEBUG BUTTON (REPLACES STATUS BADGE) === */
+
+.pair-debug-btn {
+  padding: 6px 12px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1;
+  min-width: 40px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+/* Status-specific colors - Match border-left colors */
+.pair.matched .pair-debug-btn {
+  background: #28a745; /* 🟢 Green - Complete */
+}
+
+.pair.matched .pair-debug-btn:hover {
+  background: #218838;
+  transform: scale(1.05);
+}
+
+.pair.gap .pair-debug-btn {
+  background: #ffc107; /* 🟡 Yellow - Waiting (no data/stuck) */
+  color: #333;
+}
+
+.pair.gap .pair-debug-btn:hover {
+  background: #e0a800;
+  transform: scale(1.05);
+}
+
+.pair.partial .pair-debug-btn {
+  background: #007bff; /* 🔵 Blue - Streaming (data flowing) */
+  color: white;
+}
+
+.pair.partial .pair-debug-btn:hover {
+  background: #0056b3;
+  transform: scale(1.05);
+}
+
+.pair.orphan .pair-debug-btn {
+  background: #dc3545; /* 🔴 Red - Error/orphan */
+}
+
+.pair.orphan .pair-debug-btn:hover {
+  background: #c82333;
+  transform: scale(1.05);
+}
+
+.pair-debug-btn:active {
+  transform: scale(0.95);
+}
+
+/* Highlight pair when debugging */
+.pair.debugging {
+  animation: debugHighlight 0.5s ease-out;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+@keyframes debugHighlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
+  }
+}
+
+/* === PAIR CONTENT === */
+
+.pair-content {
+  padding: 14px;
+}
+
+.json-grid {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 12px 14px;
+  align-items: start;
+}
+
+.json-label {
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  padding-top: 3px;
+}
+
+.json-value {
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  color: #333;
+  line-height: 1.6;
+  word-break: break-word;
+  background: #f8f8f8;
+  padding: 8px 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 3px;
+}
+
+.json-value.empty {
+  color: #999;
+  font-style: italic;
+  background: #fafafa;
+}
+
+.json-value.streaming {
+  color: #007bff;
+  background: #f8fbff;
+  border-color: #cce5ff;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* === ORPHAN SPECIAL STYLING === */
+
+.batch-group[data-group-num="ORPHAN"] {
+  border-top: 4px solid #e67e22;
+}
+
+/* === UTILITIES === */
+
+#display .empty {
+  margin: 40px auto;
+  max-width: 500px;
+}
+
+/* Performance */
+.pair {
+  contain: layout style paint;
+}
+.batch-group {
+  contain: layout;
+}
+
+/* === RESPONSIVE === */
+
+@media (max-width: 768px) {
+  .timeline-annotation {
+    padding: 10px 15px;
+    font-size: 12px;
+  }
+
+  .json-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .json-label {
+    padding-top: 0;
+  }
+
+  .pair {
+    margin: 10px 10px;
+  }
+}
