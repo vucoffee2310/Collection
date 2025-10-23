@@ -1,3 +1,7 @@
+/**
+ * Mapper Module - Optimized
+ */
+
 import { throttle } from "../../shared/js/utils.js";
 
 export class Mapper {
@@ -7,37 +11,27 @@ export class Mapper {
     this.targetPartial = null;
     this.displayElement = displayElement;
     this.logger = logger;
-    this.sendToDebugWindow = sendToDebugWindowCallback || (() => { });
+    this.sendToDebugWindow = sendToDebugWindowCallback || (() => {});
 
-    // Cached DOM elements for performance
     this.renderedPairs = new Map();
     this.renderedGroups = new Map();
     this.renderedBatches = new Map();
 
-    // State tracking for race condition prevention
-    this.markerStates = new Map(); // tracks: 'gap', 'partial', 'matched', 'orphan'
-    this.updateSequence = 0; // global sequence counter
-    this.markerSequences = new Map(); // tracks last sequence per marker
+    this.markerStates = new Map();
+    this.updateSequence = 0;
+    this.markerSequences = new Map();
 
-    // Throttled update with proper cancellation
-    this.throttledUpdatePartial = throttle(
-      this.updatePartialDisplay.bind(this),
-      200
-    );
-    this.pendingPartialMarker = null; // track what's pending in throttle
-
-    // Debug click handler
+    this.throttledUpdatePartial = throttle(this.updatePartialDisplay.bind(this), 200);
+    this.pendingPartialMarker = null;
     this.onDebugClick = null;
+    this.processingSegments = false;
 
-    // Configuration
     this.config = {
       batchSize: 3,
       firstGroupBatches: 1,
       regularGroupBatches: 10,
     };
   }
-
-  /* === PUBLIC API === */
 
   setSource(segments) {
     this.source = segments;
@@ -46,25 +40,34 @@ export class Mapper {
   }
 
   reset() {
+    if (this.processingSegments) {
+      console.error('[Mapper] Cannot reset while processing');
+      return false;
+    }
+
+    this.throttledUpdatePartial.cancel();
     this.target = [];
     this.targetPartial = null;
     this.markerStates.clear();
     this.markerSequences.clear();
     this.updateSequence = 0;
     this.pendingPartialMarker = null;
-    this.throttledUpdatePartial.cancel();
+
     this.clearDisplay();
     this.initialRender();
+    return true;
   }
 
   addTargetBatch(segments) {
     if (!segments?.length) return;
 
-    // Increment sequence for this batch update
+    this.processingSegments = true;
     const batchSequence = ++this.updateSequence;
 
     this.target.push(...segments);
     this.updateMatchedSegments(segments, batchSequence);
+
+    this.processingSegments = false;
   }
 
   setTargetPartial(partial) {
@@ -77,21 +80,7 @@ export class Mapper {
 
     const currentState = this.markerStates.get(partial.marker);
 
-    // RACE CONDITION CHECK #1: Don't update if already matched or orphaned
     if (currentState === "matched" || currentState === "orphan") {
-      if (this.logger) {
-        this.logger.warn(
-          `[RACE_CONDITION] Partial update ignored for ${partial.marker} (state: ${currentState})`
-        );
-      }
-      this.sendToDebugWindow("RACE_CONDITION_DETECTED", {
-        marker: partial.marker,
-        currentState: currentState,
-        attemptedState: "partial",
-        details: "Partial update after terminal state.",
-      });
-
-      // Cancel any pending throttled update for this marker
       if (this.pendingPartialMarker === partial.marker) {
         this.throttledUpdatePartial.cancel();
         this.pendingPartialMarker = null;
@@ -99,11 +88,7 @@ export class Mapper {
       return;
     }
 
-    // Only update if content changed
-    if (
-      this.targetPartial?.marker !== partial.marker ||
-      this.targetPartial?.text !== partial.text
-    ) {
+    if (this.targetPartial?.marker !== partial.marker || this.targetPartial?.text !== partial.text) {
       this.targetPartial = partial;
       this.pendingPartialMarker = partial.marker;
       this.throttledUpdatePartial();
@@ -111,7 +96,6 @@ export class Mapper {
   }
 
   finalize() {
-    // Flush any pending throttled updates
     if (this.throttledUpdatePartial?.flush) {
       this.throttledUpdatePartial.flush();
     }
@@ -123,13 +107,10 @@ export class Mapper {
     this.onDebugClick = callback;
   }
 
-  /* === DISPLAY MANAGEMENT === */
-
   clearDisplay() {
     this.renderedPairs.clear();
     this.renderedGroups.clear();
     this.renderedBatches.clear();
-
     if (this.displayElement) {
       this.displayElement.innerHTML = "";
     }
@@ -144,13 +125,7 @@ export class Mapper {
     const marker = this.targetPartial.marker;
     const currentState = this.markerStates.get(marker);
 
-    // RACE CONDITION CHECK #2: Re-check state before applying throttled update
     if (currentState === "matched" || currentState === "orphan") {
-      if (this.logger) {
-        this.logger.warn(
-          `[RACE_CONDITION] Throttled partial update cancelled for ${marker} (state: ${currentState})`
-        );
-      }
       this.targetPartial = null;
       this.pendingPartialMarker = null;
       return;
@@ -165,16 +140,11 @@ export class Mapper {
     const source = this.source.find((s) => s.marker === marker);
     if (source) {
       const updateSequence = ++this.updateSequence;
-      this.applyPairUpdate(
-        pairElement,
-        {
-          type: "partial",
-          source: source,
-          target: this.targetPartial,
-        },
-        marker,
-        updateSequence
-      );
+      this.applyPairUpdate(pairElement, {
+        type: "partial",
+        source: source,
+        target: this.targetPartial,
+      }, marker, updateSequence);
     }
 
     this.pendingPartialMarker = null;
@@ -189,11 +159,7 @@ export class Mapper {
       const sourceMatch = sourceMap.get(marker);
       const pairElement = this.renderedPairs.get(marker);
 
-      // Create sequence for this specific update
-      const updateSequence = batchSequence || ++this.updateSequence;
-
       if (sourceMatch && pairElement) {
-        // Cancel any pending partial update for this marker
         if (this.pendingPartialMarker === marker) {
           this.throttledUpdatePartial.cancel();
           this.pendingPartialMarker = null;
@@ -202,27 +168,42 @@ export class Mapper {
           }
         }
 
-        // Update existing pair with matched state
-        this.applyPairUpdate(
-          pairElement,
-          {
-            type: "matched",
-            source: sourceMatch,
-            target: segment,
-          },
-          marker,
-          updateSequence
-        );
+        this.applyPairUpdate(pairElement, {
+          type: "matched",
+          source: sourceMatch,
+          target: segment,
+        }, marker, batchSequence);
+
+      } else if (sourceMatch && !pairElement) {
+        console.error(`[Mapper] Missing DOM for ${marker} - recreating`);
+        
+        const newPair = this.createPairElement({
+          type: "matched",
+          source: sourceMatch,
+          target: segment,
+        });
+
+        const batchNum = Math.floor(this.source.findIndex(s => s.marker === marker) / this.config.batchSize) + 1;
+        let batchElement = this.renderedBatches.get(`BATCH-${batchNum}`);
+
+        if (batchElement) {
+          const batchContent = batchElement.querySelector('.batch-content');
+          if (batchContent) {
+            batchContent.appendChild(newPair);
+            this.renderedPairs.set(marker, newPair);
+            this.markerStates.set(marker, 'matched');
+            this.markerSequences.set(marker, batchSequence);
+          }
+        } else {
+          orphans.push(segment);
+        }
       } else if (!sourceMatch) {
-        // Collect orphans for batch processing
         orphans.push(segment);
       }
     });
 
-    // Process all orphans at once
     if (orphans.length > 0) {
-      const orphanSequence = ++this.updateSequence;
-      this.addOrphanSegments(orphans, orphanSequence);
+      this.addOrphanSegments(orphans, batchSequence);
     }
   }
 
@@ -230,13 +211,7 @@ export class Mapper {
     const currentState = this.markerStates.get(marker);
     const lastSequence = this.markerSequences.get(marker) || 0;
 
-    // RACE CONDITION CHECK #3: Prevent older updates from overwriting newer ones
     if (sequence < lastSequence) {
-      if (this.logger) {
-        this.logger.warn(
-          `[RACE_CONDITION] Out-of-order update rejected for ${marker} (seq ${sequence} < ${lastSequence})`
-        );
-      }
       this.sendToDebugWindow("RACE_CONDITION_DETECTED", {
         marker: marker,
         currentSequence: lastSequence,
@@ -246,16 +221,8 @@ export class Mapper {
       return;
     }
 
-    // RACE CONDITION CHECK #4: Prevent state regression (matched/orphan are terminal)
-    if (
-      (currentState === "matched" || currentState === "orphan") &&
-      (item.type === "partial" || item.type === "gap")
-    ) {
-      if (this.logger) {
-        this.logger.warn(
-          `[RACE_CONDITION] State regression prevented for ${marker} (${currentState} -> ${item.type})`
-        );
-      }
+    if ((currentState === "matched" || currentState === "orphan") &&
+        (item.type === "partial" || item.type === "gap")) {
       this.sendToDebugWindow("RACE_CONDITION_DETECTED", {
         marker: marker,
         currentState: currentState,
@@ -265,14 +232,10 @@ export class Mapper {
       return;
     }
 
-    // Apply the update
     this.updatePairElement(pairElement, item);
-
-    // Update state tracking
     this.markerStates.set(marker, item.type);
     this.markerSequences.set(marker, sequence);
 
-    // Update batch annotation color based on new state
     const batchElement = pairElement.closest(".batch");
     if (batchElement) {
       this.updateBatchAnnotationColor(batchElement);
@@ -280,20 +243,15 @@ export class Mapper {
   }
 
   updatePairElement(pairElement, item) {
-    // Update class
     pairElement.className = `pair ${item.type}`;
 
-    // Update debug button status (no need to update text, just dataset)
     const debugBtn = pairElement.querySelector(".pair-debug-btn");
     if (debugBtn) {
       debugBtn.dataset.status = item.type;
-      debugBtn.title = `${item.type.toUpperCase()} - Click to view detailed debug analysis`;
     }
 
-    // Update target value
-    const targetValue =
-      pairElement.querySelectorAll(".json-value")[1] ||
-      pairElement.querySelector(".json-value");
+    const targetValue = pairElement.querySelectorAll(".json-value")[1] || 
+                        pairElement.querySelector(".json-value");
 
     if (targetValue) {
       this.updateTargetValue(targetValue, item);
@@ -301,7 +259,6 @@ export class Mapper {
   }
 
   updateTargetValue(targetValue, item) {
-    // Reset classes
     targetValue.className = "json-value";
 
     switch (item.type) {
@@ -315,12 +272,8 @@ export class Mapper {
         break;
       case "matched":
       case "orphan":
-        if (item.target?.text) {
-          targetValue.textContent = item.target.text;
-        } else {
-          targetValue.textContent = "(no target)";
-          targetValue.classList.add("empty");
-        }
+        targetValue.textContent = item.target?.text || "(no target)";
+        if (!item.target?.text) targetValue.classList.add("empty");
         break;
       default:
         targetValue.textContent = "(no target)";
@@ -331,7 +284,6 @@ export class Mapper {
   addOrphanSegments(segments, sequence) {
     if (!segments?.length) return;
 
-    // Get or create orphan group
     let orphanGroup = this.renderedGroups.get("ORPHAN");
     if (!orphanGroup) {
       orphanGroup = this.createGroupElement("ORPHAN");
@@ -339,7 +291,6 @@ export class Mapper {
       this.displayElement.appendChild(orphanGroup);
     }
 
-    // Get or create orphan batch
     let orphanBatch = this.renderedBatches.get("ORPHAN-BATCH");
     if (!orphanBatch) {
       orphanBatch = this.createBatchElement("ORPHAN", "ORPHAN");
@@ -347,14 +298,12 @@ export class Mapper {
       orphanGroup.querySelector(".group-content").appendChild(orphanBatch);
     }
 
-    // Batch create all orphan pairs
     const fragment = document.createDocumentFragment();
     const batchContent = orphanBatch.querySelector(".batch-content");
 
     segments.forEach((segment) => {
       const marker = segment.marker;
 
-      // Cancel any pending partial for this marker
       if (this.pendingPartialMarker === marker) {
         this.throttledUpdatePartial.cancel();
         this.pendingPartialMarker = null;
@@ -370,8 +319,6 @@ export class Mapper {
       pairElement.dataset.batchNum = "ORPHAN";
 
       this.renderedPairs.set(marker, pairElement);
-
-      // Track state
       this.markerStates.set(marker, "orphan");
       this.markerSequences.set(marker, sequence);
 
@@ -381,14 +328,11 @@ export class Mapper {
     batchContent.appendChild(fragment);
   }
 
-  /* === RENDERING === */
-
   initialRender() {
     if (!this.displayElement) return;
 
     if (!this.source.length) {
-      this.displayElement.innerHTML =
-        '<div class="empty">No source segments available.</div>';
+      this.displayElement.innerHTML = '<div class="empty">No source segments available.</div>';
       return;
     }
 
@@ -396,7 +340,6 @@ export class Mapper {
     const targetMap = new Map(this.target.map((t) => [t.marker, t]));
     const allBatches = this.buildBatches(targetMap);
 
-    // Initialize marker states
     this.source.forEach((seg) => {
       if (!this.markerStates.has(seg.marker)) {
         this.markerStates.set(seg.marker, "gap");
@@ -406,7 +349,6 @@ export class Mapper {
     this.renderGroups(fragment, allBatches);
     this.renderOrphans(fragment);
 
-    // Single DOM update
     this.displayElement.innerHTML = "";
     this.displayElement.appendChild(fragment);
   }
@@ -416,15 +358,11 @@ export class Mapper {
     let batchIndex = 0;
 
     while (batchIndex < allBatches.length) {
-      const batchesPerGroup =
-        groupNum === 1
-          ? this.config.firstGroupBatches
-          : this.config.regularGroupBatches;
+      const batchesPerGroup = groupNum === 1 ? 
+        this.config.firstGroupBatches : 
+        this.config.regularGroupBatches;
 
-      const batchesInGroup = allBatches.slice(
-        batchIndex,
-        batchIndex + batchesPerGroup
-      );
+      const batchesInGroup = allBatches.slice(batchIndex, batchIndex + batchesPerGroup);
 
       if (batchesInGroup.length > 0) {
         const groupElement = this.createGroupElement(groupNum);
@@ -465,8 +403,6 @@ export class Mapper {
     });
 
     batchContent.appendChild(fragment);
-
-    // Update annotation color based on batch content
     this.updateBatchAnnotationColor(batchElement);
 
     return batchElement;
@@ -496,8 +432,6 @@ export class Mapper {
       pairElement.dataset.batchNum = "ORPHAN";
 
       this.renderedPairs.set(marker, pairElement);
-
-      // Track state
       this.markerStates.set(marker, "orphan");
 
       batchFragment.appendChild(pairElement);
@@ -523,21 +457,14 @@ export class Mapper {
       if (matchedSeg) {
         item = { type: "matched", source: sourceSeg, target: matchedSeg };
       } else if (this.targetPartial?.marker === sourceSeg.marker) {
-        item = {
-          type: "partial",
-          source: sourceSeg,
-          target: this.targetPartial,
-        };
+        item = { type: "partial", source: sourceSeg, target: this.targetPartial };
       } else {
         item = { type: "gap", source: sourceSeg, target: null };
       }
 
       currentBatch.push(item);
 
-      if (
-        currentBatch.length === this.config.batchSize ||
-        i === this.source.length - 1
-      ) {
+      if (currentBatch.length === this.config.batchSize || i === this.source.length - 1) {
         batches.push(currentBatch);
         currentBatch = [];
       }
@@ -546,34 +473,35 @@ export class Mapper {
     return batches;
   }
 
-  /* === DOM CREATION === */
-
   createGroupElement(groupNum) {
-    const div = this.createElement("div", "batch-group");
+    const div = document.createElement("div");
+    div.className = "batch-group";
     div.dataset.groupNum = groupNum;
 
-    const content = this.createElement("div", "group-content");
+    const content = document.createElement("div");
+    content.className = "group-content";
     div.appendChild(content);
 
     return div;
   }
 
   createBatchElement(batchNum, groupNum) {
-    const div = this.createElement("div", "batch");
+    const div = document.createElement("div");
+    div.className = "batch";
     div.dataset.batchNum = batchNum;
 
-    // Create timeline annotation
-    const annotation = this.createElement("div", "timeline-annotation");
+    const annotation = document.createElement("div");
+    annotation.className = "timeline-annotation";
 
     if (batchNum === "ORPHAN") {
       annotation.textContent = "Orphan Segments";
       annotation.classList.add("orphan-section");
     } else {
       annotation.textContent = `Group ${groupNum} - Batch ${batchNum}`;
-      // Color will be determined by batch content (set later)
     }
 
-    const content = this.createElement("div", "batch-content");
+    const content = document.createElement("div");
+    content.className = "batch-content";
 
     div.appendChild(annotation);
     div.appendChild(content);
@@ -583,18 +511,12 @@ export class Mapper {
 
   updateBatchAnnotationColor(batchElement) {
     const annotation = batchElement.querySelector(".timeline-annotation");
-    if (!annotation || annotation.classList.contains("orphan-section")) {
-      return; // Skip orphan batches (already red)
-    }
+    if (!annotation || annotation.classList.contains("orphan-section")) return;
 
-    // Get all pairs in this batch
     const pairs = batchElement.querySelectorAll(".pair");
     if (pairs.length === 0) return;
 
-    // Count states
-    let matched = 0;
-    let partial = 0;
-    let gap = 0;
+    let matched = 0, partial = 0, gap = 0;
 
     pairs.forEach((pair) => {
       if (pair.classList.contains("matched")) matched++;
@@ -602,35 +524,23 @@ export class Mapper {
       else if (pair.classList.contains("gap")) gap++;
     });
 
-    // Remove existing state classes
-    annotation.classList.remove(
-      "matched-section",
-      "streaming-section",
-      "waiting-section"
-    );
+    annotation.classList.remove("matched-section", "streaming-section", "waiting-section");
 
-    // Apply color based on predominant state
     if (matched === pairs.length) {
-      // All matched - green
       annotation.classList.add("matched-section");
     } else if (partial > 0) {
-      // Has streaming - blue
       annotation.classList.add("streaming-section");
     } else if (gap > 0) {
-      // Has waiting - yellow
       annotation.classList.add("waiting-section");
     }
-    // Default remains blue
   }
 
   createPairElement(item) {
-    const div = this.createElement("div", `pair ${item.type}`);
+    const div = document.createElement("div");
+    div.className = `pair ${item.type}`;
     div.dataset.marker = item.source?.marker || item.target?.marker;
 
-    // Create header
     const header = this.createPairHeader(div.dataset.marker, item.type);
-
-    // Create content
     const content = this.createPairContent(item);
 
     div.appendChild(header);
@@ -640,22 +550,25 @@ export class Mapper {
   }
 
   createPairHeader(marker, type) {
-    const header = this.createElement("div", "pair-header");
+    const header = document.createElement("div");
+    header.className = "pair-header";
 
-    const markerSpan = this.createElement("span", "pair-marker");
+    const markerSpan = document.createElement("span");
+    markerSpan.className = "pair-marker";
     markerSpan.textContent = marker;
 
-    // Create debug button with status-colored background (replaces status badge)
-    const debugBtn = this.createElement("button", "pair-debug-btn");
+    const debugBtn = document.createElement("button");
+    debugBtn.className = "pair-debug-btn";
     debugBtn.textContent = "🔍";
     debugBtn.dataset.marker = marker;
     debugBtn.dataset.status = type;
     debugBtn.title = `${type.toUpperCase()} - Click to view detailed debug analysis`;
 
-    // Prevent button click from bubbling
     debugBtn.onclick = (e) => {
       e.stopPropagation();
-      this.handleDebugClick(marker, type);
+      if (this.onDebugClick) {
+        this.onDebugClick(marker, type);
+      }
     };
 
     header.appendChild(markerSpan);
@@ -664,36 +577,31 @@ export class Mapper {
     return header;
   }
 
-  handleDebugClick(marker, status) {
-    console.log(`[Mapper] Debug button clicked for ${marker} (${status})`);
-
-    // Add visual feedback
-    const pairElement = this.renderedPairs.get(marker);
-    if (pairElement) {
-      pairElement.classList.add("debugging");
-      setTimeout(() => {
-        pairElement.classList.remove("debugging");
-      }, 500);
-    }
-
-    // Notify via callback
-    if (this.onDebugClick) {
-      this.onDebugClick(marker, status);
-    }
-  }
-
   createPairContent(item) {
-    const content = this.createElement("div", "pair-content");
-    const grid = this.createElement("div", "json-grid");
+    const content = document.createElement("div");
+    content.className = "pair-content";
+    
+    const grid = document.createElement("div");
+    grid.className = "json-grid";
 
-    // Add source if not orphan
     if (item.source || item.type !== "orphan") {
-      grid.appendChild(this.createLabel("Source"));
-      grid.appendChild(this.createValue(item.source?.text, !item.source?.text));
+      const srcLabel = document.createElement("div");
+      srcLabel.className = "json-label";
+      srcLabel.textContent = "Source";
+      grid.appendChild(srcLabel);
+
+      const srcValue = document.createElement("div");
+      srcValue.className = "json-value";
+      srcValue.textContent = item.source?.text || "(no source)";
+      if (!item.source?.text) srcValue.classList.add("empty");
+      grid.appendChild(srcValue);
     }
 
-    // Add target
-    grid.appendChild(this.createLabel("Target"));
+    const tgtLabel = document.createElement("div");
+    tgtLabel.className = "json-label";
+    tgtLabel.textContent = "Target";
+    grid.appendChild(tgtLabel);
+
     grid.appendChild(this.createTargetValue(item));
 
     content.appendChild(grid);
@@ -701,48 +609,23 @@ export class Mapper {
   }
 
   createTargetValue(item) {
-    let text = "";
-    let isEmpty = false;
-    let isStreaming = false;
+    const value = document.createElement("div");
+    value.className = "json-value";
 
     switch (item.type) {
       case "gap":
-        text = "(waiting...)";
-        isEmpty = true;
+        value.textContent = "(waiting...)";
+        value.classList.add("empty");
         break;
       case "partial":
-        text = item.target?.text || "...";
-        isStreaming = true;
+        value.textContent = item.target?.text || "...";
+        value.classList.add("streaming");
         break;
       default:
-        text = item.target?.text;
-        isEmpty = !text;
+        value.textContent = item.target?.text || "(no target)";
+        if (!item.target?.text) value.classList.add("empty");
     }
 
-    const value = this.createValue(text, isEmpty);
-    if (isStreaming) {
-      value.classList.add("streaming");
-    }
-
-    return value;
-  }
-
-  createElement(tag, className) {
-    const el = document.createElement(tag);
-    if (className) el.className = className;
-    return el;
-  }
-
-  createLabel(text) {
-    const label = this.createElement("div", "json-label");
-    label.textContent = text;
-    return label;
-  }
-
-  createValue(text, isEmpty = false) {
-    const value = this.createElement("div", "json-value");
-    value.textContent = text || "(no target)";
-    if (isEmpty) value.classList.add("empty");
     return value;
   }
 }
