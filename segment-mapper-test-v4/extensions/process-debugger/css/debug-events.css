@@ -90,19 +90,26 @@
 
 /* Timeline marker colors - MATCH MAPPER */
 .timeline-marker.success {
-  background: #28a745; /* 🟢 Green - Matched */
+  background: #28a745;
+  /* 🟢 Green - Matched */
   color: white;
 }
+
 .timeline-marker.info {
-  background: #007bff; /* 🔵 Blue - Info/Streaming */
+  background: #007bff;
+  /* 🔵 Blue - Info/Streaming */
   color: white;
 }
+
 .timeline-marker.warning {
-  background: #ffc107; /* 🟡 Yellow - Waiting/Gap */
+  background: #ffc107;
+  /* 🟡 Yellow - Waiting/Gap */
   color: #333;
 }
+
 .timeline-marker.critical {
-  background: #dc3545; /* 🔴 Red - Orphan/Error */
+  background: #dc3545;
+  /* 🔴 Red - Orphan/Error */
   color: white;
 }
 
@@ -117,16 +124,23 @@
 
 /* Event severity border-left - MATCH MAPPER */
 .event.severity-success {
-  border-left: 4px solid #28a745; /* 🟢 Green */
+  border-left: 4px solid #28a745;
+  /* 🟢 Green */
 }
+
 .event.severity-info {
-  border-left: 4px solid #007bff; /* 🔵 Blue */
+  border-left: 4px solid #007bff;
+  /* 🔵 Blue */
 }
+
 .event.severity-warning {
-  border-left: 4px solid #ffc107; /* 🟡 Yellow */
+  border-left: 4px solid #ffc107;
+  /* 🟡 Yellow */
 }
+
 .event.severity-critical {
-  border-left: 4px solid #dc3545; /* 🔴 Red */
+  border-left: 4px solid #dc3545;
+  /* 🔴 Red */
 }
 
 .event-number {

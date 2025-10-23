@@ -460,15 +460,15 @@ export const OrphanStepTemplates = {
         diagnostic:
           severity === "critical"
             ? [
-                "CRITICAL: AI hallucinated entire base marker category",
-                "Base marker doesn't exist in source at all",
-                "AI completely failed to follow source structure",
-              ]
+              "CRITICAL: AI hallucinated entire base marker category",
+              "Base marker doesn't exist in source at all",
+              "AI completely failed to follow source structure",
+            ]
             : [
-                "WARNING: Base marker exists, but index is wrong",
-                "AI generated too many segments for this base marker",
-                "Likely duplication or counting error",
-              ],
+              "WARNING: Base marker exists, but index is wrong",
+              "AI generated too many segments for this base marker",
+              "Likely duplication or counting error",
+            ],
       }
     ),
 
@@ -552,12 +552,12 @@ export const RaceConditionStepTemplates = {
           },
           ...(currentSeq !== undefined
             ? [
-                {
-                  icon: "🔢",
-                  text: `Sequence check: ${rejectedSeq} < ${currentSeq} (OUT OF ORDER)`,
-                  type: "error",
-                },
-              ]
+              {
+                icon: "🔢",
+                text: `Sequence check: ${rejectedSeq} < ${currentSeq} (OUT OF ORDER)`,
+                type: "error",
+              },
+            ]
             : []),
         ],
         diagnostic: [

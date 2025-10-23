@@ -28,16 +28,23 @@
 
 /* Color coding for specific stats - MATCH MAPPER */
 .stat-item.info .stat-number {
-  color: #007bff; /* 🔵 Blue - Info */
+  color: #007bff;
+  /* 🔵 Blue - Info */
 }
+
 .stat-item.matched .stat-number {
-  color: #28a745; /* 🟢 Green - Matched */
+  color: #28a745;
+  /* 🟢 Green - Matched */
 }
+
 .stat-item.orphan .stat-number {
-  color: #dc3545; /* 🔴 Red - Orphan */
+  color: #dc3545;
+  /* 🔴 Red - Orphan */
 }
+
 .stat-item.gap .stat-number {
-  color: #ffc107; /* 🟡 Yellow - Waiting/Gap */
+  color: #ffc107;
+  /* 🟡 Yellow - Waiting/Gap */
 }
 
 .controls-row {

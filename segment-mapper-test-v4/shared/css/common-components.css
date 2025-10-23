@@ -31,54 +31,61 @@
 /* Status Badges */
 .status-badge,
 .severity-badge {
-  padding: 4px 12px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-smaller);
-  font-weight: 700;
-  text-transform: uppercase;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-smaller);
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 /* MATCH MAPPER COLOR SCHEME */
 .status-badge.success,
 .severity-badge.success {
-  background: #28a745; /* 🟢 Green - Matched/Complete */
-  color: white;
+    background: #28a745;
+    /* 🟢 Green - Matched/Complete */
+    color: white;
 }
 
 .status-badge.error,
 .severity-badge.critical {
-  background: #dc3545; /* 🔴 Red - Orphan/Error */
-  color: white;
+    background: #dc3545;
+    /* 🔴 Red - Orphan/Error */
+    color: white;
 }
 
 .status-badge.warning,
 .severity-badge.warning {
-  background: #ffc107; /* 🟡 Yellow - Waiting/Gap */
-  color: #333;
+    background: #ffc107;
+    /* 🟡 Yellow - Waiting/Gap */
+    color: #333;
 }
 
 .status-badge.info,
 .severity-badge.info {
-  background: #007bff; /* 🔵 Blue - Streaming/Info */
-  color: white;
+    background: #007bff;
+    /* 🔵 Blue - Streaming/Info */
+    color: white;
 }
 
 .status-badge.in-progress {
-  background: #007bff; /* 🔵 Blue - Active/Streaming */
-  color: white;
+    background: #007bff;
+    /* 🔵 Blue - Active/Streaming */
+    color: white;
 }
 
 .status-badge.completed {
-  background: #28a745; /* 🟢 Green - Complete */
-  color: white;
+    background: #28a745;
+    /* 🟢 Green - Complete */
+    color: white;
 }
 
 .status-badge.aborted {
-  background: #ff9800; /* 🟠 Orange - Aborted */
-  color: white;
+    background: #ff9800;
+    /* 🟠 Orange - Aborted */
+    color: white;
 }
 
 /* Alerts */
@@ -257,10 +264,22 @@ summary::-webkit-details-marker {
     font-weight: bold;
 }
 
-.flow-icon.success { background: var(--color-success); }
-.flow-icon.error { background: var(--color-error); }
-.flow-icon.warning { background: var(--color-warning); color: var(--color-text); }
-.flow-icon.info { background: var(--color-info); }
+.flow-icon.success {
+    background: var(--color-success);
+}
+
+.flow-icon.error {
+    background: var(--color-error);
+}
+
+.flow-icon.warning {
+    background: var(--color-warning);
+    color: var(--color-text);
+}
+
+.flow-icon.info {
+    background: var(--color-info);
+}
 
 /* Comparison Grid */
 .comparison-grid {
@@ -355,7 +374,7 @@ summary::-webkit-details-marker {
     font-weight: 700;
 }
 
-.waiting-progress > div {
+.waiting-progress>div {
     font-size: var(--font-size-small);
     color: var(--color-text);
 }
@@ -384,7 +403,7 @@ summary::-webkit-details-marker {
     .comparison-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .comparison-arrow {
         transform: rotate(90deg);
         justify-self: center;

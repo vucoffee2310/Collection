@@ -68,7 +68,7 @@ mapper.setDebugClickHandler((marker, statusFromDOM) => {
       console.warn(
         `[Main App] ⚠️ Target exists for ${marker} but no debug events recorded during streaming`
       );
-      
+
       alert(
         `⚠️ Debug data missing for ${marker}\n\n` +
         `Status: ${actualStatus.toUpperCase()}\n` +

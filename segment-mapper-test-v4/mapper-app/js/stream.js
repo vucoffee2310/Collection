@@ -290,9 +290,8 @@ export class AIStream {
           .filter((w) => w.type === "FAKE_MARKER")
           .slice(0, 5)
           .forEach((w, i) => {
-            reportText += `${i + 1}. (${w.baseMarker}) at position ${
-              w.responsePosition
-            }\n`;
+            reportText += `${i + 1}. (${w.baseMarker}) at position ${w.responsePosition
+              }\n`;
             reportText += `   Context: [${w.responsePreceding.join(", ")}]\n`;
             reportText += `   Reason: ${w.message}\n\n`;
           });
@@ -409,9 +408,8 @@ export class AIStream {
 
     const html = `
             <div class="report-section summary-section">
-                <h4>Generation Summary <span class="status-badge ${statusClass}" id="status-badge">${
-      this.report.summary?.status || "Initializing"
-    }</span></h4>
+                <h4>Generation Summary <span class="status-badge ${statusClass}" id="status-badge">${this.report.summary?.status || "Initializing"
+      }</span></h4>
                 <div class="report-content" id="summary-content"></div>
             </div>
             

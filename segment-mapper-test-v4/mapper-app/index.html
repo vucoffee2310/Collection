@@ -1,23 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Segment Mapper & Debugger</title>
-    
+
     <!-- Shared CSS (Load First) -->
     <link rel="stylesheet" href="../shared/css/variables.css">
     <link rel="stylesheet" href="../shared/css/buttons.css">
     <link rel="stylesheet" href="../shared/css/common-components.css">
     <link rel="stylesheet" href="../shared/css/utilities.css">
-    
+
     <!-- Mapper App CSS -->
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/widgets.css">
     <link rel="stylesheet" href="css/mapping.css">
-    
+
     <!-- Debugger Extension CSS -->
     <link rel="stylesheet" href="../extensions/process-debugger/css/debug-layout.css">
     <link rel="stylesheet" href="../extensions/process-debugger/css/debug-controls.css">
@@ -26,6 +27,7 @@
     <link rel="stylesheet" href="../extensions/process-debugger/css/debug-steps.css">
     <link rel="stylesheet" href="../extensions/process-debugger/css/debug-components.css">
 </head>
+
 <body>
     <!-- Protocol Checker -->
     <script>
@@ -123,20 +125,22 @@ url:https://github.com/0342/
         <!-- Debugger View -->
         <div id="debugView" class="view">
             <div class="debug-container">
-                 <!-- Breakdown Section -->
-                 <details class="breakdown-section" id="breakdownSection" open>
+                <!-- Breakdown Section -->
+                <details class="breakdown-section" id="breakdownSection" open>
                     <summary class="breakdown-header">
-                       <span class="breakdown-title">🔍 Marker Overview - Click any card to see full details</span>
-                       <button id="clearBtn" class="clear-btn btn-danger" title="Clear all events and reset">🗑️ Clear</button>
+                        <span class="breakdown-title">🔍 Marker Overview - Click any card to see full details</span>
+                        <button id="clearBtn" class="clear-btn btn-danger" title="Clear all events and reset">🗑️
+                            Clear</button>
                     </summary>
                     <div id="markerBreakdownTable"></div>
-                 </details>
-                 <!-- Container for Event Timelines -->
-                 <div id="timeline-container"></div>
+                </details>
+                <!-- Container for Event Timelines -->
+                <div id="timeline-container"></div>
             </div>
         </div>
     </div>
-    
+
     <script src="js/main.js" type="module"></script>
 </body>
+
 </html>

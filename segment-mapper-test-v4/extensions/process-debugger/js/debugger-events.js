@@ -10,8 +10,8 @@ export function createWaitingEvent(source, debugContext) {
     const index = parseInt(source.marker.split('-')[1]);
     const timestamp = new Date().toLocaleTimeString();
 
-    const waitTime = debugContext.generationStartTime 
-        ? Math.floor((Date.now() - debugContext.generationStartTime) / 1000) 
+    const waitTime = debugContext.generationStartTime
+        ? Math.floor((Date.now() - debugContext.generationStartTime) / 1000)
         : 0;
 
     const totalSources = debugContext.sourceSegments.length;
@@ -22,8 +22,8 @@ export function createWaitingEvent(source, debugContext) {
 
     const sourceIndex = debugContext.sourceSegments.findIndex(s => s.marker === source.marker);
 
-    let severity = waitTime > 60 || (matchedCount > 0 && sourceIndex < matchedCount) 
-        ? 'warning' 
+    let severity = waitTime > 60 || (matchedCount > 0 && sourceIndex < matchedCount)
+        ? 'warning'
         : 'info';
 
     const jsonPair = { marker: source.marker, source: source.text, target: '⏳ PENDING...' };

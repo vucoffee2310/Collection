@@ -337,10 +337,8 @@ export class StreamingParser {
       });
 
       console.log(
-        `[StreamingParser] ✅ pos ${
-          this.responseSequence.length - 1
-        }: (${baseMarker}) → ${matchResult.sourceMarker} (depth ${
-          matchResult.matchDepth
+        `[StreamingParser] ✅ pos ${this.responseSequence.length - 1
+        }: (${baseMarker}) → ${matchResult.sourceMarker} (depth ${matchResult.matchDepth
         })`
       );
     }

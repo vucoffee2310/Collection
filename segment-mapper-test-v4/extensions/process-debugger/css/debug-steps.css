@@ -55,10 +55,22 @@
     flex-shrink: 0;
 }
 
-.step-number.success { background: var(--color-success); }
-.step-number.info { background: var(--color-info); }
-.step-number.warning { background: var(--color-warning); color: var(--color-text); }
-.step-number.error { background: var(--color-error); }
+.step-number.success {
+    background: var(--color-success);
+}
+
+.step-number.info {
+    background: var(--color-info);
+}
+
+.step-number.warning {
+    background: var(--color-warning);
+    color: var(--color-text);
+}
+
+.step-number.error {
+    background: var(--color-error);
+}
 
 .step-content {
     font-size: var(--font-size-small);
@@ -70,7 +82,7 @@
     .step {
         padding: 12px;
     }
-    
+
     .step-number {
         width: 26px;
         height: 26px;

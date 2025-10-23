@@ -69,21 +69,33 @@
 }
 
 /* Log Entry Styles */
-.log-entry { 
+.log-entry {
     margin-bottom: 4px;
     word-wrap: break-word;
 }
 
-.log-entry .timestamp { 
-    color: #888; 
+.log-entry .timestamp {
+    color: #888;
     margin-right: 8px;
     font-weight: 500;
 }
 
-.log-entry.info { color: #6a8759; }
-.log-entry.error { color: #ff6b68; font-weight: bold; }
-.log-entry.warn { color: #bbb529; }
-.log-chunk { color: #cc7832; }
+.log-entry.info {
+    color: #6a8759;
+}
+
+.log-entry.error {
+    color: #ff6b68;
+    font-weight: bold;
+}
+
+.log-entry.warn {
+    color: #bbb529;
+}
+
+.log-chunk {
+    color: #cc7832;
+}
 
 /* Status badges */
 .status-badge {

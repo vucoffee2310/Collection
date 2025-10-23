@@ -7,7 +7,7 @@ export class Mapper {
     this.targetPartial = null;
     this.displayElement = displayElement;
     this.logger = logger;
-    this.sendToDebugWindow = sendToDebugWindowCallback || (() => {});
+    this.sendToDebugWindow = sendToDebugWindowCallback || (() => { });
 
     // Cached DOM elements for performance
     this.renderedPairs = new Map();

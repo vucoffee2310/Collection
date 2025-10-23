@@ -23,7 +23,8 @@
 
 .timeline-annotation::before {
   content: "•";
-  color: #007bff; /* 🔵 Blue - Default/Regular batches */
+  color: #007bff;
+  /* 🔵 Blue - Default/Regular batches */
   font-size: 20px;
   line-height: 1;
   flex-shrink: 0;
@@ -36,12 +37,14 @@
 }
 
 .timeline-annotation.orphan-section::before {
-  color: #dc3545; /* 🔴 Red - Orphan batches */
+  color: #dc3545;
+  /* 🔴 Red - Orphan batches */
 }
 
 /* Optional: Matched section - Green (if you want to distinguish completed batches) */
 .timeline-annotation.matched-section::before {
-  color: #28a745; /* 🟢 Green - All matched */
+  color: #28a745;
+  /* 🟢 Green - All matched */
 }
 
 /* Optional: Waiting section - Yellow (if you want to distinguish waiting batches) */
@@ -50,12 +53,14 @@
 }
 
 .timeline-annotation.waiting-section::before {
-  color: #ffc107; /* 🟡 Yellow - Waiting/gaps */
+  color: #ffc107;
+  /* 🟡 Yellow - Waiting/gaps */
 }
 
 /* Optional: Streaming section - Blue (explicit) */
 .timeline-annotation.streaming-section::before {
-  color: #007bff; /* 🔵 Blue - Has streaming data */
+  color: #007bff;
+  /* 🔵 Blue - Has streaming data */
 }
 
 /* === LAYOUT STRUCTURE === */
@@ -73,7 +78,8 @@
 
 /* Group Header - Simplified as separator */
 .group-header {
-  display: none; /* Hidden - replaced by per-batch sticky annotation */
+  display: none;
+  /* Hidden - replaced by per-batch sticky annotation */
 }
 
 /* Group Content */
@@ -98,7 +104,8 @@
 
 /* Batch Header - Simplified as separator */
 .batch-header {
-  display: none; /* Hidden - replaced by sticky annotation */
+  display: none;
+  /* Hidden - replaced by sticky annotation */
 }
 
 .batch-content {
@@ -113,7 +120,8 @@
   margin: 12px 16px;
   border: 1px solid #e5e5e5;
   border-left: 4px solid #ccc;
-  scroll-margin-top: 80px; /* Account for sticky header */
+  scroll-margin-top: 80px;
+  /* Account for sticky header */
 }
 
 .pair:first-child {
@@ -126,16 +134,23 @@
 
 /* Pair Status Colors - Clear distinction between states */
 .pair.matched {
-  border-left-color: #28a745; /* 🟢 Green - Success, complete */
+  border-left-color: #28a745;
+  /* 🟢 Green - Success, complete */
 }
+
 .pair.gap {
-  border-left-color: #ffc107; /* 🟡 Yellow - Waiting/stuck, no data yet */
+  border-left-color: #ffc107;
+  /* 🟡 Yellow - Waiting/stuck, no data yet */
 }
+
 .pair.partial {
-  border-left-color: #007bff; /* 🔵 Blue - Streaming, data flowing */
+  border-left-color: #007bff;
+  /* 🔵 Blue - Streaming, data flowing */
 }
+
 .pair.orphan {
-  border-left-color: #dc3545; /* 🔴 Red - Error, no source match */
+  border-left-color: #dc3545;
+  /* 🔴 Red - Error, no source match */
 }
 
 /* Pair Header */
@@ -179,7 +194,8 @@
 
 /* Status-specific colors - Match border-left colors */
 .pair.matched .pair-debug-btn {
-  background: #28a745; /* 🟢 Green - Complete */
+  background: #28a745;
+  /* 🟢 Green - Complete */
 }
 
 .pair.matched .pair-debug-btn:hover {
@@ -188,7 +204,8 @@
 }
 
 .pair.gap .pair-debug-btn {
-  background: #ffc107; /* 🟡 Yellow - Waiting (no data/stuck) */
+  background: #ffc107;
+  /* 🟡 Yellow - Waiting (no data/stuck) */
   color: #333;
 }
 
@@ -198,7 +215,8 @@
 }
 
 .pair.partial .pair-debug-btn {
-  background: #007bff; /* 🔵 Blue - Streaming (data flowing) */
+  background: #007bff;
+  /* 🔵 Blue - Streaming (data flowing) */
   color: white;
 }
 
@@ -208,7 +226,8 @@
 }
 
 .pair.orphan .pair-debug-btn {
-  background: #dc3545; /* 🔴 Red - Error/orphan */
+  background: #dc3545;
+  /* 🔴 Red - Error/orphan */
 }
 
 .pair.orphan .pair-debug-btn:hover {
@@ -230,6 +249,7 @@
   0% {
     box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.5);
   }
+
   100% {
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
   }
@@ -283,10 +303,12 @@
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.7;
   }
@@ -309,6 +331,7 @@
 .pair {
   contain: layout style paint;
 }
+
 .batch-group {
   contain: layout;
 }

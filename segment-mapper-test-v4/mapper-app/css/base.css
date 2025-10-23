@@ -2,8 +2,8 @@
    BASE RESET & GLOBAL STYLES
    ================================= */
 
-* { 
-    box-sizing: border-box; 
+* {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
@@ -12,7 +12,7 @@ html {
     height: 100%;
 }
 
-body { 
+body {
     font-family: var(--font-family-base);
     background: var(--color-bg-main);
     height: 100%;
@@ -21,14 +21,23 @@ body {
     flex-direction: column;
 }
 
-h1, h2, h3 { 
+h1,
+h2,
+h3 {
     margin: 0;
     color: var(--color-text);
 }
 
-h1 { font-size: var(--font-size-xxlarge); }
-h2 { font-size: var(--font-size-xlarge); margin-bottom: var(--spacing-sm); }
-h3 { 
+h1 {
+    font-size: var(--font-size-xxlarge);
+}
+
+h2 {
+    font-size: var(--font-size-xlarge);
+    margin-bottom: var(--spacing-sm);
+}
+
+h3 {
     font-size: var(--font-size-large);
     margin-bottom: var(--spacing-sm);
     border-bottom: 1px solid var(--color-border-lighter);
