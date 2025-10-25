@@ -1,0 +1,397 @@
+/* =================================
+   STREAM CARDS DISPLAY - REAL-TIME TRANSLATION PROCESSING
+   ================================= */
+
+/* === STICKY TIMELINE ANNOTATION === */
+
+.timeline-annotation {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.timeline-annotation::before {
+  content: "•";
+  color: #007bff;
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.timeline-annotation.matched-section {
+  background: #f8fff8;
+  border-bottom-color: #28a745;
+}
+
+.timeline-annotation.matched-section::before {
+  color: #28a745;
+}
+
+.timeline-annotation.merged-section {
+  background: #fffef8;
+  border-bottom-color: #ffc107;
+}
+
+.timeline-annotation.merged-section::before {
+  color: #ffc107;
+}
+
+.timeline-annotation.orphaned-section {
+  background: #fff5f5;
+  border-bottom-color: #dc3545;
+}
+
+.timeline-annotation.orphaned-section::before {
+  color: #dc3545;
+}
+
+/* === STREAM CARD STRUCTURE === */
+
+.stream-card {
+  background: white;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  position: relative;
+  contain: layout style paint;
+}
+
+.stream-card:last-child {
+  border-bottom: none;
+}
+
+/* Card wrapper for individual items */
+.card-item {
+  background: white;
+  border-left: 4px solid #ccc;
+  margin: 12px 16px;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  scroll-margin-top: 80px;
+  overflow: hidden;
+}
+
+.card-item:first-child {
+  margin-top: 12px;
+}
+
+.card-item:last-child {
+  margin-bottom: 12px;
+}
+
+/* Card Status Colors */
+.card-item.matched {
+  border-left-color: #28a745;
+}
+
+.card-item.merged {
+  border-left-color: #ffc107;
+}
+
+.card-item.orphaned {
+  border-left-color: #dc3545;
+}
+
+.card-item.failed {
+  border-left-color: #dc3545;
+}
+
+/* === CARD HEADER === */
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.card-marker {
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  background: #e5e5e5;
+  padding: 4px 10px;
+  border-radius: 3px;
+}
+
+.card-info {
+  font-size: 11px;
+  color: #666;
+  flex: 1;
+  margin: 0 12px;
+}
+
+/* === STATUS BADGE === */
+
+.card-status {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 3px;
+  color: white;
+  white-space: nowrap;
+}
+
+.card-item.matched .card-status {
+  background: #28a745;
+}
+
+.card-item.merged .card-status {
+  background: #ffc107;
+  color: #333;
+}
+
+.card-item.orphaned .card-status {
+  background: #dc3545;
+}
+
+.card-item.failed .card-status {
+  background: #dc3545;
+}
+
+/* === CARD CONTENT === */
+
+.card-content {
+  padding: 14px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 12px 14px;
+  align-items: start;
+}
+
+.content-label {
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  padding-top: 3px;
+}
+
+.content-value {
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  color: #333;
+  line-height: 1.6;
+  word-break: break-word;
+  background: #f8f8f8;
+  padding: 8px 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 3px;
+}
+
+.content-value.empty {
+  color: #999;
+  font-style: italic;
+  background: #fafafa;
+}
+
+.content-value.original {
+  background: #f8f9fa;
+  border-left: 3px solid #6c757d;
+}
+
+.content-value.translation {
+  background: #e7f5ff;
+  border-left: 3px solid #007bff;
+}
+
+/* === UTTERANCES SECTION === */
+
+.utterances-toggle {
+  width: 100%;
+  padding: 10px 14px;
+  background: #f0f4ff;
+  color: #667eea;
+  border: 1px solid #667eea;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  margin-top: 12px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.utterances-toggle:hover {
+  background: #667eea;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.utterances-toggle.expanded {
+  background: #667eea;
+  color: white;
+}
+
+.utterances-container {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f4ff;
+  border-radius: 4px;
+  border-left: 4px solid #667eea;
+}
+
+.utterances-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #667eea;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.utterance-item {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.utterance-item:last-child {
+  margin-bottom: 0;
+}
+
+.utterance-meta {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #666;
+  font-size: 10px;
+}
+
+.utterance-index {
+  background: #667eea;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.utterance-timestamp {
+  font-family: monospace;
+  margin-right: auto;
+}
+
+.utterance-words {
+  color: #999;
+}
+
+.utterance-text {
+  padding: 6px 8px;
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+.utterance-text.original {
+  background: #f8f9fa;
+  border-left: 3px solid #6c757d;
+}
+
+.utterance-text.translation {
+  background: #e7f5ff;
+  border-left: 3px solid #007bff;
+}
+
+.utterance-text.missing {
+  background: #fff3cd;
+  border-left: 3px solid #ffc107;
+  font-style: italic;
+  color: #856404;
+}
+
+.utterance-label {
+  font-size: 9px;
+  color: #666;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.3px;
+}
+
+/* === UTILITIES === */
+
+.cards-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+}
+
+/* === RESPONSIVE === */
+
+@media (max-width: 768px) {
+  .timeline-annotation {
+    padding: 10px 15px;
+    font-size: 12px;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .content-label {
+    padding-top: 0;
+  }
+
+  .card-item {
+    margin: 10px 10px;
+  }
+
+  .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .card-info {
+    flex-basis: 100%;
+    margin: 0;
+  }
+}
+
+/* === ANIMATIONS === */
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-item {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Performance optimization */
+.card-item {
+  contain: layout style paint;
+}
