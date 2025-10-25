@@ -1,0 +1,196 @@
+/**
+ * Stream Cards CSS - Minimal Design with Strong Colors
+ */
+
+/* Container */
+#cardsContainer {
+  margin: 12px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+#cardsContainerTitle {
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Cards */
+.card-item {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #333;
+}
+
+.card-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Card Header */
+.card-header {
+  margin-bottom: 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-marker {
+  font-family: monospace;
+  font-weight: bold;
+  color: #000;
+  font-size: 13px;
+}
+
+.card-info {
+  color: #333;
+  flex: 1;
+  font-weight: 500;
+}
+
+.card-status {
+  color: #666;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* Card Content */
+.card-content {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.content-grid {
+  display: block;
+}
+
+.content-label {
+  font-weight: bold;
+  color: #000;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+  margin-bottom: 3px;
+}
+
+.content-label:first-child {
+  margin-top: 0;
+}
+
+.content-value {
+  font-family: monospace;
+  color: #000;
+  word-break: break-word;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* Utterances Toggle */
+.utterances-toggle {
+  width: 100%;
+  padding: 8px;
+  background: none;
+  color: #000;
+  border: none;
+  border-top: 2px solid #ccc;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.utterances-toggle:hover {
+  background: #f0f0f0;
+}
+
+/* Utterances Container */
+.utterances-container {
+  margin-top: 10px;
+  padding-left: 16px;
+  border-left: 3px solid #333;
+}
+
+.utterances-title {
+  font-size: 10px;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Utterance Item */
+.utterance-item {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ccc;
+}
+
+.utterance-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.utterance-meta {
+  font-size: 10px;
+  color: #333;
+  margin-bottom: 6px;
+  display: flex;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.utterance-index {
+  font-weight: bold;
+  color: #000;
+}
+
+.utterance-timestamp {
+  font-family: monospace;
+  color: #000;
+}
+
+.utterance-words {
+  margin-left: auto;
+  color: #666;
+}
+
+/* Utterance Text */
+.utterance-text {
+  margin-bottom: 6px;
+}
+
+.utterance-text:last-child {
+  margin-bottom: 0;
+}
+
+.utterance-label {
+  font-size: 9px;
+  color: #000;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.utterance-text div:last-child {
+  font-family: monospace;
+  font-size: 11px;
+  color: #000;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .card-header {
+    flex-wrap: wrap;
+  }
+}
