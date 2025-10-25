@@ -1,4 +1,4 @@
-import { $, copyToClipboard } from '../utils.js';
+import { $, copyToClipboard, getVideoId } from '../utils.js';
 import { formatJSON } from '../format.js';
 import { sendToAI, getPot } from '../api.js';
 import { convertSubtitlesToMarkedParagraphs } from '../subs.js';
@@ -8,13 +8,23 @@ import { createStreamModal } from './modal.js';
 
 const contentCache = new Map();
 const jsonCache = new Map();
+let lastClearedVideoId = null;
 
 const processTrack = async track => {
-  const cacheKey = track.baseUrl;
-  if (contentCache.has(cacheKey)) return contentCache.get(cacheKey);
+  const videoId = getVideoId();
+  const cacheKey = `${videoId}::${track.baseUrl}`;
   
-  const { pot } = await getPot() || {};
-  if (!pot) return alert('Please enable subtitles and refresh the page'), null;
+  if (contentCache.has(cacheKey)) {
+    return contentCache.get(cacheKey);
+  }
+  
+  const response = await getPot(videoId);
+  const pot = response?.pot;
+  
+  if (!pot) {
+    alert('Please enable subtitles and refresh the page');
+    return null;
+  }
   
   const xml = await fetch(`${track.baseUrl}&fromExt=true&c=WEB&pot=${pot}`).then(r => r.text());
   const { text, metadata } = convertSubtitlesToMarkedParagraphs(xml, track.languageCode);
@@ -22,18 +32,24 @@ const processTrack = async track => {
   
   const result = { content, metadata };
   contentCache.set(cacheKey, result);
+  
   return result;
 };
 
 const getOrCreateJSON = async (track) => {
-  const cacheKey = track.baseUrl;
-  if (jsonCache.has(cacheKey)) return jsonCache.get(cacheKey);
+  const videoId = getVideoId();
+  const cacheKey = `${videoId}::${track.baseUrl}`;
+  
+  if (jsonCache.has(cacheKey)) {
+    return jsonCache.get(cacheKey);
+  }
   
   const result = await processTrack(track);
   if (!result) return null;
   
   const json = extractMarkersWithContext(result.content, result.metadata);
   jsonCache.set(cacheKey, json);
+  
   return json;
 };
 
@@ -129,8 +145,13 @@ const createTrackRow = (track) => {
 
 export const createUI = tracks => {
   $('#captionDownloadContainer')?.remove();
-  contentCache.clear();
-  jsonCache.clear();
+  
+  const currentVideoId = getVideoId();
+  if (currentVideoId !== lastClearedVideoId) {
+    contentCache.clear();
+    jsonCache.clear();
+    lastClearedVideoId = currentVideoId;
+  }
   
   const container = document.createElement('div');
   container.id = 'captionDownloadContainer';

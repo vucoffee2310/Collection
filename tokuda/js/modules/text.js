@@ -21,7 +21,6 @@ export const mergeLowMarkerParagraphs = text => {
 };
 
 export const splitTextAtMiddle = (text, lang) => {
-  // ✅ IMPROVED: For non-spaced languages, use grapheme segmentation
   if (NON_SPACED_LANGS.has(lang) && typeof Intl?.Segmenter === 'function') {
     try {
       const segmenter = new Intl.Segmenter(lang, { granularity: 'grapheme' });
@@ -36,11 +35,9 @@ export const splitTextAtMiddle = (text, lang) => {
       }
     } catch (err) {
       console.warn('Grapheme splitting failed:', err);
-      // Fall through to character-based split
     }
   }
   
-  // For spaced languages or fallback, split at word boundary near middle
   const mid = Math.floor(text.length / 2);
   const [after, before] = [text.indexOf(' ', mid), text.lastIndexOf(' ', mid)];
   const idx = after === -1 && before === -1 ? mid :

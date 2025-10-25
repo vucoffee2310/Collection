@@ -40,6 +40,8 @@ export const sendToAI = async content => {
   }
 };
 
-export const getPot = () => new Promise(resolve => 
-  chrome.runtime.sendMessage({ action: 'getPot' }, resolve)
+export const getPot = (videoId) => new Promise(resolve => 
+  chrome.runtime.sendMessage({ action: 'getPot', videoId }, response => {
+    resolve(response || {});
+  })
 );

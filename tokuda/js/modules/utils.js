@@ -33,19 +33,41 @@ export const combinations = (arr, size) => {
   return result;
 };
 
+// ✅ OPTIMIZATION: Cache segmenter instances
+const segmenterCache = new Map();
+
+const getSegmenter = (lang, granularity) => {
+  const key = `${lang}-${granularity}`;
+  if (!segmenterCache.has(key)) {
+    if (typeof Intl?.Segmenter === 'function') {
+      try {
+        segmenterCache.set(key, new Intl.Segmenter(lang, { granularity }));
+      } catch {
+        segmenterCache.set(key, null);
+      }
+    } else {
+      segmenterCache.set(key, null);
+    }
+  }
+  return segmenterCache.get(key);
+};
+
 export const countWords = (text, lang = 'en') => {
   if (!text || !text.trim()) return 0;
   
   const NON_SPACED_LANGS = new Set(['ja', 'th', 'zh', 'lo', 'km']);
   
-  if (NON_SPACED_LANGS.has(lang) && typeof Intl?.Segmenter === 'function') {
-    try {
-      const segmenter = new Intl.Segmenter(lang, { granularity: 'word' });
-      const segments = Array.from(segmenter.segment(text));
-      return segments.filter(s => s.isWordLike).length;
-    } catch {
-      return text.replace(/\s+/g, '').length;
+  if (NON_SPACED_LANGS.has(lang)) {
+    const segmenter = getSegmenter(lang, 'word');
+    if (segmenter) {
+      try {
+        const segments = Array.from(segmenter.segment(text));
+        return segments.filter(s => s.isWordLike).length;
+      } catch {
+        return text.replace(/\s+/g, '').length;
+      }
     }
+    return text.replace(/\s+/g, '').length;
   }
   
   return text.trim().split(/\s+/).filter(word => word.length > 0).length;
@@ -65,16 +87,19 @@ export const splitTranslationByWordRatio = (translationText, utterances, lang = 
   let translationWords = [];
   const NON_SPACED_LANGS = new Set(['ja', 'th', 'zh', 'lo', 'km']);
   
-  if (NON_SPACED_LANGS.has(lang) && typeof Intl?.Segmenter === 'function') {
-    try {
-      const segmenter = new Intl.Segmenter(lang, { granularity: 'word' });
-      const segments = Array.from(segmenter.segment(translationText));
-      translationWords = segments.filter(s => s.isWordLike).map(s => s.segment);
-    } catch {
+  if (NON_SPACED_LANGS.has(lang)) {
+    const segmenter = getSegmenter(lang, 'word');
+    if (segmenter) {
+      try {
+        const segments = Array.from(segmenter.segment(translationText));
+        translationWords = segments.filter(s => s.isWordLike).map(s => s.segment);
+      } catch {
+        translationWords = translationText.split('');
+      }
+    } else {
       translationWords = translationText.split('');
     }
   } else {
-    // ✅ FIX: Split by spaces but DON'T keep the spaces in the array
     translationWords = translationText.trim().split(/\s+/).filter(w => w.length > 0);
   }
 
@@ -86,17 +111,14 @@ export const splitTranslationByWordRatio = (translationText, utterances, lang = 
     const ratio = utt.wordLength / totalWordLength;
     let wordsToTake = Math.round(totalTranslationWords * ratio);
     
-    // Ensure we don't exceed bounds
     if (currentIndex + wordsToTake > translationWords.length) {
       wordsToTake = translationWords.length - currentIndex;
     }
     
     if (idx === utterances.length - 1) {
-      // Last utterance takes all remaining words
       wordsToTake = translationWords.length - currentIndex;
     }
 
-    // ✅ FIX: Take actual words and rejoin with spaces
     const portion = translationWords.slice(currentIndex, currentIndex + wordsToTake).join(' ');
     elementTranslations.push(portion.trim());
     

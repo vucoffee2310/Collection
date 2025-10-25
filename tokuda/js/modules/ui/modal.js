@@ -4,6 +4,7 @@ import { simulateSSEStream } from '../stream.js';
 import { CONFIG } from '../config.js';
 import { createStatElement } from './helpers.js';
 import { downloadSRT, downloadVTT, downloadTXT } from './export.js';
+import { createResultsCard } from './card.js';
 
 export const createStreamModal = (track, getOrCreateJSON) => {
   const modal = document.createElement('div');
@@ -117,10 +118,10 @@ const createStatsDisplay = () => {
   const elements = {
     chunks: createStatElement('0/0', 'Chunks (0%)'),
     matched: createStatElement('0', 'Matched', '#4ade80'),
+    merged: createStatElement('0', 'Merged', '#ff9800'),
     orphaned: createStatElement('0', 'Orphaned', '#f87171'),
     processed: createStatElement('0', 'Processed'),
-    total: createStatElement('0', 'Total Source'),
-    buffer: createStatElement('0', 'Buffer Size')
+    total: createStatElement('0', 'Total Source')
   };
   
   Object.values(elements).forEach(el => grid.appendChild(el.container));
@@ -301,9 +302,18 @@ const createControlButtons = (
     eventsLog.style.display = 'block';
     
     streamDisplay.textContent = '';
+    eventsLog.innerHTML = '';
     
-    const sourceJSON = await getOrCreateJSON(track);
-    if (!sourceJSON) return;
+    const cachedJSON = await getOrCreateJSON(track);
+    if (!cachedJSON) {
+      textarea.disabled = false;
+      startBtn.disabled = false;
+      startBtn.textContent = '▶ Start Stream';
+      startBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      return;
+    }
+    
+    const sourceJSON = JSON.parse(JSON.stringify(cachedJSON));
     
     console.log('\n' + '='.repeat(80));
     console.log('🌊 SSE STREAM SIMULATION STARTED');
@@ -326,30 +336,40 @@ const createControlButtons = (
     
     const formatted = formatJSON(updatedJSON);
     copyToClipboard(formatted);
-    console.log('📋 Final JSON:\n', formatted);
+    console.log('📋 Final JSON copied to clipboard');
     
-    addCompletionMessage(eventsLog);
+    addCompletionMessage(eventsLog, updatedJSON, translationText);
     exportContainer.style.display = 'block';
     
     startBtn.textContent = '✓ Done';
     startBtn.style.background = '#28a745';
     cancelBtn.textContent = 'Close';
+    
+    setTimeout(() => {
+      textarea.disabled = false;
+      startBtn.disabled = false;
+      startBtn.textContent = '▶ Run Again';
+      startBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    }, 1000);
   };
   
   return { startBtn, cancelBtn };
 };
 
+let lastBufferContent = '';
+
 const updateStreamDisplay = (display, progress) => {
-  if (display.firstChild?.nodeType === 3) {
-    display.firstChild.textContent = progress.bufferLength > 500 
-      ? `...${progress.bufferLength - 500} chars hidden...\n` 
-      : '';
-  } else {
-    display.textContent = progress.bufferLength > 500 
-      ? `...${progress.bufferLength - 500} chars hidden...\n` 
-      : '';
+  const newContent = progress.bufferLength > 500 
+    ? `...${progress.bufferLength - 500} chars hidden...\n` 
+    : '';
+  
+  if (lastBufferContent !== newContent) {
+    requestAnimationFrame(() => {
+      display.textContent = newContent;
+      display.scrollTop = display.scrollHeight;
+    });
+    lastBufferContent = newContent;
   }
-  display.scrollTop = display.scrollHeight;
 };
 
 const updateStats = (statsDisplay, progress) => {
@@ -359,20 +379,23 @@ const updateStats = (statsDisplay, progress) => {
   
   const { elements, progressFill } = statsDisplay;
   
-  elements.chunks.valueEl.textContent = `${progress.chunkIndex}/${progress.totalChunks}`;
-  elements.chunks.labelEl.textContent = `Chunks (${percentage}%)`;
-  elements.matched.valueEl.textContent = `✓ ${progress.stats.matched}`;
-  elements.orphaned.valueEl.textContent = `✗ ${progress.stats.orphaned}`;
-  elements.processed.valueEl.textContent = progress.stats.processed;
-  elements.total.valueEl.textContent = progress.stats.total;
-  elements.buffer.valueEl.textContent = progress.bufferLength;
-  progressFill.style.width = `${percentage}%`;
+  requestAnimationFrame(() => {
+    elements.chunks.valueEl.textContent = `${progress.chunkIndex}/${progress.totalChunks}`;
+    elements.chunks.labelEl.textContent = `Chunks (${percentage}%)`;
+    elements.matched.valueEl.textContent = `✓ ${progress.stats.matched}`;
+    elements.merged.valueEl.textContent = `🔗 ${progress.stats.merged}`;
+    elements.orphaned.valueEl.textContent = `✗ ${progress.stats.orphaned}`;
+    elements.processed.valueEl.textContent = progress.stats.processed;
+    elements.total.valueEl.textContent = progress.stats.total;
+    progressFill.style.width = `${percentage}%`;
+  });
 };
 
 const updateEvents = (eventsLog, progress, lastEventCount) => {
   if (!progress.events || progress.events.length <= lastEventCount) return;
   
-  const newEvents = progress.events.slice(lastEventCount).filter(e => e.type === 'marker_completed');
+  const newEvents = progress.events.slice(lastEventCount);
+  
   const fragment = document.createDocumentFragment();
   
   newEvents.forEach(event => {
@@ -382,47 +405,145 @@ const updateEvents = (eventsLog, progress, lastEventCount) => {
   
   eventsLog.appendChild(fragment);
   
-  while (eventsLog.children.length > CONFIG.MAX_EVENT_LOG_ITEMS) {
+  const maxItems = CONFIG.MAX_EVENT_LOG_ITEMS;
+  while (eventsLog.children.length > maxItems) {
     eventsLog.removeChild(eventsLog.firstChild);
   }
   
-  eventsLog.scrollTop = eventsLog.scrollHeight;
+  requestAnimationFrame(() => {
+    eventsLog.scrollTop = eventsLog.scrollHeight;
+  });
+};
+
+const eventStyles = {
+  merged: 'margin: 5px 0; padding: 8px; border-left: 3px solid #ff9800; background: #fff3e0; border-radius: 3px;',
+  mergedText: 'color: #f57c00; font-weight: bold;',
+  mergedSubtext: 'color: #f57c00; margin-left: 10px;',
+  mergedReason: 'color: #f57c00; margin-top: 3px; font-size: 10px;',
+  orphaned: 'margin: 5px 0; padding: 8px; border-left: 3px solid #ffc107; background: #fff3cd; border-radius: 3px;',
+  orphanedText: 'color: #856404; font-weight: bold;',
+  orphanedSubtext: 'color: #856404; margin-left: 10px;',
+  orphanedReason: 'color: #856404; margin-top: 3px; font-size: 10px;',
+  matched: 'margin: 5px 0; padding: 8px; border-left: 3px solid #28a745; background: white; border-radius: 3px;',
+  failed: 'margin: 5px 0; padding: 8px; border-left: 3px solid #dc3545; background: white; border-radius: 3px;',
+  markerMatched: 'color: #28a745; font-weight: bold;',
+  markerFailed: 'color: #dc3545; font-weight: bold;',
+  position: 'color: #6c757d; margin-left: 10px;',
+  sourceMatched: 'color: #28a745; margin-left: 5px; font-weight: bold;',
+  methodMatched: 'color: #28a745; margin-left: 10px;',
+  methodFailed: 'color: #dc3545; margin-left: 10px;',
+  content: 'color: #495057; margin-top: 3px; font-size: 10px;'
 };
 
 const createEventElement = (event) => {
   const eventDiv = document.createElement('div');
+  
+  if (event.type === 'marker_merged') {
+    eventDiv.style.cssText = eventStyles.merged;
+    
+    const markerSpan = document.createElement('span');
+    markerSpan.style.cssText = eventStyles.mergedText;
+    markerSpan.textContent = `🔗 MERGED ${event.marker}`;
+    
+    const posSpan = document.createElement('span');
+    posSpan.style.cssText = eventStyles.mergedSubtext;
+    posSpan.textContent = `Source #${event.position}`;
+    
+    const reasonDiv = document.createElement('div');
+    reasonDiv.style.cssText = eventStyles.mergedReason;
+    reasonDiv.textContent = `→ Into ${event.mergedInto}`;
+    
+    eventDiv.append(markerSpan, posSpan, reasonDiv);
+    return eventDiv;
+  }
+  
+  if (event.type === 'marker_orphaned') {
+    eventDiv.style.cssText = eventStyles.orphaned;
+    
+    const markerSpan = document.createElement('span');
+    markerSpan.style.cssText = eventStyles.orphanedText;
+    markerSpan.textContent = `⚠️ ORPHANED ${event.marker}`;
+    
+    const posSpan = document.createElement('span');
+    posSpan.style.cssText = eventStyles.orphanedSubtext;
+    posSpan.textContent = `Source #${event.position}`;
+    
+    const reasonDiv = document.createElement('div');
+    reasonDiv.style.cssText = eventStyles.orphanedReason;
+    reasonDiv.textContent = event.detectedBetween;
+    
+    eventDiv.append(markerSpan, posSpan, reasonDiv);
+    return eventDiv;
+  }
+  
   const statusColor = event.matched ? '#28a745' : '#dc3545';
   const statusIcon = event.matched ? '✅' : '❌';
   
-  eventDiv.style.cssText = `margin: 5px 0; padding: 8px; border-left: 3px solid ${statusColor}; background: white; border-radius: 3px;`;
+  eventDiv.style.cssText = event.matched ? eventStyles.matched : eventStyles.failed;
   
   const markerSpan = document.createElement('span');
-  markerSpan.style.cssText = `color: ${statusColor}; font-weight: bold;`;
-  markerSpan.textContent = `${statusIcon} MARKER ${event.marker}`;
+  markerSpan.style.cssText = event.matched ? eventStyles.markerMatched : eventStyles.markerFailed;
+  markerSpan.textContent = `${statusIcon} ${event.marker}`;
   
   const posSpan = document.createElement('span');
-  posSpan.style.cssText = 'color: #6c757d; margin-left: 10px;';
-  posSpan.textContent = `Position: ${event.position}`;
+  posSpan.style.cssText = eventStyles.position;
+  posSpan.textContent = `Trans #${event.position}`;
+  
+  if (event.matched && event.sourcePosition) {
+    const sourceSpan = document.createElement('span');
+    sourceSpan.style.cssText = eventStyles.sourceMatched;
+    sourceSpan.textContent = `→ Source #${event.sourcePosition}`;
+    posSpan.appendChild(sourceSpan);
+  }
   
   const methodSpan = document.createElement('span');
-  methodSpan.style.cssText = event.matched ? 'color: #28a745; margin-left: 10px;' : 'color: #dc3545; margin-left: 10px;';
-  methodSpan.textContent = event.matched ? `Method: ${event.method}` : `Reason: ${event.reason}`;
+  methodSpan.style.cssText = event.matched ? eventStyles.methodMatched : eventStyles.methodFailed;
+  methodSpan.textContent = event.matched ? `${event.method}` : `${event.reason}`;
   
-  const contentDiv = document.createElement('div');
-  contentDiv.style.cssText = 'color: #495057; margin-top: 3px; font-size: 10px;';
-  contentDiv.textContent = `"${event.content}"`;
+  eventDiv.append(markerSpan, posSpan, methodSpan);
   
-  eventDiv.append(markerSpan, posSpan, methodSpan, contentDiv);
+  if (event.content) {
+    const contentDiv = document.createElement('div');
+    contentDiv.style.cssText = eventStyles.content;
+    contentDiv.textContent = `"${event.content}"`;
+    eventDiv.appendChild(contentDiv);
+  }
+  
   return eventDiv;
 };
 
-const addCompletionMessage = (eventsLog) => {
+const addCompletionMessage = (eventsLog, updatedJSON, translationText) => {
   const eventDiv = document.createElement('div');
   eventDiv.style.cssText = 'margin: 10px 0; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 6px; font-weight: bold; text-align: center;';
   eventDiv.innerHTML = `
     🎉 STREAM COMPLETED!<br>
     <span style="font-size: 12px; opacity: 0.9;">Updated JSON copied to clipboard</span>
   `;
+  
+  const viewBtn = document.createElement('button');
+  viewBtn.textContent = '📊 View Details';
+  viewBtn.style.cssText = `
+    margin-top: 12px;
+    padding: 10px 20px;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+    transition: transform 0.2s;
+  `;
+  viewBtn.onmouseenter = () => viewBtn.style.transform = 'scale(1.05)';
+  viewBtn.onmouseleave = () => viewBtn.style.transform = 'scale(1)';
+  viewBtn.onclick = () => {
+    document.body.appendChild(createResultsCard(updatedJSON, translationText));
+  };
+  
+  eventDiv.appendChild(viewBtn);
   eventsLog.appendChild(eventDiv);
-  eventsLog.scrollTop = eventsLog.scrollHeight;
+  
+  requestAnimationFrame(() => {
+    eventsLog.scrollTop = eventsLog.scrollHeight;
+  });
 };

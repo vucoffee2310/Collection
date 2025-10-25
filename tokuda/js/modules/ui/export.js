@@ -1,18 +1,11 @@
 import { formatSRTTime, formatVTTTime, decodeHTMLEntities, downloadFile, getVideoId } from './helpers.js';
 
-// ✅ NEW: Detect if text is likely from a non-spaced language
 const detectNonSpacedLanguage = (text) => {
   if (!text) return false;
-  
-  // Check for CJK characters (Chinese, Japanese, Korean)
   const cjkPattern = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uAC00-\uD7AF]/;
-  // Check for Thai characters
   const thaiPattern = /[\u0E00-\u0E7F]/;
-  // Check for Lao characters
   const laoPattern = /[\u0E80-\u0EFF]/;
-  // Check for Khmer characters
   const khmerPattern = /[\u1780-\u17FF]/;
-  
   return cjkPattern.test(text) || thaiPattern.test(text) || 
          laoPattern.test(text) || khmerPattern.test(text);
 };
@@ -42,16 +35,13 @@ export const exportToSRT = (jsonData) => {
     const originalText = decodeHTMLEntities(utt.utterance);
     const translatedText = decodeHTMLEntities(utt.elementTranslation || '');
     
-    // ✅ IMPROVED: Handle line breaks appropriately
     const isNonSpaced = detectNonSpacedLanguage(translatedText);
     
     srtContent += `${counter}\n`;
     srtContent += `${startTime} --> ${endTime}\n`;
     srtContent += `${originalText}\n`;
     if (translatedText) {
-      // For non-spaced languages, might need to wrap long lines
       if (isNonSpaced && translatedText.length > 40) {
-        // Split into multiple lines at reasonable points
         const wrapped = wrapNonSpacedText(translatedText, 40);
         srtContent += `${wrapped}\n`;
       } else {
@@ -140,11 +130,9 @@ export const exportToTXT = (jsonData) => {
   return txtContent;
 };
 
-// ✅ NEW: Wrap non-spaced language text at grapheme boundaries
 const wrapNonSpacedText = (text, maxLength) => {
   if (text.length <= maxLength) return text;
   
-  // Use Intl.Segmenter if available for grapheme-aware wrapping
   if (typeof Intl?.Segmenter === 'function') {
     try {
       const segmenter = new Intl.Segmenter('ja', { granularity: 'grapheme' });
@@ -172,9 +160,8 @@ const wrapNonSpacedText = (text, maxLength) => {
     }
   }
   
-  // Fallback: simple character-based wrapping
   const lines = [];
-  const chars = Array.from(text); // Handles surrogate pairs
+  const chars = Array.from(text);
   
   for (let i = 0; i < chars.length; i += maxLength) {
     lines.push(chars.slice(i, i + maxLength).join(''));

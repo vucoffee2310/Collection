@@ -1,15 +1,12 @@
 (async () => {
-  // ✅ Single import for faster loading
   const { getVideoId, $ } = await import(chrome.runtime.getURL('js/modules/utils.js'));
   const { createUI } = await import(chrome.runtime.getURL('js/modules/ui.js'));
 
   let currentVideoId = null;
   let debounceTimer = null;
 
-  // ✅ Get tracks from YouTube's already-parsed data (no fetching!)
   const getTracksFromWindow = () => {
     try {
-      // Try multiple sources where YouTube stores player data
       const sources = [
         window.ytInitialPlayerResponse,
         window.ytplayer?.config?.args?.player_response,
@@ -33,7 +30,6 @@
     return null;
   };
 
-  // ✅ Fallback: fetch only if window data unavailable
   const fetchTracksFromAPI = async (videoId) => {
     try {
       const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
@@ -51,31 +47,25 @@
     return [];
   };
 
-  // ✅ Main update function
   const updateUI = async () => {
     const videoId = getVideoId();
     
-    // No video ID = remove UI
     if (!videoId) {
       $('#captionDownloadContainer')?.remove();
       currentVideoId = null;
       return;
     }
     
-    // Same video = skip
     if (videoId === currentVideoId) return;
     currentVideoId = videoId;
     
-    // Try to get tracks from window first (instant!)
     let tracks = getTracksFromWindow();
     
-    // If not available, wait a bit and try again
     if (!tracks) {
       await new Promise(resolve => setTimeout(resolve, 300));
       tracks = getTracksFromWindow();
     }
     
-    // Still no tracks? Fetch from API (slow fallback)
     if (!tracks) {
       tracks = await fetchTracksFromAPI(videoId);
     }
@@ -83,18 +73,14 @@
     createUI(tracks || []);
   };
 
-  // ✅ Debounced update to prevent rapid re-renders
   const debouncedUpdate = () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(updateUI, 100);
   };
 
-  // ✅ Listen to YouTube's SPA navigation events (most reliable)
   const observeNavigation = () => {
-    // Method 1: YouTube's custom event (fires on navigation)
     document.addEventListener('yt-navigate-finish', debouncedUpdate);
     
-    // Method 2: History API changes (backup)
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
     
@@ -110,7 +96,6 @@
     
     window.addEventListener('popstate', debouncedUpdate);
     
-    // Method 3: MutationObserver for DOM changes (fallback)
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
@@ -129,7 +114,6 @@
     });
   };
 
-  // ✅ Wait for DOM ready
   const init = () => {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
