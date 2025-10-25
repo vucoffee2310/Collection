@@ -53,4 +53,5 @@ export const calculateStats = (json) => {
     merged, 
     total: json.totalMarkers 
   };
+
 };
