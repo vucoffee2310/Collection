@@ -1,0 +1,346 @@
+/**
+ * Stream Cards CSS - With Group Support
+ */
+
+/* Container */
+#cardsContainer {
+  margin: 12px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+#cardsContainerTitle {
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Group Container */
+.card-group {
+  margin-bottom: 30px;
+  padding: 15px;
+  border: 2px solid #333;
+  border-radius: 4px;
+  background: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.card-group:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Group Header */
+.group-header {
+  font-weight: bold;
+  font-size: 13px;
+  color: #000;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ccc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.group-header:hover {
+  background: rgba(0,0,0,0.02);
+  margin: -5px;
+  padding: 5px 5px 13px 5px;
+  border-radius: 3px;
+}
+
+.group-toggle-icon {
+  margin-right: 8px;
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.group-title {
+  font-weight: bold;
+  flex: 0 0 auto;
+}
+
+.group-count {
+  font-size: 11px;
+  color: #666;
+  flex: 0 0 auto;
+  margin-left: 10px;
+}
+
+.group-stats {
+  font-size: 10px;
+  color: #888;
+  margin-left: 10px;
+  flex: 1 1 auto;
+}
+
+/* Group Cards Container */
+.group-cards {
+  transition: all 0.3s ease;
+}
+
+/* Group Summary */
+.group-summary {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+  font-size: 11px;
+  color: #666;
+}
+
+/* Cards */
+.card-item {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #ddd;
+  position: relative;
+}
+
+.card-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Card Header */
+.card-header {
+  margin-bottom: 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.card-number {
+  font-size: 10px;
+  color: #999;
+  font-family: monospace;
+  min-width: 30px;
+}
+
+.card-group-badge {
+  background: #e0e0e0;
+  color: #333;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.card-marker {
+  font-family: monospace;
+  font-weight: bold;
+  color: #000;
+  font-size: 13px;
+}
+
+.card-info {
+  color: #333;
+  flex: 1;
+  font-weight: 500;
+}
+
+.card-status {
+  color: #666;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #f0f0f0;
+}
+
+/* Card Content */
+.card-content {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.content-grid {
+  display: block;
+}
+
+.content-label {
+  font-weight: bold;
+  color: #000;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+  margin-bottom: 3px;
+}
+
+.content-label:first-child {
+  margin-top: 0;
+}
+
+.content-value {
+  font-family: monospace;
+  color: #000;
+  word-break: break-word;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* Compound Word Highlighting */
+.compound-word {
+  background: linear-gradient(to bottom, transparent 60%, #ffeb3b 60%);
+  font-weight: 600;
+  padding: 0 2px;
+  border-radius: 2px;
+  position: relative;
+}
+
+.compound-word::before {
+  content: '«';
+  color: #f57c00;
+  font-weight: bold;
+  margin-right: 2px;
+}
+
+.compound-word::after {
+  content: '»';
+  color: #f57c00;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+.compound-marker {
+  color: #f57c00;
+  font-weight: bold;
+  font-size: 10px;
+  vertical-align: super;
+  margin: 0 1px;
+}
+
+.compound-info {
+  background: #fff3e0;
+  border-left: 3px solid #f57c00;
+  padding: 6px 10px;
+  margin: 8px 0;
+  font-size: 10px;
+  color: #e65100;
+  font-weight: 500;
+}
+
+.compound-info::before {
+  content: '✨ ';
+}
+
+/* Utterances Toggle */
+.utterances-toggle {
+  width: 100%;
+  padding: 8px;
+  background: none;
+  color: #000;
+  border: none;
+  border-top: 2px solid #ccc;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.utterances-toggle:hover {
+  background: #f0f0f0;
+}
+
+/* Utterances Container */
+.utterances-container {
+  margin-top: 10px;
+  padding-left: 16px;
+  border-left: 3px solid #333;
+}
+
+.utterances-title {
+  font-size: 10px;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Utterance Item */
+.utterance-item {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ccc;
+}
+
+.utterance-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.utterance-meta {
+  font-size: 10px;
+  color: #333;
+  margin-bottom: 6px;
+  display: flex;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.utterance-index {
+  font-weight: bold;
+  color: #000;
+}
+
+.utterance-timestamp {
+  font-family: monospace;
+  color: #000;
+}
+
+.utterance-words {
+  margin-left: auto;
+  color: #666;
+}
+
+/* Utterance Text */
+.utterance-text {
+  margin-bottom: 6px;
+}
+
+.utterance-text:last-child {
+  margin-bottom: 0;
+}
+
+.utterance-label {
+  font-size: 9px;
+  color: #000;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.utterance-text div:last-child {
+  font-family: monospace;
+  font-size: 11px;
+  color: #000;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .card-header {
+    flex-wrap: wrap;
+  }
+  
+  .card-group-badge {
+    order: -1;
+  }
+}
