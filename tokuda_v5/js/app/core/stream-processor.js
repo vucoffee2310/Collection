@@ -1,7 +1,7 @@
 /**
  * Streaming Translation Processor
  */
-
+import { getGroupInfo } from '../ui/cards.js';
 import { splitTranslationByWordRatio, splitTextIntoWords } from '../utils/dom.js';
 import { 
   mergeVietnameseCompounds, 
@@ -123,18 +123,23 @@ export class StreamingTranslationProcessor {
       targetInstance.utteranceCount = targetInstance.utterances.length;
     }
     
-    if (this.events.length < this.maxEvents) {
-      this.events.push({
-        type: 'marker_merged',
-        marker: orphanInstance.domainIndex,
-        position: orphanInstance.position,
-        mergedInto: targetInstance.domainIndex,
-        mergeDirection: 'FORWARD',
-        reason: 'forward_merge',
-        detectedBetween: `Forward-merged into ${targetInstance.domainIndex}`
-      });
-    }
-    
+      if (this.events.length < this.maxEvents) {
+        const eventIndex = this.events.length;
+        const groupInfo = getGroupInfo(eventIndex);
+        
+        this.events.push({
+          type: 'marker_merged',
+          marker: orphanInstance.domainIndex,
+          position: orphanInstance.position,
+          mergedInto: targetInstance.domainIndex,
+          mergeDirection: 'FORWARD',
+          reason: 'forward_merge',
+          detectedBetween: `Forward-merged into ${targetInstance.domainIndex}`,
+          group: groupInfo.groupNumber,
+          eventIndex: eventIndex
+        });
+      }
+          
     console.log(`🔗 Forward: ${orphanInstance.domainIndex} (#${orphanInstance.position}) → ${targetInstance.domainIndex}`);
   }
 
@@ -144,12 +149,17 @@ export class StreamingTranslationProcessor {
       this.stats.orphaned++;
       
       if (this.events.length < this.maxEvents) {
+        const eventIndex = this.events.length;
+        const groupInfo = getGroupInfo(eventIndex);
+        
         this.events.push({
           type: 'marker_orphaned',
           marker: orphanInstance.domainIndex,
           position: orphanInstance.position,
           reason: 'no_preceding_match',
-          detectedBetween: 'No preceding match to merge with'
+          detectedBetween: 'No preceding match to merge with',
+          group: groupInfo.groupNumber,
+          eventIndex: eventIndex
         });
       }
       
@@ -189,17 +199,22 @@ export class StreamingTranslationProcessor {
       this.lastMatchedInstance.utteranceCount = this.lastMatchedInstance.utterances.length;
     }
     
-    if (this.events.length < this.maxEvents) {
-      this.events.push({
-        type: 'marker_merged',
-        marker: orphanInstance.domainIndex,
-        position: orphanInstance.position,
-        mergedInto: this.lastMatchedInstance.domainIndex,
-        mergeDirection: 'BACKWARD',
-        reason: 'backward_merge',
-        detectedBetween: `Backward-merged into ${this.lastMatchedInstance.domainIndex}`
-      });
-    }
+      if (this.events.length < this.maxEvents) {
+        const eventIndex = this.events.length;
+        const groupInfo = getGroupInfo(eventIndex);
+        
+        this.events.push({
+          type: 'marker_merged',
+          marker: orphanInstance.domainIndex,
+          position: orphanInstance.position,
+          mergedInto: this.lastMatchedInstance.domainIndex,
+          mergeDirection: 'BACKWARD',
+          reason: 'backward_merge',
+          detectedBetween: `Backward-merged into ${this.lastMatchedInstance.domainIndex}`,
+          group: groupInfo.groupNumber,
+          eventIndex: eventIndex
+        });
+      }
     
     console.log(`🔗 Backward: ${orphanInstance.domainIndex} (#${orphanInstance.position}) → ${this.lastMatchedInstance.domainIndex}`);
   }
@@ -415,7 +430,11 @@ export class StreamingTranslationProcessor {
       this.completedMarkers.push(marker);
       const matchResult = this.matchAndUpdate(marker);
       
+      // In processChunk method, when creating events:
       if (this.events.length < this.maxEvents) {
+        const eventIndex = this.events.length;
+        const groupInfo = getGroupInfo(eventIndex);
+        
         this.events.push({
           type: 'marker_completed',
           marker: marker.marker,
@@ -424,9 +443,11 @@ export class StreamingTranslationProcessor {
           matched: matchResult.matched,
           method: matchResult.method,
           reason: matchResult.reason,
-          sourcePosition: matchResult.sourcePosition
+          sourcePosition: matchResult.sourcePosition,
+          group: groupInfo.groupNumber,
+          eventIndex: eventIndex
         });
-      }
+      }                    
     });
     
     return {

@@ -203,3 +203,70 @@ export const createStructuredJSON = (rawJSON) => {
     orphaned: orphaned
   };
 };
+
+/**
+ * Create clean JSON export with group information
+ */
+export const createCleanJSONWithGroups = (rawJSON, events = []) => {
+  const cleanJSON = createCleanJSON(rawJSON);
+  
+  // Add group information from events
+  if (events && events.length > 0) {
+    const groups = {};
+    
+    events.forEach(event => {
+      if (event.group) {
+        if (!groups[event.group]) {
+          groups[event.group] = {
+            groupNumber: event.group,
+            cardCount: 0,
+            stats: {
+              matched: 0,
+              merged: 0,
+              orphaned: 0,
+              failed: 0
+            },
+            events: []
+          };
+        }
+        
+        groups[event.group].cardCount++;
+        
+        // Update stats
+        if (event.matched) {
+          groups[event.group].stats.matched++;
+        } else if (event.type === 'marker_merged') {
+          groups[event.group].stats.merged++;
+        } else if (event.type === 'marker_orphaned') {
+          groups[event.group].stats.orphaned++;
+        } else {
+          groups[event.group].stats.failed++;
+        }
+        
+        groups[event.group].events.push({
+          type: event.type,
+          marker: event.marker,
+          position: event.position,
+          status: event.matched ? 'MATCHED' : 
+                  event.type === 'marker_merged' ? 'MERGED' :
+                  event.type === 'marker_orphaned' ? 'ORPHANED' : 'FAILED',
+          method: event.method,
+          sourcePosition: event.sourcePosition
+        });
+      }
+    });
+    
+    // Convert to array and sort by group number
+    cleanJSON.groups = Object.values(groups).sort((a, b) => a.groupNumber - b.groupNumber);
+    
+    // Add summary
+    cleanJSON.groupsSummary = {
+      totalGroups: cleanJSON.groups.length,
+      group1Size: 3,
+      otherGroupsSize: 10,
+      totalCards: events.length
+    };
+  }
+  
+  return cleanJSON;
+};

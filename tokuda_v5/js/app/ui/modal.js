@@ -7,8 +7,8 @@ import { formatJSON, createStatElement } from '../utils/helpers.js';
 import { simulateSSEStream, StreamingTranslationProcessor } from '../core/stream-processor.js';
 import { sendToAI } from '../utils/api.js';
 import { downloadSRT, downloadVTT, downloadTXT } from '../export/subtitle-formats.js';
-import { createCleanJSON, createMinimalJSON, createStructuredJSON } from '../export/json-formats.js';
-import { createCardsContainer, updateCards } from './cards.js';
+import { createCleanJSON, createMinimalJSON, createStructuredJSON, createCleanJSONWithGroups } from '../export/json-formats.js';
+import { createCardsContainer, updateCards, resetCardGrouping, getGroupsData } from './cards.js';
 import { loadCompoundData } from '../utils/vietnamese-compounds.js';
 
 export const createStreamModal = async (track, getOrCreateJSON, processTrack) => {
@@ -51,11 +51,25 @@ export const createStreamModal = async (track, getOrCreateJSON, processTrack) =>
   const footer = createFooter();
   
   let updatedJSONData = null;
+  let processedEvents = [];
   
   setupTabSwitching(tabs, manualTab, aiTab, footer.querySelector('#streamModalStartBtn'));
-  setupAITab(aiTab, track, processTrack, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, (data) => { updatedJSONData = data; });
-  setupExportSection(exportSection, track, getOrCreateJSON, processTrack, () => updatedJSONData);
-  setupFooter(footer, manualTab, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, (data) => { updatedJSONData = data; });
+  setupAITab(aiTab, track, processTrack, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, 
+    (data, events) => { 
+      updatedJSONData = data; 
+      processedEvents = events || [];
+    }
+  );
+  setupExportSection(exportSection, track, getOrCreateJSON, processTrack, 
+    () => updatedJSONData, 
+    () => processedEvents
+  );
+  setupFooter(footer, manualTab, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, 
+    (data, events) => { 
+      updatedJSONData = data; 
+      processedEvents = events || [];
+    }
+  );
   
   header.querySelector('#streamModalCloseBtn').onclick = () => modal.remove();
   
@@ -253,7 +267,7 @@ const setupTabSwitching = (tabs, manualTab, aiTab, startBtn) => {
   };
 };
 
-const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, setUpdatedJSON) => {
+const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, setUpdatedData) => {
   const btn = tab.querySelector('#aiTabStreamBtn');
   btn.onclick = async () => {
     btn.disabled = true;
@@ -265,6 +279,7 @@ const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisplay, st
     
     const cardsWrapper = cardsContainer.querySelector('#cardsWrapper');
     cardsWrapper.innerHTML = '';
+    resetCardGrouping(); // Reset grouping for new session
     
     try {
       const result = await processTrack(track);
@@ -290,7 +305,12 @@ const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisplay, st
       
       processor.finalize();
       const updatedJSON = processor.getUpdatedJSON();
-      setUpdatedJSON(updatedJSON);
+      
+      // Get final groups data
+      const groupsData = getGroupsData();
+      console.log('Groups summary:', groupsData);
+      
+      setUpdatedData(updatedJSON, processor.events);
       
       updateCards(cardsWrapper, processor.events, updatedJSON);
       
@@ -312,7 +332,7 @@ const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisplay, st
   };
 };
 
-const setupExportSection = (section, track, getOrCreateJSON, processTrack, getUpdatedJSON) => {
+const setupExportSection = (section, track, getOrCreateJSON, processTrack, getUpdatedJSON, getEvents) => {
   const buttonsDiv = section.querySelector('#exportButtons');
   
   const createBtn = (text, handler) => {
@@ -334,7 +354,7 @@ const setupExportSection = (section, track, getOrCreateJSON, processTrack, getUp
     copyDropdown.style.display = copyDropdown.style.display === 'none' ? 'block' : 'none';
   });
   
-  const copyDropdown = createCopyDropdown(track, getOrCreateJSON, processTrack, getUpdatedJSON);
+  const copyDropdown = createCopyDropdown(track, getOrCreateJSON, processTrack, getUpdatedJSON, getEvents);
   copyGroup.append(copyBtn, copyDropdown);
   
   // Download dropdown
@@ -373,7 +393,7 @@ const showResultButtons = (exportSection) => {
   });
 };
 
-const createCopyDropdown = (track, getOrCreateJSON, processTrack, getUpdatedJSON) => {
+const createCopyDropdown = (track, getOrCreateJSON, processTrack, getUpdatedJSON, getEvents) => {
   const dropdown = document.createElement('div');
   dropdown.style.cssText = `
     display: none; position: absolute; top: 100%; left: 0; margin-top: 2px;
@@ -418,6 +438,14 @@ const createCopyDropdown = (track, getOrCreateJSON, processTrack, getUpdatedJSON
       if (data) {
         copyToClipboard(formatJSON(createCleanJSON(data)));
         console.log('Clean JSON copied');
+      }
+    }),
+    createItem('Clean JSON with Groups', () => {
+      const data = getUpdatedJSON();
+      const events = getEvents();
+      if (data) {
+        copyToClipboard(formatJSON(createCleanJSONWithGroups(data, events)));
+        console.log('Clean JSON with groups copied');
       }
     }),
     createItem('Minimal JSON', () => {
@@ -494,7 +522,7 @@ const createDownloadDropdown = (getUpdatedJSON) => {
   return dropdown;
 };
 
-const setupFooter = (footer, manualTab, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, setUpdatedJSON) => {
+const setupFooter = (footer, manualTab, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, setUpdatedData) => {
   const closeBtn = footer.querySelector('#streamModalFooterCloseBtn');
   const startBtn = footer.querySelector('#streamModalStartBtn');
   
@@ -511,12 +539,12 @@ const setupFooter = (footer, manualTab, track, getOrCreateJSON, streamDisplay, s
       return;
     }
     
-    await processManualInput(text, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, startBtn, setUpdatedJSON);
+    await processManualInput(text, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, startBtn, setUpdatedData);
   };
 };
 
 // Processing
-const processManualInput = async (text, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, startBtn, setUpdatedJSON) => {
+const processManualInput = async (text, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, startBtn, setUpdatedData) => {
   startBtn.disabled = true;
   startBtn.textContent = 'Processing...';
   
@@ -526,6 +554,7 @@ const processManualInput = async (text, track, getOrCreateJSON, streamDisplay, s
   
   const cardsWrapper = cardsContainer.querySelector('#cardsWrapper');
   cardsWrapper.innerHTML = '';
+  resetCardGrouping(); // Reset grouping for new session
   
   const cachedJSON = await getOrCreateJSON(track);
   if (!cachedJSON) {
@@ -543,7 +572,14 @@ const processManualInput = async (text, track, getOrCreateJSON, streamDisplay, s
   
   updateCards(cardsWrapper, updatedJSON.events || [], updatedJSON);
   
-  setUpdatedJSON(updatedJSON);
+  // Get final groups data
+  const groupsData = getGroupsData();
+  console.log('Groups summary:', groupsData);
+  
+  // Store events from the processor
+  const events = updatedJSON.events || [];
+  setUpdatedData(updatedJSON, events);
+  
   copyToClipboard(formatJSON(updatedJSON));
   
   showResultButtons(exportSection);
