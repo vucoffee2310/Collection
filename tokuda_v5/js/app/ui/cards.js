@@ -1,8 +1,9 @@
 /**
- * Stream Cards UI - Minimal Design with Compound Support
+ * Stream Cards UI - Minimal Design with Compound Support + Consistent Word Counting
  */
 
 import { formatCompoundsForDisplay, extractCompounds, removeCompoundMarkers } from '../utils/vietnamese-compounds.js';
+import { countWordsConsistent } from '../utils/dom.js';
 
 export const createCardsContainer = () => {
   const container = document.createElement('div');
@@ -164,8 +165,13 @@ export const createEventCard = (event, sourceJSON) => {
       title.textContent = `${utteranceCount} utterances`;
       utterancesDiv.appendChild(title);
       
+      // CRITICAL: Calculate total translation words using consistent counting
+      const totalTranslationWords = utterances.reduce((sum, utt) => {
+        return sum + countWordsConsistent(utt.elementTranslation || '', 'vi');
+      }, 0);
+      
       utterances.forEach((utt, idx) => {
-        const item = createUtteranceItem(utt, idx, instance);
+        const item = createUtteranceItem(utt, idx, instance, utterances, totalTranslationWords);
         utterancesDiv.appendChild(item);
       });
       
@@ -223,9 +229,19 @@ export const updateCards = (cardsWrapper, events, sourceJSON) => {
 };
 
 // Helpers
-const createUtteranceItem = (utt, idx, instance) => {
+const createUtteranceItem = (utt, idx, instance, allUtterances, totalTranslationWords) => {
   const item = document.createElement('div');
   item.className = 'utterance-item';
+  
+  // CRITICAL: Calculate translation words using consistent counting
+  // This MUST match the counting logic in splitTranslationByWordRatio
+  const translationText = utt.elementTranslation || '';
+  const translationWords = countWordsConsistent(translationText, 'vi');
+  const percentage = totalTranslationWords > 0 ? ((translationWords / totalTranslationWords) * 100).toFixed(1) : 0;
+  
+  // Calculate original words ratio
+  const totalOriginalWords = allUtterances.reduce((sum, u) => sum + (u.wordLength || 0), 0);
+  const originalPercentage = totalOriginalWords > 0 ? ((utt.wordLength / totalOriginalWords) * 100).toFixed(1) : 0;
   
   // Check if this utterance is from a merged source
   const isMerged = !!utt.mergedSource;
@@ -235,33 +251,64 @@ const createUtteranceItem = (utt, idx, instance) => {
     const orphan = instance?.mergedOrphans?.find(o => o.domainIndex === utt.mergedSource);
     if (orphan) {
       const direction = orphan.mergeDirection === 'FORWARD' ? '⬆' : '⬇';
-      mergedInfo = `<span style="color: #999; font-size: 9px; margin-left: 6px;">${direction} ${utt.mergedSource}</span>`;
+      mergedInfo = `<span style="background: #ffe0b2; padding: 2px 5px; border-radius: 2px; font-size: 9px; font-weight: bold; margin-left: 6px;">${direction} ${utt.mergedSource}</span>`;
     }
   }
   
   const meta = document.createElement('div');
   meta.className = 'utterance-meta';
+  meta.style.cssText = 'font-size: 10px; color: #333; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;';
+  
   meta.innerHTML = `
-    <span class="utterance-index">#${utt.index !== undefined ? utt.index + 1 : idx + 1}</span>
-    <span class="utterance-timestamp">${utt.timestamp || 'N/A'}</span>
-    <span class="utterance-words">${utt.wordLength || 0}w</span>
-    ${mergedInfo}
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span class="utterance-index" style="font-weight: bold; color: #000;">Seg #${idx + 1}</span>
+      <span class="utterance-timestamp" style="font-family: monospace; color: #666;">⏱ ${utt.timestamp || 'N/A'}</span>
+      ${mergedInfo}
+    </div>
+    <div style="display: flex; gap: 6px; align-items: center;">
+      <span style="background: #e3f2fd; padding: 2px 6px; border-radius: 2px; font-size: 9px; font-weight: bold;">
+        Src: ${utt.wordLength || 0}w (${originalPercentage}%)
+      </span>
+      <span style="background: #e8f5e9; padding: 2px 6px; border-radius: 2px; font-size: 9px; font-weight: bold;">
+        Trans: ${translationWords}w (${percentage}%)
+      </span>
+    </div>
+  `;
+  
+  // Add ratio visualization bar
+  const ratioBar = document.createElement('div');
+  ratioBar.style.cssText = 'margin-bottom: 8px;';
+  ratioBar.innerHTML = `
+    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 3px;">
+      <div style="font-size: 8px; color: #666; width: 60px;">Original:</div>
+      <div style="flex: 1; background: #f0f0f0; height: 6px; border-radius: 3px; overflow: hidden;">
+        <div style="width: ${originalPercentage}%; height: 100%; background: #2196F3;"></div>
+      </div>
+      <div style="font-size: 8px; color: #666; width: 40px; text-align: right;">${originalPercentage}%</div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <div style="font-size: 8px; color: #666; width: 60px;">Translation:</div>
+      <div style="flex: 1; background: #f0f0f0; height: 6px; border-radius: 3px; overflow: hidden;">
+        <div style="width: ${percentage}%; height: 100%; background: #4CAF50;"></div>
+      </div>
+      <div style="font-size: 8px; color: #666; width: 40px; text-align: right;">${percentage}%</div>
+    </div>
   `;
   
   const originalDiv = document.createElement('div');
   originalDiv.className = 'utterance-text';
   originalDiv.innerHTML = `
-    <div class="utterance-label">Original</div>
+    <div class="utterance-label">Original (${utt.wordLength || 0} words)</div>
     <div>${escapeHtml(utt.utterance || '')}</div>
   `;
   
-  item.append(meta, originalDiv);
+  item.append(meta, ratioBar, originalDiv);
   
   if (utt.elementTranslation && utt.elementTranslation.trim()) {
     const translationDiv = document.createElement('div');
     translationDiv.className = 'utterance-text';
     translationDiv.innerHTML = `
-      <div class="utterance-label">Translation</div>
+      <div class="utterance-label">Translation (${translationWords} words)</div>
       <div>${formatCompoundsForDisplay(utt.elementTranslation)}</div>
     `;
     item.appendChild(translationDiv);

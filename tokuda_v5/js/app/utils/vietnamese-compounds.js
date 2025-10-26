@@ -1,5 +1,5 @@
 /**
- * Vietnamese Compound Word Processing (PERFORMANCE OPTIMIZED)
+ * Vietnamese Compound Word Processing (PERFORMANCE OPTIMIZED + UNICODE FIXED)
  */
 
 let compoundData = null;
@@ -37,14 +37,20 @@ export const loadCompoundData = async () => {
 };
 
 /**
- * Build trie structure for efficient compound lookup
+ * Build trie structure for efficient compound lookup (WITH UNICODE NORMALIZATION)
  */
 const buildTrie = (data) => {
   const trie = {};
   
   Object.entries(data).forEach(([root, suffixes]) => {
-    if (!trie[root]) {
-      trie[root] = new Set(suffixes);
+    // Normalize the root key to NFC (precomposed Unicode)
+    const normalizedRoot = root.normalize('NFC').toLowerCase();
+    
+    // Normalize all suffixes to NFC
+    const normalizedSuffixes = suffixes.map(s => s.normalize('NFC').toLowerCase());
+    
+    if (!trie[normalizedRoot]) {
+      trie[normalizedRoot] = new Set(normalizedSuffixes);
     }
   });
   
@@ -52,7 +58,7 @@ const buildTrie = (data) => {
 };
 
 /**
- * Normalize Vietnamese text for compound matching (WITH CACHE)
+ * Normalize Vietnamese text for compound matching (WITH UNICODE NORMALIZATION + CACHE)
  */
 export const normalizeVietnamese = (text) => {
   // Check cache first
@@ -60,7 +66,10 @@ export const normalizeVietnamese = (text) => {
     return normalizationCache.get(text);
   }
   
+  // CRITICAL: Normalize Unicode to NFC (precomposed form) before processing
+  // This ensures "ý" as combining diacritics matches "ý" as precomposed character
   const normalized = text
+    .normalize('NFC')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
@@ -82,7 +91,7 @@ const isPunctuation = (token) => {
 };
 
 /**
- * Check if two words form a compound (OPTIMIZED)
+ * Check if two words form a compound (OPTIMIZED + DEBUG)
  */
 const isCompound = (word1, word2) => {
   if (!compoundTrie || !word1 || !word2) return false;
@@ -90,11 +99,23 @@ const isCompound = (word1, word2) => {
   const normalized1 = normalizeVietnamese(word1);
   const normalized2 = normalizeVietnamese(word2);
   
-  return compoundTrie[normalized1]?.has(normalized2) || false;
+  const result = compoundTrie[normalized1]?.has(normalized2) || false;
+  
+  // DEBUG: Uncomment to troubleshoot specific compounds
+  // if (normalized1 === 'đăng' || normalized1 === 'hoạt') {
+  //   console.log(`🔍 Checking "${normalized1}" + "${normalized2}":`, {
+  //     hasRoot: !!compoundTrie[normalized1],
+  //     hasSuffix: compoundTrie[normalized1]?.has(normalized2),
+  //     result: result,
+  //     suffixes: compoundTrie[normalized1] ? Array.from(compoundTrie[normalized1]).slice(0, 10) : []
+  //   });
+  // }
+  
+  return result;
 };
 
 /**
- * Get cached regex pattern
+ * Get cached regex pattern (FIXED FOR UNICODE)
  */
 const getCachedRegex = (word1, word2) => {
   const key = `${word1}|${word2}`;
@@ -103,9 +124,12 @@ const getCachedRegex = (word1, word2) => {
     return regexCache.get(key);
   }
   
+  // Use Unicode-aware word boundaries instead of \b
+  // (?<![\p{L}]) = not preceded by a Unicode letter
+  // (?![\p{L}]) = not followed by a Unicode letter
   const pattern = new RegExp(
-    `\\b${escapeRegex(word1)}\\s+${escapeRegex(word2)}\\b`,
-    'gi'
+    `(?<![\\p{L}])${escapeRegex(word1)}\\s+${escapeRegex(word2)}(?![\\p{L}])`,
+    'giu'  // 'u' flag enables Unicode mode for \p{L}
   );
   
   // Limit cache size
@@ -153,7 +177,7 @@ export const mergeVietnameseCompounds = (text) => {
   // Replace compounds using cached regex patterns
   let result = text;
   
-  // Sort by length (longest first)
+  // Sort by length (longest first) to avoid partial replacements
   compounds.sort((a, b) => b.text.length - a.text.length);
   
   for (const compound of compounds) {

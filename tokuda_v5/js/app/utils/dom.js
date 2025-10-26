@@ -115,6 +115,7 @@ export const countWords = (text, lang = 'en') => {
 
 /**
  * Split text into words (unified function)
+ * This is THE CANONICAL word splitting function used everywhere
  */
 export const splitTextIntoWords = (text, lang = 'en') => {
   if (!text || !text.trim()) return [];
@@ -143,7 +144,15 @@ export const splitTextIntoWords = (text, lang = 'en') => {
 };
 
 /**
- * Split translation by word ratio across utterances
+ * Count words using the same logic as splitTextIntoWords
+ * CRITICAL: This ensures consistency between splitting and counting
+ */
+export const countWordsConsistent = (text, lang = 'en') => {
+  return splitTextIntoWords(text, lang).length;
+};
+
+/**
+ * Split translation by word ratio across utterances (CONSISTENT COUNTING)
  */
 export const splitTranslationByWordRatio = (translationText, utterances, lang = 'vi') => {
   if (!translationText || !utterances || utterances.length === 0) {
@@ -156,6 +165,7 @@ export const splitTranslationByWordRatio = (translationText, utterances, lang = 
     return utterances.map(() => '');
   }
 
+  // CRITICAL: Use splitTextIntoWords for consistent word counting
   const translationWords = splitTextIntoWords(translationText, lang);
   const totalTranslationWords = translationWords.length;
   
@@ -170,12 +180,57 @@ export const splitTranslationByWordRatio = (translationText, utterances, lang = 
     const ratio = utt.wordLength / totalWordLength;
     let wordsToTake = Math.round(totalTranslationWords * ratio);
     
+    // Ensure we don't exceed available words
     if (currentIndex + wordsToTake > translationWords.length) {
       wordsToTake = translationWords.length - currentIndex;
     }
     
+    // Last utterance gets all remaining words
     if (idx === utterances.length - 1) {
       wordsToTake = translationWords.length - currentIndex;
+    }
+    
+    // Ensure at least 1 word if words remain
+    if (wordsToTake === 0 && currentIndex < translationWords.length) {
+      wordsToTake = 1;
+    }
+
+    // ROBUST ADJUSTMENT: Avoid splitting after conjunctions/prepositions
+    if (currentIndex + wordsToTake < translationWords.length && wordsToTake > 0) {
+      const lastWord = translationWords[currentIndex + wordsToTake - 1];
+      const nextWord = translationWords[currentIndex + wordsToTake];
+      
+      // Remove compound markers for checking
+      const lastWordClean = lastWord.replace(/[«»]/g, '').toLowerCase();
+      const nextWordClean = nextWord.replace(/[«»]/g, '').toLowerCase();
+      
+      // Vietnamese conjunctions and prepositions that shouldn't end a segment
+      const dontEndWith = new Set([
+        'và', 'hoặc', 'hay', 'nhưng', 'mà', 'nên', 'vì', 'do', 
+        'để', 'cho', 'với', 'của', 'trong', 'trên', 'dưới', 'ngoài',
+        'các', 'những', 'một', 'mỗi', 'từng', 'bất', 'thật', 'rất',
+        'đã', 'đang', 'sẽ', 'có', 'là', 'bị', 'được', 'hãy', 'không'
+      ]);
+      
+      // Don't start with these
+      const dontStartWith = new Set([
+        'hơn', 'nhất', 'lắm', 'quá', 'thôi'
+      ]);
+      
+      // If last word is a conjunction/preposition, try to include next word
+      if (dontEndWith.has(lastWordClean) && wordsToTake < totalTranslationWords && idx < utterances.length - 1) {
+        wordsToTake++;
+      }
+      
+      // If next word is a comparative/superlative, pull it into current segment
+      if (dontStartWith.has(nextWordClean) && wordsToTake < totalTranslationWords && idx < utterances.length - 1) {
+        wordsToTake++;
+      }
+      
+      // Ensure we don't exceed bounds after adjustment
+      if (currentIndex + wordsToTake > translationWords.length) {
+        wordsToTake = translationWords.length - currentIndex;
+      }
     }
 
     const portion = translationWords.slice(currentIndex, currentIndex + wordsToTake).join(' ');
@@ -183,6 +238,16 @@ export const splitTranslationByWordRatio = (translationText, utterances, lang = 
     
     currentIndex += wordsToTake;
   });
+
+  // Distribute any remaining words to the last utterance
+  if (currentIndex < translationWords.length) {
+    const remaining = translationWords.slice(currentIndex).join(' ');
+    if (elementTranslations.length > 0) {
+      elementTranslations[elementTranslations.length - 1] += ' ' + remaining;
+    } else {
+      elementTranslations.push(remaining);
+    }
+  }
 
   // Fix compound boundaries between utterances for Vietnamese
   if (lang === 'vi' && elementTranslations.length > 1) {
