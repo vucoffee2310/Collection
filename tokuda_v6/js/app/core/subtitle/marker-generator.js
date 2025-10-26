@@ -3,7 +3,8 @@
  * Generates random markers with seeded RNG for reproducibility
  */
 
-import { SeededRandom } from '../../utils/helpers.js';
+// ✅ UPDATED IMPORT PATH
+import { SeededRandom } from '../../utils/random/seeded-rng.js';
 
 /**
  * Default configuration

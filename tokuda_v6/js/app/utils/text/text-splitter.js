@@ -3,7 +3,7 @@
  * Splits text at middle point (handles non-spaced languages)
  */
 
-import { getSegmenter } from '../language-config.js';
+import { getSegmenter } from '../config/language-config.js';
 
 /**
  * Split text at approximate middle
