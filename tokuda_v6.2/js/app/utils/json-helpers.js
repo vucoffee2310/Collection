@@ -289,3 +289,58 @@ export const getUtteranceDisplayData = (utterance, allUtterances, totalTranslati
     mergedSource: utterance.mergedSource
   };
 };
+
+/**
+ * ✅ Build events from final JSON state (shared utility)
+ * Used by processors.js and tab-handlers.js
+ */
+export const buildEventsFromJSON = (jsonData) => {
+  const events = [];
+  
+  const allInstances = [];
+  Object.values(jsonData.markers).forEach(instances => {
+    instances.forEach(instance => {
+      allInstances.push(instance);
+    });
+  });
+  allInstances.sort((a, b) => a.position - b.position);
+  
+  allInstances.forEach(instance => {
+    if (instance.status === 'MATCHED') {
+      events.push({
+        type: 'marker_completed',
+        marker: `(${instance.domainIndex.charAt(1)})`,
+        position: instance.position,
+        matched: true,
+        method: instance.matchMethod,
+        sourcePosition: instance.position
+      });
+    } else if (instance.status === 'MERGED') {
+      events.push({
+        type: 'marker_merged',
+        marker: instance.domainIndex,
+        position: instance.position,
+        mergedInto: instance.mergedInto,
+        mergeDirection: instance.mergeDirection,
+        reason: instance.mergeDirection === 'ORPHAN_GROUP' ? 'orphan_group_member' : 'backward_merge'
+      });
+    } else if (instance.status === 'ORPHAN_GROUP') {
+      events.push({
+        type: 'orphan_group_created',
+        marker: instance.domainIndex,
+        position: instance.position,
+        orphanGroupType: instance.orphanGroupType,
+        memberCount: instance.groupMembers?.length || 0
+      });
+    } else if (instance.status === 'ORPHAN') {
+      events.push({
+        type: 'marker_orphaned',
+        marker: instance.domainIndex,
+        position: instance.position,
+        reason: 'no_match_found'
+      });
+    }
+  });
+  
+  return events;
+};

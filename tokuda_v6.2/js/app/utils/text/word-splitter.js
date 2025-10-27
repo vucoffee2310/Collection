@@ -57,28 +57,29 @@ export const splitTranslationByWordRatio = (translationText, utterances, lang = 
     return utterances.map(() => '');
   }
 
-  const elementTranslations = [];
-  let currentIndex = 0;
-
+  // ✅ NEW: Calculate target end positions using cumulative ratios
+  const targetPositions = [];
+  let cumulativeRatio = 0;
+  
   utterances.forEach((utt, idx) => {
-    const ratio = utt.wordLength / totalWordLength;
-    let wordsToTake = Math.round(totalTranslationWords * ratio);
-    
-    if (currentIndex + wordsToTake > translationWords.length) {
-      wordsToTake = translationWords.length - currentIndex;
-    }
-    
-    if (idx === utterances.length - 1) {
-      wordsToTake = translationWords.length - currentIndex;
-    }
-    
-    if (wordsToTake === 0 && currentIndex < translationWords.length) {
-      wordsToTake = 1;
-    }
+    cumulativeRatio += utt.wordLength / totalWordLength;
+    const targetEnd = Math.round(totalTranslationWords * cumulativeRatio);
+    targetPositions.push(targetEnd);
+  });
+  
+  // Ensure last position equals total words (prevent rounding errors)
+  targetPositions[targetPositions.length - 1] = totalTranslationWords;
 
-    if (currentIndex + wordsToTake < translationWords.length && wordsToTake > 0) {
-      const lastWord = translationWords[currentIndex + wordsToTake - 1];
-      const nextWord = translationWords[currentIndex + wordsToTake];
+  const elementTranslations = [];
+  let currentStart = 0;
+
+  targetPositions.forEach((targetEnd, idx) => {
+    let actualEnd = targetEnd;
+    
+    // Smart boundary logic (only for non-last segments)
+    if (idx < utterances.length - 1 && actualEnd < totalTranslationWords && actualEnd > currentStart) {
+      const lastWord = translationWords[actualEnd - 1];
+      const nextWord = translationWords[actualEnd];
       
       const lastWordClean = lastWord.replace(/[«»]/g, '').toLowerCase();
       const nextWordClean = nextWord.replace(/[«»]/g, '').toLowerCase();
@@ -91,37 +92,37 @@ export const splitTranslationByWordRatio = (translationText, utterances, lang = 
       ]);
       
       const dontStartWith = new Set([
-        'hơn', 'nhất', 'lắm', 'quá', 'thôi'
+        'hơn', 'nhất', 'lắm', 'quá', 'thôi', 'nữa'
       ]);
       
-      if (dontEndWith.has(lastWordClean) && wordsToTake < totalTranslationWords && idx < utterances.length - 1) {
-        wordsToTake++;
-      }
+      // ✅ NEW: Prevent starvation of remaining segments
+      const remainingWords = totalTranslationWords - actualEnd;
+      const remainingSegments = utterances.length - idx - 1;
+      const avgWordsPerRemainingSegment = remainingSegments > 0 
+        ? remainingWords / remainingSegments 
+        : 0;
       
-      if (dontStartWith.has(nextWordClean) && wordsToTake < totalTranslationWords && idx < utterances.length - 1) {
-        wordsToTake++;
-      }
+      // Only adjust if it won't leave remaining segments with too few words
+      const minWordsPerSegment = 2; // Don't let any segment have < 2 words
       
-      if (currentIndex + wordsToTake > translationWords.length) {
-        wordsToTake = translationWords.length - currentIndex;
+      if (dontEndWith.has(lastWordClean) && 
+          remainingWords > remainingSegments * minWordsPerSegment &&
+          actualEnd + 1 <= totalTranslationWords) {
+        actualEnd++;
+      } else if (dontStartWith.has(nextWordClean) && 
+                 remainingWords > remainingSegments * minWordsPerSegment &&
+                 actualEnd + 1 <= totalTranslationWords) {
+        actualEnd++;
       }
     }
-
-    const portion = translationWords.slice(currentIndex, currentIndex + wordsToTake).join(' ');
+    
+    const portion = translationWords.slice(currentStart, actualEnd).join(' ');
     elementTranslations.push(portion.trim());
     
-    currentIndex += wordsToTake;
+    currentStart = actualEnd;
   });
 
-  if (currentIndex < translationWords.length) {
-    const remaining = translationWords.slice(currentIndex).join(' ');
-    if (elementTranslations.length > 0) {
-      elementTranslations[elementTranslations.length - 1] += ' ' + remaining;
-    } else {
-      elementTranslations.push(remaining);
-    }
-  }
-
+  // Fix compound boundaries
   if (lang === 'vi' && elementTranslations.length > 1) {
     const hasCompounds = translationText.includes('«') || translationText.includes('»');
     if (hasCompounds) {

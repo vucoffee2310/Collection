@@ -1,5 +1,6 @@
 /**
  * Content Script - YouTube Integration
+ * ✅ FIXED: Memory leak prevention with proper cleanup
  */
 
 (async () => {
@@ -8,6 +9,7 @@
 
   let currentVideoId = null;
   let debounceTimer = null;
+  let navigationCleanup = null;
 
   const getTracksFromWindow = () => {
     try {
@@ -55,7 +57,8 @@
     const videoId = getVideoId();
     
     if (!videoId) {
-      $('#captionDownloadContainer')?.remove();
+      const container = document.querySelector('#captionDownloadContainer');
+      if (container) container.remove();
       currentVideoId = null;
       return;
     }
@@ -83,8 +86,20 @@
   };
 
   const observeNavigation = () => {
-    document.addEventListener('yt-navigate-finish', debouncedUpdate);
+    // ✅ Clean up previous listeners before adding new ones
+    if (navigationCleanup) {
+      navigationCleanup();
+    }
+
+    // Store handlers so we can remove them
+    const handleNavigate = debouncedUpdate;
+    const handlePopState = debouncedUpdate;
     
+    // Add event listeners
+    document.addEventListener('yt-navigate-finish', handleNavigate);
+    window.addEventListener('popstate', handlePopState);
+    
+    // Override history methods
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
     
@@ -98,8 +113,7 @@
       debouncedUpdate();
     };
     
-    window.addEventListener('popstate', debouncedUpdate);
-    
+    // Create mutation observer
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
@@ -116,6 +130,19 @@
       childList: true,
       subtree: true
     });
+    
+    // ✅ Store cleanup function
+    navigationCleanup = () => {
+      document.removeEventListener('yt-navigate-finish', handleNavigate);
+      window.removeEventListener('popstate', handlePopState);
+      observer.disconnect();
+      
+      // Restore original history methods
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+      
+      console.log('🧹 Navigation listeners cleaned up');
+    };
   };
 
   const init = () => {
@@ -129,6 +156,16 @@
       observeNavigation();
     }
   };
+
+  // ✅ Clean up on extension unload/page unload
+  window.addEventListener('beforeunload', () => {
+    if (navigationCleanup) {
+      navigationCleanup();
+    }
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+  });
 
   init();
 })();

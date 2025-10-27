@@ -1,15 +1,12 @@
 /**
  * Subtitle Format Exports
- * Generate timestamps on-demand from start/end values
+ * ✅ OPTIMIZED: Array-based string building (O(n) instead of O(n²))
  */
 
 import { downloadFile, decodeHTMLEntities, formatSRTTime, formatVTTTime } from '../utils/helpers.js';
 import { getVideoId } from './helpers.js';
 import { getAllUtterancesSorted } from '../utils/json-helpers.js';
 
-/**
- * Get translated utterances from processed JSON
- */
 const getTranslatedUtterances = (jsonData) => {
   const allUtterances = getAllUtterancesSorted(jsonData);
   
@@ -30,7 +27,8 @@ const getTranslatedUtterances = (jsonData) => {
 };
 
 export const exportToSRT = (jsonData) => {
-  let srtContent = '';
+  // ✅ Use array instead of string concatenation
+  const lines = [];
   let counter = 1;
   
   const translatedUtterances = getTranslatedUtterances(jsonData);
@@ -48,24 +46,28 @@ export const exportToSRT = (jsonData) => {
     const originalText = decodeHTMLEntities(utt.utterance);
     const translatedText = decodeHTMLEntities(utt.elementTranslation || '');
     
-    srtContent += `${counter}\n`;
-    srtContent += `${startTime} --> ${endTime}\n`;
-    srtContent += `${originalText}\n`;
+    lines.push(counter);
+    lines.push(`${startTime} --> ${endTime}`);
+    lines.push(originalText);
     
     if (translatedText) {
-      srtContent += `${translatedText}\n`;
+      lines.push(translatedText);
     }
     
-    srtContent += `\n`;
+    lines.push(''); // Empty line separator
     counter++;
   });
+  
+  // ✅ Single join operation
+  const srtContent = lines.join('\n');
   
   console.log(`Generated SRT content: ${srtContent.length} bytes`);
   return srtContent;
 };
 
 export const exportToVTT = (jsonData) => {
-  let vttContent = 'WEBVTT\n\n';
+  // ✅ Use array
+  const lines = ['WEBVTT', ''];
   
   const translatedUtterances = getTranslatedUtterances(jsonData);
   
@@ -82,22 +84,25 @@ export const exportToVTT = (jsonData) => {
     const originalText = decodeHTMLEntities(utt.utterance);
     const translatedText = decodeHTMLEntities(utt.elementTranslation || '');
     
-    vttContent += `${startTime} --> ${endTime}\n`;
-    vttContent += `${originalText}\n`;
+    lines.push(`${startTime} --> ${endTime}`);
+    lines.push(originalText);
     
     if (translatedText) {
-      vttContent += `${translatedText}\n`;
+      lines.push(translatedText);
     }
     
-    vttContent += `\n`;
+    lines.push('');
   });
+  
+  const vttContent = lines.join('\n');
   
   console.log(`Generated VTT content: ${vttContent.length} bytes`);
   return vttContent;
 };
 
 export const exportToTXT = (jsonData) => {
-  let txtContent = '';
+  // ✅ Use array
+  const lines = [];
   
   const translatedUtterances = getTranslatedUtterances(jsonData);
   
@@ -113,13 +118,15 @@ export const exportToTXT = (jsonData) => {
     const originalText = decodeHTMLEntities(utt.utterance);
     const translatedText = decodeHTMLEntities(utt.elementTranslation || '');
     
-    txtContent += `[${timestamp}]\n`;
-    txtContent += `${originalText}\n`;
+    lines.push(`[${timestamp}]`);
+    lines.push(originalText);
     if (translatedText) {
-      txtContent += `${translatedText}\n`;
+      lines.push(translatedText);
     }
-    txtContent += `\n`;
+    lines.push('');
   });
+  
+  const txtContent = lines.join('\n');
   
   console.log(`Generated TXT content: ${txtContent.length} bytes`);
   return txtContent;

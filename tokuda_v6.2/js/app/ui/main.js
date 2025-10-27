@@ -1,9 +1,10 @@
 /**
  * UI Main Entry Point
+ * ✅ FIXED: Use POT retry logic
  */
 
 import { getVideoId } from '../utils/dom.js';
-import { getPot } from '../utils/api.js';
+import { getPotWithRetry } from '../utils/api.js';
 import { convertSubtitlesToMarkedParagraphs } from '../core/subtitle-parser.js';
 import { extractMarkersWithContext } from '../core/marker-extractor.js';
 import { getLabel } from '../utils/helpers.js';
@@ -30,25 +31,40 @@ export const processTrack = async track => {
     return contentCache.get(cacheKey);
   }
   
-  const response = await getPot(videoId);
-  const pot = response?.pot;
-  
-  if (!pot) {
-    alert('Please enable subtitles and refresh the page');
-    return null;
+  // ✅ Use retry logic
+  try {
+    const response = await getPotWithRetry(videoId);
+    const pot = response?.pot;
+    
+    if (!pot) {
+      throw new Error('Unable to obtain POT token');
+    }
+    
+    const xml = await fetch(`${track.baseUrl}&fromExt=true&c=WEB&pot=${pot}`).then(r => r.text());
+    
+    const { text, metadata, language } = convertSubtitlesToMarkedParagraphs(xml, track.languageCode);
+    
+    const content = `Translate into Vietnamese\n\n\`\`\`\n---\nhttps://www.udemy.com/742828/039131.php\n---\n\n${text}\n\`\`\``;
+    
+    const result = { content, metadata, language };
+    contentCache.set(cacheKey, result);
+    
+    return result;
+    
+  } catch (error) {
+    console.error('Failed to process track:', error);
+    
+    // User-friendly error
+    let message = 'Failed to load subtitles: ';
+    if (error.message.includes('POT')) {
+      message += 'Token refresh failed. Please refresh the page and try again.';
+    } else {
+      message += error.message;
+    }
+    
+    alert(message);
+    throw error;
   }
-  
-  const xml = await fetch(`${track.baseUrl}&fromExt=true&c=WEB&pot=${pot}`).then(r => r.text());
-  
-  // ✅ Pass language code
-  const { text, metadata, language } = convertSubtitlesToMarkedParagraphs(xml, track.languageCode);
-  
-  const content = `Translate into Vietnamese\n\n\`\`\`\n---\nhttps://www.udemy.com/742828/039131.php\n---\n\n${text}\n\`\`\``;
-  
-  const result = { content, metadata, language };
-  contentCache.set(cacheKey, result);
-  
-  return result;
 };
 
 export const getOrCreateJSON = async (track) => {
@@ -62,10 +78,7 @@ export const getOrCreateJSON = async (track) => {
   const result = await processTrack(track);
   if (!result) return null;
   
-  // ✅ Pass language to marker extractor
   const json = extractMarkersWithContext(result.content, result.metadata, result.language);
-  
-  // ✅ Store source language in JSON
   json.sourceLanguage = result.language;
   
   jsonCache.set(cacheKey, json);

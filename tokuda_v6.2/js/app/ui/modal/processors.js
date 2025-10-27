@@ -1,5 +1,6 @@
 /**
  * Processing Logic - Manual input and stats update
+ * ✅ OPTIMIZED: Only re-render if data actually changed + Throttled stats
  */
 
 import { simulateSSEStream } from '../../core/stream-processor/index.js';
@@ -8,6 +9,10 @@ import { copyToClipboard } from '../../utils/dom.js';
 import { formatJSON } from '../../utils/helpers.js';
 import { showResultButtons } from './export-ui.js';
 import { getGlobalStats } from '../../utils/json-helpers.js';
+
+// ✅ NEW: Throttle tracking
+let lastStatsUpdate = 0;
+const STATS_UPDATE_INTERVAL = 50; // 50ms = max 20 updates/sec
 
 export const processManualInput = async (text, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, startBtn, setUpdatedData) => {
   startBtn.disabled = true;
@@ -30,20 +35,33 @@ export const processManualInput = async (text, track, getOrCreateJSON, streamDis
   
   const sourceJSON = JSON.parse(JSON.stringify(cachedJSON));
   
-  // ✅ Process with incremental card updates (for progress feedback)
+  // ✅ NEW: Track if we need to re-render
+  let needsRerender = false;
+  
+  // Process with incremental card updates
   const updatedJSON = await simulateSSEStream(text, sourceJSON, (progress) => {
     updateStats(statsDisplay, progress.stats, sourceJSON);
     updateCards(cardsWrapper, progress.events, sourceJSON);
+    
+    // Check if there were any merges/orphans (indicates final state might differ)
+    if (progress.stats.merged > 0 || progress.stats.orphaned > 0) {
+      needsRerender = true;
+    }
   });
   
-  // ✅ ROOT FIX: Clear and re-render ALL cards from final JSON state
-  console.log('🔄 Re-rendering cards from final JSON state...');
-  cardsWrapper.innerHTML = '';
-  resetCardGrouping();
-  
-  // Create final events from updated JSON (not from stream events)
-  const finalEvents = buildEventsFromJSON(updatedJSON);
-  updateCards(cardsWrapper, finalEvents, updatedJSON);
+  // ✅ OPTIMIZED: Only re-render if there were merges/orphans
+  if (needsRerender) {
+    console.log('🔄 Re-rendering cards from final JSON state (merges detected)...');
+    
+    // Use requestAnimationFrame to batch the update
+    requestAnimationFrame(() => {
+      cardsWrapper.innerHTML = '';
+      resetCardGrouping();
+      
+      const finalEvents = buildEventsFromJSON(updatedJSON);
+      updateCards(cardsWrapper, finalEvents, updatedJSON);
+    });
+  }
   
   const groupsData = getGroupsData();
   console.log('Groups summary:', groupsData);
@@ -63,13 +81,11 @@ export const processManualInput = async (text, track, getOrCreateJSON, streamDis
 };
 
 /**
- * ✅ ROOT FIX: Build events from final JSON state
- * This ensures cards reflect the actual data, not the streaming order
+ * ✅ Build events from final JSON state
  */
 const buildEventsFromJSON = (jsonData) => {
   const events = [];
   
-  // Get all instances sorted by position
   const allInstances = [];
   Object.values(jsonData.markers).forEach(instances => {
     instances.forEach(instance => {
@@ -78,7 +94,6 @@ const buildEventsFromJSON = (jsonData) => {
   });
   allInstances.sort((a, b) => a.position - b.position);
   
-  // Create events based on final status
   allInstances.forEach(instance => {
     if (instance.status === 'MATCHED') {
       events.push({
@@ -119,7 +134,19 @@ const buildEventsFromJSON = (jsonData) => {
   return events;
 };
 
+/**
+ * ✅ UPDATED: Throttled stats update (max 20 updates/sec)
+ */
 export const updateStats = (statsDisplay, stats, sourceJSON = null) => {
+  const now = Date.now();
+  
+  // ✅ NEW: Skip update if called too frequently
+  if (now - lastStatsUpdate < STATS_UPDATE_INTERVAL) {
+    return;
+  }
+  
+  lastStatsUpdate = now;
+  
   const { elements } = statsDisplay;
   
   requestAnimationFrame(() => {

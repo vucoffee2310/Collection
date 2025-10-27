@@ -1,5 +1,6 @@
 /**
  * Modal Builder - UI Structure Creation
+ * ✅ FIXED: Remove duplicate declarations, only import from tab-handlers
  */
 
 import { setupTabSwitching, setupAITab, setupFooter } from './tab-handlers.js';
@@ -48,6 +49,9 @@ export const createStreamModal = async (track, getOrCreateJSON, processTrack) =>
   let updatedJSONData = null;
   let processedEvents = [];
   
+  // ✅ Processing state
+  let isProcessing = false;
+  
   setupTabSwitching(tabs, manualTab, aiTab, footer.querySelector('#streamModalStartBtn'));
   setupAITab(aiTab, track, processTrack, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, 
     (data, events) => { 
@@ -66,13 +70,61 @@ export const createStreamModal = async (track, getOrCreateJSON, processTrack) =>
     }
   );
   
-  header.querySelector('#streamModalCloseBtn').onclick = () => modal.remove();
+  // ✅ Close handler with confirmation
+  const closeModal = () => {
+    if (isProcessing) {
+      const confirmClose = confirm('Processing in progress. Are you sure you want to close?');
+      if (!confirmClose) return;
+    }
+    modal.remove();
+  };
+  
+  header.querySelector('#streamModalCloseBtn').onclick = closeModal;
+  footer.querySelector('#streamModalFooterCloseBtn').onclick = closeModal;
+  
+  // ✅ ESC key handler
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      closeModal();
+    }
+  };
+  
+  document.addEventListener('keydown', handleEscape);
+  
+  // ✅ Click outside to close
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      closeModal();
+    }
+  };
+  
+  // Prevent click propagation on panel
+  panel.onclick = (e) => {
+    e.stopPropagation();
+  };
+  
+  // ✅ Clean up event listener on remove
+  const originalRemove = modal.remove.bind(modal);
+  modal.remove = () => {
+    document.removeEventListener('keydown', handleEscape);
+    originalRemove();
+  };
+  
+  // ✅ Export processing state setter
+  modal.setProcessing = (state) => { 
+    isProcessing = state;
+    console.log(`🔒 Modal processing state: ${state}`);
+  };
   
   panel.append(header, tabs, manualTab, aiTab, streamDisplay, statsDisplay.container, cardsContainer, exportSection, footer);
   modal.appendChild(panel);
   
   return modal;
 };
+
+// ==========================================
+// UI Component Builders (LOCAL TO THIS FILE)
+// ==========================================
 
 export const createHeader = () => {
   const header = document.createElement('div');

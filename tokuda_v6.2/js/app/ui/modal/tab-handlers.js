@@ -1,5 +1,6 @@
 /**
  * Tab Handlers - Tab switching and processing logic
+ * ✅ FIXED: Shared buildEventsFromJSON + AI error handling + structuredClone
  */
 
 import { StreamingTranslationProcessor } from '../../core/stream-processor/index.js';
@@ -9,6 +10,17 @@ import { copyToClipboard } from '../../utils/dom.js';
 import { formatJSON } from '../../utils/helpers.js';
 import { showResultButtons } from './export-ui.js';
 import { processManualInput, updateStats } from './processors.js';
+import { buildEventsFromJSON } from '../../utils/json-helpers.js';
+
+/**
+ * ✅ Fast deep clone
+ */
+const deepClone = (obj) => {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(obj);
+  }
+  return JSON.parse(JSON.stringify(obj));
+};
 
 export const setupTabSwitching = (tabs, manualTab, aiTab, startBtn) => {
   tabs.querySelector('#manualTabBtn').onclick = () => {
@@ -34,6 +46,7 @@ export const setupTabSwitching = (tabs, manualTab, aiTab, startBtn) => {
 
 export const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, setUpdatedData) => {
   const btn = tab.querySelector('#aiTabStreamBtn');
+  
   btn.onclick = async () => {
     btn.disabled = true;
     btn.textContent = 'Initializing...';
@@ -46,6 +59,10 @@ export const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisp
     cardsWrapper.innerHTML = '';
     resetCardGrouping();
     
+    // Mark modal as processing
+    const modal = document.querySelector('#streamModal');
+    if (modal?.setProcessing) modal.setProcessing(true);
+    
     try {
       const result = await processTrack(track);
       const cachedJSON = await getOrCreateJSON(track);
@@ -57,27 +74,48 @@ export const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisp
         return;
       }
       
-      const sourceJSON = JSON.parse(JSON.stringify(cachedJSON));
+      // ✅ Use fast clone
+      const sourceJSON = deepClone(cachedJSON);
       btn.textContent = 'Streaming...';
       
       const processor = new StreamingTranslationProcessor(sourceJSON);
       
-      await sendToAI(result.content, async (chunk) => {
-        const result = processor.processChunk(chunk);
-        updateStats(statsDisplay, result.stats, sourceJSON);
-        updateCards(cardsWrapper, processor.events, sourceJSON);
-      });
+      // ✅ AI error handling
+      await sendToAI(
+        result.content,
+        async (chunk) => {
+          const result = processor.processChunk(chunk);
+          updateStats(statsDisplay, result.stats, sourceJSON);
+          updateCards(cardsWrapper, processor.events, sourceJSON);
+        },
+        (errorMessage, error) => {
+          // ✅ Error callback
+          streamDisplay.textContent = `❌ ${errorMessage}`;
+          streamDisplay.style.color = '#d32f2f';
+          btn.textContent = 'Failed - Retry';
+          btn.disabled = false;
+          console.error('AI Error:', error);
+        }
+      );
       
       processor.finalize();
       const updatedJSON = processor.getUpdatedJSON();
       
-      // ✅ ROOT FIX: Re-render all cards from final state
-      console.log('🔄 Re-rendering cards from final JSON state...');
-      cardsWrapper.innerHTML = '';
-      resetCardGrouping();
+      // ✅ Only re-render if needed
+      const hasMergesOrOrphans = processor.stats.merged > 0 || processor.stats.orphaned > 0;
       
-      const finalEvents = buildEventsFromJSON(updatedJSON);
-      updateCards(cardsWrapper, finalEvents, updatedJSON);
+      if (hasMergesOrOrphans) {
+        console.log('🔄 Re-rendering cards from final JSON state...');
+        
+        requestAnimationFrame(() => {
+          cardsWrapper.innerHTML = '';
+          resetCardGrouping();
+          
+          // ✅ Use shared function
+          const finalEvents = buildEventsFromJSON(updatedJSON);
+          updateCards(cardsWrapper, finalEvents, updatedJSON);
+        });
+      }
       
       const groupsData = getGroupsData();
       console.log('Groups summary:', groupsData);
@@ -88,72 +126,26 @@ export const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisp
       
       showResultButtons(exportSection);
       
-      btn.textContent = 'Completed';
+      btn.textContent = 'Completed ✓';
+      streamDisplay.style.color = '#000';
       
     } catch (error) {
-      console.error(error);
-      btn.textContent = 'Error';
+      console.error('Processing error:', error);
+      btn.textContent = 'Error - Retry';
+      streamDisplay.textContent = `❌ ${error.message}`;
+      streamDisplay.style.color = '#d32f2f';
+    } finally {
+      // Unmark processing state
+      if (modal?.setProcessing) modal.setProcessing(false);
+      
+      setTimeout(() => {
+        btn.disabled = false;
+        if (btn.textContent.includes('Completed') || btn.textContent.includes('Error')) {
+          btn.textContent = 'Send to AI & Process';
+        }
+      }, 3000);
     }
-    
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = 'Send to AI & Process';
-    }, 3000);
   };
-};
-
-/**
- * ✅ ROOT FIX: Build events from final JSON state
- */
-const buildEventsFromJSON = (jsonData) => {
-  const events = [];
-  
-  const allInstances = [];
-  Object.values(jsonData.markers).forEach(instances => {
-    instances.forEach(instance => {
-      allInstances.push(instance);
-    });
-  });
-  allInstances.sort((a, b) => a.position - b.position);
-  
-  allInstances.forEach(instance => {
-    if (instance.status === 'MATCHED') {
-      events.push({
-        type: 'marker_completed',
-        marker: `(${instance.domainIndex.charAt(1)})`,
-        position: instance.position,
-        matched: true,
-        method: instance.matchMethod,
-        sourcePosition: instance.position
-      });
-    } else if (instance.status === 'MERGED') {
-      events.push({
-        type: 'marker_merged',
-        marker: instance.domainIndex,
-        position: instance.position,
-        mergedInto: instance.mergedInto,
-        mergeDirection: instance.mergeDirection,
-        reason: instance.mergeDirection === 'ORPHAN_GROUP' ? 'orphan_group_member' : 'backward_merge'
-      });
-    } else if (instance.status === 'ORPHAN_GROUP') {
-      events.push({
-        type: 'orphan_group_created',
-        marker: instance.domainIndex,
-        position: instance.position,
-        orphanGroupType: instance.orphanGroupType,
-        memberCount: instance.groupMembers?.length || 0
-      });
-    } else if (instance.status === 'ORPHAN') {
-      events.push({
-        type: 'marker_orphaned',
-        marker: instance.domainIndex,
-        position: instance.position,
-        reason: 'no_match_found'
-      });
-    }
-  });
-  
-  return events;
 };
 
 export const setupFooter = (footer, manualTab, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, setUpdatedData) => {

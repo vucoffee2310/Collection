@@ -6,6 +6,9 @@ export { countWords } from './text/word-counter.js';
 export { splitTextIntoWords, splitTranslationByWordRatio, countWordsConsistent } from './text/word-splitter.js';
 export { countMarkers, mergeLowMarkerParagraphs, splitTextAtMiddle } from './text/text-utils.js';
 
+// ✅ ADD THIS: querySelector shorthand
+export const $ = (selector) => document.querySelector(selector);
+
 export const getVideoId = () => new URL(location.href).searchParams.get('v');
 
 export const copyToClipboard = async (text) => {

@@ -1,5 +1,6 @@
 /**
  * Card Updater - Update cards display
+ * ✅ OPTIMIZED: Track count in memory instead of DOM queries
  */
 
 import { createEventCard, resetTotalCardCount, getTotalCardCount } from './card-factory.js';
@@ -7,48 +8,94 @@ import { getGroupInfo, createGroupContainer, updateGroupCount, updateGroupStats,
 
 let currentGroup = null;
 let currentGroupCardCount = 0;
+let totalRenderedCards = 0; // ✅ Track in memory
 
 export const updateCards = (cardsWrapper, events, sourceJSON) => {
   if (!events || events.length === 0) return;
   
-  const existingCount = cardsWrapper.querySelectorAll('.card-item').length;
+  // ✅ Use memory counter instead of DOM query
+  const existingCount = totalRenderedCards;
   const newEvents = events.slice(existingCount);
+  
+  if (newEvents.length === 0) return;
+  
+  // ✅ Batch DOM operations
+  const fragment = document.createDocumentFragment();
+  let pendingGroup = currentGroup;
+  let batchStats = new Map(); // Batch stat updates
   
   newEvents.forEach(event => {
     const card = createEventCard(event, sourceJSON);
-    if (card) {
-      const totalCardCount = getTotalCardCount();
-      const groupInfo = getGroupInfo(totalCardCount - 1); // -1 because createEventCard already incremented
+    if (!card) return;
+    
+    const totalCardCount = getTotalCardCount();
+    const groupInfo = getGroupInfo(totalCardCount - 1);
+    
+    // Check if we need a new group
+    if (!pendingGroup || 
+        (totalCardCount === 4) || 
+        (totalCardCount > 4 && currentGroupCardCount >= 10)) {
       
-      // Check if we need a new group
-      if (!currentGroup || 
-          (totalCardCount === 4) || // Start group 2 after first 3 cards (totalCardCount is already incremented)
-          (totalCardCount > 4 && currentGroupCardCount >= 10)) {
-        
-        currentGroup = createGroupContainer(groupInfo.groupNumber, groupInfo);
-        cardsWrapper.appendChild(currentGroup);
-        currentGroupCardCount = 0;
+      // Add previous group to fragment
+      if (pendingGroup && !cardsWrapper.contains(pendingGroup)) {
+        fragment.appendChild(pendingGroup);
       }
       
-      // Add card to current group
-      const groupCardsDiv = currentGroup.querySelector('.group-cards');
-      groupCardsDiv.appendChild(card);
-      
-      currentGroupCardCount++;
-      
-      // Update group count display
-      updateGroupCount(currentGroup, currentGroupCardCount);
-      updateGroupStats(groupInfo.groupNumber);
+      pendingGroup = createGroupContainer(groupInfo.groupNumber, groupInfo);
+      currentGroup = pendingGroup;
+      currentGroupCardCount = 0;
+    }
+    
+    // Add card to pending group
+    const groupCardsDiv = pendingGroup.querySelector('.group-cards');
+    groupCardsDiv.appendChild(card);
+    
+    currentGroupCardCount++;
+    totalRenderedCards++; // ✅ Increment counter
+    
+    // ✅ Batch stat updates
+    if (!batchStats.has(groupInfo.groupNumber)) {
+      batchStats.set(groupInfo.groupNumber, currentGroupCardCount);
+    } else {
+      batchStats.set(groupInfo.groupNumber, batchStats.get(groupInfo.groupNumber) + 1);
     }
   });
   
-  cardsWrapper.parentElement.scrollTop = cardsWrapper.parentElement.scrollHeight;
+  // Add final pending group
+  if (pendingGroup && !cardsWrapper.contains(pendingGroup)) {
+    fragment.appendChild(pendingGroup);
+  }
+  
+  // ✅ Single DOM write
+  if (fragment.hasChildNodes()) {
+    cardsWrapper.appendChild(fragment);
+  }
+  
+  // ✅ Batch update group counts
+  requestAnimationFrame(() => {
+    batchStats.forEach((count, groupNum) => {
+      const groupEl = cardsWrapper.querySelector(`[data-group-number="${groupNum}"]`);
+      if (groupEl) {
+        updateGroupCount(groupEl, count);
+        updateGroupStats(groupNum);
+      }
+    });
+    
+    // Debounced scroll
+    const container = cardsWrapper.parentElement;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    if (isNearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  });
 };
 
 export const resetCardGrouping = () => {
   resetTotalCardCount();
   currentGroup = null;
   currentGroupCardCount = 0;
+  totalRenderedCards = 0; // ✅ Reset counter
   clearGroups();
 };
 
