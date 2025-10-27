@@ -7,6 +7,7 @@ import { updateCards, resetCardGrouping, getGroupsData } from '../cards/index.js
 import { copyToClipboard } from '../../utils/dom.js';
 import { formatJSON } from '../../utils/helpers.js';
 import { showResultButtons } from './export-ui.js';
+import { getGlobalStats } from '../../utils/json-helpers.js';
 
 export const processManualInput = async (text, track, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, startBtn, setUpdatedData) => {
   startBtn.disabled = true;
@@ -30,7 +31,7 @@ export const processManualInput = async (text, track, getOrCreateJSON, streamDis
   const sourceJSON = JSON.parse(JSON.stringify(cachedJSON));
   
   const updatedJSON = await simulateSSEStream(text, sourceJSON, (progress) => {
-    updateStats(statsDisplay, progress.stats);
+    updateStats(statsDisplay, progress.stats, sourceJSON);
     updateCards(cardsWrapper, progress.events, sourceJSON);
   });
   
@@ -53,11 +54,21 @@ export const processManualInput = async (text, track, getOrCreateJSON, streamDis
   }, 2000);
 };
 
-export const updateStats = (statsDisplay, stats) => {
+export const updateStats = (statsDisplay, stats, sourceJSON = null) => {
   const { elements } = statsDisplay;
+  
   requestAnimationFrame(() => {
     elements.matched.valueEl.textContent = stats.matched;
     elements.merged.valueEl.textContent = stats.merged;
     elements.orphaned.valueEl.textContent = stats.orphaned;
+    
+    if (sourceJSON && elements.words && elements.language) {
+      const globalStats = getGlobalStats(sourceJSON);
+      if (globalStats) {
+        elements.words.valueEl.textContent = globalStats.totalWords;
+        const langNames = { en: 'EN', ja: 'JA', zh: 'ZH', vi: 'VI', th: 'TH', lo: 'LO', km: 'KM' };
+        elements.language.valueEl.textContent = langNames[globalStats.primaryLanguage] || globalStats.primaryLanguage.toUpperCase();
+      }
+    }
   });
 };

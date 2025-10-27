@@ -8,7 +8,6 @@ import { loadCompoundData } from '../../utils/compounds/index.js';
 import { createCardsContainer } from '../cards/index.js';
 
 export const createStreamModal = async (track, getOrCreateJSON, processTrack) => {
-  // Load compound data first
   await loadCompoundData();
   
   if (!document.querySelector('#streamCardsCSS')) {
@@ -177,7 +176,7 @@ export const createStatsDisplay = () => {
   `;
   
   const grid = document.createElement('div');
-  grid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 11px;';
+  grid.style.cssText = 'display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; font-size: 11px;';
   
   const createStatElement = (value, label) => {
     const container = document.createElement('div');
@@ -200,11 +199,15 @@ export const createStatsDisplay = () => {
     matched: createStatElement('0', 'Matched'),
     merged: createStatElement('0', 'Merged'),
     orphaned: createStatElement('0', 'Orphaned'),
+    words: createStatElement('0', 'Words'),
+    language: createStatElement('--', 'Language')
   };
   
   elements.matched.container.id = 'statsMatched';
   elements.merged.container.id = 'statsMerged';
   elements.orphaned.container.id = 'statsOrphaned';
+  elements.words.container.id = 'statsWords';
+  elements.language.container.id = 'statsLanguage';
   
   Object.values(elements).forEach(el => grid.appendChild(el.container));
   container.appendChild(grid);

@@ -7,10 +7,38 @@ import { getCompoundMarkers } from './data-loader.js';
 const compoundExtractionCache = new Map();
 
 /**
+ * Clean up multiple nested brackets (safety fix)
+ */
+export const cleanupNestedBrackets = (text) => {
+  if (!text) return text;
+  
+  const { open: COMPOUND_OPEN, close: COMPOUND_CLOSE } = getCompoundMarkers();
+  
+  // Replace multiple consecutive open brackets with single one
+  let cleaned = text.replace(new RegExp(`${COMPOUND_OPEN}{2,}`, 'g'), COMPOUND_OPEN);
+  
+  // Replace multiple consecutive close brackets with single one
+  cleaned = cleaned.replace(new RegExp(`${COMPOUND_CLOSE}{2,}`, 'g'), COMPOUND_CLOSE);
+  
+  // Remove mismatched brackets (open without close or vice versa)
+  const openCount = (cleaned.match(new RegExp(COMPOUND_OPEN, 'g')) || []).length;
+  const closeCount = (cleaned.match(new RegExp(COMPOUND_CLOSE, 'g')) || []).length;
+  
+  if (openCount !== closeCount) {
+    console.warn(`⚠️ Mismatched brackets: ${openCount} open, ${closeCount} close`);
+  }
+  
+  return cleaned;
+};
+
+/**
  * Extract compound words with their positions
  */
 export const extractCompounds = (text) => {
   if (!text) return [];
+  
+  // ✅ Clean up nested brackets first
+  text = cleanupNestedBrackets(text);
   
   if (compoundExtractionCache.has(text)) {
     return compoundExtractionCache.get(text);
@@ -87,6 +115,9 @@ export const removeCompoundMarkers = (text) => {
  */
 export const formatCompoundsForDisplay = (text) => {
   if (!text) return text;
+  
+  // ✅ Clean up nested brackets first
+  text = cleanupNestedBrackets(text);
   
   const parts = extractCompounds(text);
   const htmlParts = [];

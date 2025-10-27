@@ -64,7 +64,7 @@ export const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisp
       
       await sendToAI(result.content, async (chunk) => {
         const result = processor.processChunk(chunk);
-        updateStats(statsDisplay, result.stats);
+        updateStats(statsDisplay, result.stats, sourceJSON);
         updateCards(cardsWrapper, processor.events, sourceJSON);
       });
       

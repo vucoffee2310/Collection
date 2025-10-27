@@ -1,33 +1,28 @@
 /**
  * Subtitle Format Exports
+ * Generate timestamps on-demand from start/end values
  */
 
-import { downloadFile, decodeHTMLEntities } from '../utils/helpers.js';
+import { downloadFile, decodeHTMLEntities, formatSRTTime, formatVTTTime } from '../utils/helpers.js';
 import { getVideoId } from './helpers.js';
+import { getAllUtterancesSorted } from '../utils/json-helpers.js';
 
 /**
  * Get translated utterances from processed JSON
  */
 const getTranslatedUtterances = (jsonData) => {
-  const translatedUtterances = [];
+  const allUtterances = getAllUtterancesSorted(jsonData);
   
-  // Iterate through all markers
-  Object.values(jsonData.markers || {}).forEach(instances => {
-    instances.forEach(instance => {
-      // Only process MATCHED markers
-      if (instance.status === 'MATCHED' && instance.utterances) {
-        instance.utterances.forEach(utt => {
-          // Only include utterances with translation
-          if (utt.elementTranslation && utt.elementTranslation.trim()) {
-            translatedUtterances.push(utt);
-          }
-        });
-      }
-    });
+  const translatedUtterances = allUtterances.filter(utt => {
+    if (!utt.elementTranslation || !utt.elementTranslation.trim()) {
+      return false;
+    }
+    
+    const parentMarker = jsonData.markers[`(${utt.markerDomainIndex?.charAt(1)})`]
+      ?.find(m => m.domainIndex === utt.markerDomainIndex);
+    
+    return parentMarker?.status === 'MATCHED';
   });
-  
-  // Sort by index to maintain order
-  translatedUtterances.sort((a, b) => (a.index || 0) - (b.index || 0));
   
   console.log(`Found ${translatedUtterances.length} translated utterances`);
   
@@ -48,8 +43,8 @@ export const exportToSRT = (jsonData) => {
   translatedUtterances.forEach(utt => {
     if (!utt.utterance) return;
     
-    const startTime = utt.timestampSRT;
-    const endTime = utt.endTimestampSRT;
+    const startTime = formatSRTTime(utt.start);
+    const endTime = formatSRTTime(utt.end);
     const originalText = decodeHTMLEntities(utt.utterance);
     const translatedText = decodeHTMLEntities(utt.elementTranslation || '');
     
@@ -82,8 +77,8 @@ export const exportToVTT = (jsonData) => {
   translatedUtterances.forEach(utt => {
     if (!utt.utterance) return;
     
-    const startTime = utt.timestampVTT;
-    const endTime = utt.endTimestampVTT;
+    const startTime = formatVTTTime(utt.start);
+    const endTime = formatVTTTime(utt.end);
     const originalText = decodeHTMLEntities(utt.utterance);
     const translatedText = decodeHTMLEntities(utt.elementTranslation || '');
     
@@ -114,10 +109,11 @@ export const exportToTXT = (jsonData) => {
   translatedUtterances.forEach(utt => {
     if (!utt.utterance) return;
     
+    const timestamp = formatSRTTime(utt.start);
     const originalText = decodeHTMLEntities(utt.utterance);
     const translatedText = decodeHTMLEntities(utt.elementTranslation || '');
     
-    txtContent += `[${utt.timestamp}]\n`;
+    txtContent += `[${timestamp}]\n`;
     txtContent += `${originalText}\n`;
     if (translatedText) {
       txtContent += `${translatedText}\n`;
@@ -145,7 +141,7 @@ export const downloadSRT = (jsonData) => {
 export const downloadVTT = (jsonData) => {
   const content = exportToVTT(jsonData);
   
-  if (!content || content.length <= 8) { // 'WEBVTT\n\n' is 8 bytes
+  if (!content || content.length <= 8) {
     alert('No translated content available to export. Please ensure you have processed the translation.');
     return;
   }

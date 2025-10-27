@@ -2,10 +2,12 @@
  * Cache Builder - Build lookup caches for fast matching
  */
 
+import { getPositionMap } from '../../utils/json-helpers.js';
+
 export const buildCaches = (sourceJSON) => {
   const unmatchedMap = buildUnmatchedMap(sourceJSON);
   const sourcePrevCache = buildSourcePrevCache(sourceJSON);
-  const positionMap = buildPositionMap(sourceJSON);
+  const positionMap = getPositionMap(sourceJSON);
   
   return { unmatchedMap, sourcePrevCache, positionMap };
 };
@@ -48,20 +50,4 @@ const buildSourcePrevCache = (sourceJSON) => {
   });
   
   return sourcePrevCache;
-};
-
-const buildPositionMap = (sourceJSON) => {
-  const positionMap = new Map();
-  
-  if (sourceJSON._meta?.positionMap) {
-    return new Map(sourceJSON._meta.positionMap);
-  }
-  
-  Object.values(sourceJSON.markers).forEach(instances => {
-    instances.forEach(instance => {
-      positionMap.set(instance.position, instance);
-    });
-  });
-  
-  return positionMap;
 };

@@ -3,6 +3,7 @@
  */
 
 import { downloadFile } from '../utils/helpers.js';
+import { getGlobalStats, getTranslatedUtterancesCount, getTranslationCoverage } from '../utils/json-helpers.js';
 
 export { downloadFile };
 
@@ -37,10 +38,6 @@ export const validateExportData = (jsonData) => {
     errors.push('Invalid markers structure');
   }
   
-  if (!jsonData._meta) {
-    errors.push('Missing metadata');
-  }
-  
   if (jsonData.totalMarkers === undefined) {
     errors.push('Missing totalMarkers count');
   }
@@ -52,62 +49,26 @@ export const validateExportData = (jsonData) => {
 };
 
 export const getExportStats = (jsonData) => {
-  if (!jsonData || !jsonData._meta) {
+  const globalStats = getGlobalStats(jsonData);
+  
+  if (!globalStats) {
     return {
       totalUtterances: 0,
       translatedUtterances: 0,
       totalDuration: 0,
-      translationCoverage: 0
+      totalWords: 0,
+      translationCoverage: 0,
+      primaryLanguage: 'en'
     };
   }
   
-  const allUtterances = jsonData._meta.allUtterancesSorted || [];
-  
-  const translatedUtterances = allUtterances.filter(utt => {
-    const parentMarker = jsonData.markers[`(${utt.markerDomainIndex?.charAt(1)})`]
-      ?.find(m => m.domainIndex === utt.markerDomainIndex);
-    return parentMarker?.status === 'MATCHED' && utt.elementTranslation;
-  });
-  
-  const totalDuration = jsonData._meta.totalDuration || 0;
-  const coverage = allUtterances.length > 0
-    ? (translatedUtterances.length / allUtterances.length * 100).toFixed(1)
-    : 0;
-  
   return {
-    totalUtterances: allUtterances.length,
-    translatedUtterances: translatedUtterances.length,
-    totalDuration: totalDuration,
-    translationCoverage: coverage
-  };
-};
-
-export const generateExportMetadata = (format, jsonData) => {
-  const stats = getExportStats(jsonData);
-  const videoId = getVideoId();
-  const timestamp = new Date().toISOString();
-  
-  return {
-    exportFormat: format,
-    videoId: videoId,
-    exportDate: timestamp,
-    statistics: stats,
-    version: '1.0'
-  };
-};
-
-export const createExportManifest = (exports) => {
-  return {
-    version: '1.0',
-    created: new Date().toISOString(),
-    videoId: getVideoId(),
-    exports: exports.map(exp => ({
-      format: exp.format,
-      filename: exp.filename,
-      size: estimateFileSize(exp.content),
-      stats: exp.stats
-    })),
-    totalFiles: exports.length
+    totalUtterances: globalStats.totalUtterances,
+    translatedUtterances: getTranslatedUtterancesCount(jsonData),
+    totalDuration: globalStats.totalDuration,
+    totalWords: globalStats.totalWords,
+    translationCoverage: getTranslationCoverage(jsonData),
+    primaryLanguage: globalStats.primaryLanguage
   };
 };
 

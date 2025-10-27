@@ -6,6 +6,8 @@ import { getGroupInfo } from './group-manager.js';
 import { updateGroupStats, getGroups } from './group-manager.js';
 import { formatCompoundsForDisplay, extractCompounds } from '../../utils/compounds/index.js';
 import { countWordsConsistent } from '../../utils/text/index.js';
+import { formatSRTTime, escapeHtml } from '../../utils/helpers.js';
+import { findInstance } from '../../utils/json-helpers.js';
 
 let totalCardCount = 0;
 
@@ -105,7 +107,6 @@ const createOrphanedCard = (card, event, cardNumber, groupInfo) => {
 const createMatchedCard = (card, event, cardNumber, groupInfo, sourceJSON) => {
   const instance = findInstance(sourceJSON, event.sourcePosition);
   
-  // Build complete original text
   let originalText = '';
   const forwardMerged = instance?.mergedOrphans?.filter(o => o.mergeDirection === 'FORWARD') || [];
   const backwardMerged = instance?.mergedOrphans?.filter(o => o.mergeDirection === 'BACKWARD') || [];
@@ -277,6 +278,9 @@ const createUtteranceItem = (utt, idx, instance, allUtterances, totalTranslation
     }
   }
   
+  const durationMs = utt.duration ? (utt.duration * 1000).toFixed(0) + 'ms' : 'N/A';
+  const timestamp = utt.start !== undefined ? formatSRTTime(utt.start) : 'N/A';
+  
   const meta = document.createElement('div');
   meta.className = 'utterance-meta';
   meta.style.cssText = 'font-size: 10px; color: #333; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;';
@@ -284,7 +288,8 @@ const createUtteranceItem = (utt, idx, instance, allUtterances, totalTranslation
   meta.innerHTML = `
     <div style="display: flex; gap: 8px; align-items: center;">
       <span class="utterance-index" style="font-weight: bold; color: #000;">Seg #${idx + 1}</span>
-      <span class="utterance-timestamp" style="font-family: monospace; color: #666;">⏱ ${utt.timestamp || 'N/A'}</span>
+      <span class="utterance-timestamp" style="font-family: monospace; color: #666;">⏱ ${timestamp}</span>
+      <span style="font-family: monospace; color: #999; font-size: 9px;">⏲ ${durationMs}</span>
       ${mergedInfo}
     </div>
     <div style="display: flex; gap: 6px; align-items: center;">
@@ -336,22 +341,6 @@ const createUtteranceItem = (utt, idx, instance, allUtterances, totalTranslation
   }
   
   return item;
-};
-
-// Helper functions
-const findInstance = (json, position) => {
-  if (!json.markers) return null;
-  for (const instances of Object.values(json.markers)) {
-    const found = instances.find(inst => inst.position === position);
-    if (found) return found;
-  }
-  return null;
-};
-
-const escapeHtml = (text) => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 };
 
 export const getTotalCardCount = () => totalCardCount;

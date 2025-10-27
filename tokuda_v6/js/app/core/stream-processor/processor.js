@@ -8,8 +8,6 @@ import { matchAndUpdate } from './matcher.js';
 import { checkForOrphans } from './merger.js';
 import { redistributeMergedTranslations } from './redistributor.js';
 
-// ... rest of the file stays the same
-
 export class StreamingTranslationProcessor {
   constructor(sourceJSON) {
     this.sourceJSON = sourceJSON;

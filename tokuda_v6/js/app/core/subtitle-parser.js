@@ -1,5 +1,6 @@
 /**
  * Subtitle Parser
+ * Parses YouTube XML subtitles and converts to marked paragraphs
  */
 
 import { CONFIG, SPLIT_DELIMITER } from '../utils/config.js';
@@ -7,18 +8,12 @@ import { SeededRandom } from '../utils/helpers.js';
 import { countWords } from '../utils/text/index.js';
 import { mergeLowMarkerParagraphs, splitTextAtMiddle } from '../utils/text/index.js';
 
-// ... rest of the file stays the same
-
 const rng = new SeededRandom(CONFIG.RANDOM_SEED);
 
-export const formatTimestamp = (seconds) => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-};
-
+/**
+ * Parse subtitles with timing information
+ * Returns array of utterance objects with all essential fields
+ */
 export const parseSubtitlesWithTiming = (xml, lang = 'en') => {
   const textElements = Array.from(
     new DOMParser()
@@ -33,7 +28,6 @@ export const parseSubtitlesWithTiming = (xml, lang = 'en') => {
     
     return {
       utterance: text,
-      timestamp: formatTimestamp(start),
       start: start,
       end: start + dur,
       duration: dur,
@@ -43,9 +37,17 @@ export const parseSubtitlesWithTiming = (xml, lang = 'en') => {
   }).filter(item => item.utterance);
 };
 
+/**
+ * Parse subtitles (text only)
+ * Returns array of subtitle text strings
+ */
 export const parseSubtitles = (xml, lang = 'en') => 
   parseSubtitlesWithTiming(xml, lang).map(item => item.utterance);
 
+/**
+ * Convert subtitles to marked paragraphs
+ * Main function that creates the marked text for AI translation
+ */
 export const convertSubtitlesToMarkedParagraphs = (xml, lang = 'en') => {
   rng.reset(CONFIG.RANDOM_SEED);
   
@@ -75,7 +77,6 @@ export const convertSubtitlesToMarkedParagraphs = (xml, lang = 'en') => {
       markerMetadata.push({
         utterances: segmentUtterances.map(u => ({
           utterance: u.utterance,
-          timestamp: u.timestamp,
           start: u.start,
           end: u.end,
           duration: u.duration,

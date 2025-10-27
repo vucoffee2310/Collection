@@ -16,7 +16,7 @@ export const CONFIG = {
   
   // AI API
   API_KEY: "AIzaSyCQgCQRrggBobJ-knaLqy3ORvpozHISWIk",
-  GEMINI_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse",
+  GEMINI_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse",
   
   // Streaming
   SSE_CHUNK_SIZE: 150,

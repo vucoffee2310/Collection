@@ -20,7 +20,7 @@ const getCachedRegex = (word1, word2) => {
   }
   
   const pattern = new RegExp(
-    `(?<![\\p{L}])${escapeRegex(word1)}\\s+${escapeRegex(word2)}(?![\\p{L}])`,
+    `(?<![\\p{L}«])${escapeRegex(word1)}\\s+${escapeRegex(word2)}(?![\\p{L}»])`,
     'giu'
   );
   
@@ -34,11 +34,18 @@ const getCachedRegex = (word1, word2) => {
 
 /**
  * Merge compound words in Vietnamese text
+ * Now with safeguard against multiple wrapping
  */
 export const mergeVietnameseCompounds = (text) => {
   if (!text) return text;
   
   const { open: COMPOUND_OPEN, close: COMPOUND_CLOSE } = getCompoundMarkers();
+  
+  // ✅ FIX 1: Check if already processed
+  if (text.includes(COMPOUND_OPEN) && text.includes(COMPOUND_CLOSE)) {
+    console.log('⚠️ Text already contains compound markers, skipping merge');
+    return text;
+  }
   
   WORD_PATTERN.lastIndex = 0;
   const words = [];
@@ -59,7 +66,7 @@ export const mergeVietnameseCompounds = (text) => {
         word2: words[i + 1],
         text: `${words[i]} ${words[i + 1]}`
       });
-      i++;
+      i++; // Skip next word since it's part of compound
     }
   }
   
@@ -73,6 +80,7 @@ export const mergeVietnameseCompounds = (text) => {
     pattern.lastIndex = 0;
     
     result = result.replace(pattern, (match) => {
+      // ✅ FIX 2: Double-check we're not wrapping already wrapped text
       return `${COMPOUND_OPEN}${match}${COMPOUND_CLOSE}`;
     });
   }

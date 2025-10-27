@@ -14,7 +14,7 @@ export const redistributeMergedTranslations = (sourceJSON) => {
         return;
       }
       
-      if (instance.utteranceCount === 0) {
+      if (!instance.utterances || instance.utterances.length === 0) {
         console.warn(`⚠️ Skip ${instance.domainIndex} - no utterances`);
         return;
       }
@@ -28,9 +28,9 @@ export const redistributeMergedTranslations = (sourceJSON) => {
         console.log(`   📍 Matched: ${instance.domainIndex}`);
         if (backwardMerged.length > 0) console.log(`   ➡️ Backward: ${backwardMerged.map(o => o.domainIndex).join(', ')}`);
         
-        const forwardLength = forwardMerged.reduce((sum, o) => sum + o.contentLength, 0);
-        const matchedLength = instance.contentLength;
-        const backwardLength = backwardMerged.reduce((sum, o) => sum + o.contentLength, 0);
+        const forwardLength = forwardMerged.reduce((sum, o) => sum + (o.content?.length || 0), 0);
+        const matchedLength = instance.content?.length || 0;
+        const backwardLength = backwardMerged.reduce((sum, o) => sum + (o.content?.length || 0), 0);
         const totalLength = forwardLength + matchedLength + backwardLength;
         
         console.log(`   📏 ${forwardLength} + ${matchedLength} + ${backwardLength} = ${totalLength}`);
@@ -40,15 +40,19 @@ export const redistributeMergedTranslations = (sourceJSON) => {
           return;
         }
         
-        const overallTranslation = instance.overallTranslation || '';
-        if (!overallTranslation.trim()) {
-          console.warn(`   ⚠️ Empty translation, skip`);
-          return;
-        }
+        // ✅ FIX: Use the ALREADY MERGED translation (don't merge again!)
+        let mergedTranslation = instance.overallTranslationWithCompounds;
         
-        // Merge Vietnamese compounds first
-        const mergedTranslation = mergeVietnameseCompounds(overallTranslation);
-        instance.overallTranslationWithCompounds = mergedTranslation;
+        // ✅ If it doesn't exist (shouldn't happen), merge now
+        if (!mergedTranslation) {
+          const overallTranslation = instance.overallTranslation || '';
+          if (!overallTranslation.trim()) {
+            console.warn(`   ⚠️ Empty translation, skip`);
+            return;
+          }
+          mergedTranslation = mergeVietnameseCompounds(overallTranslation);
+          instance.overallTranslationWithCompounds = mergedTranslation;
+        }
         
         const translationWords = splitTextIntoWords(mergedTranslation, targetLang);
         const totalWords = translationWords.length;
@@ -68,11 +72,9 @@ export const redistributeMergedTranslations = (sourceJSON) => {
         
         let backwardTranslation = translationWords.slice(idx).join(' ');
         
-        // Fix compound boundaries between segments
         const segments = [forwardTranslation, matchedTranslation, backwardTranslation].filter(s => s.trim());
         const fixedSegments = fixCompoundBoundaries(segments);
         
-        // Reassign fixed segments
         let segIdx = 0;
         if (forwardTranslation.trim()) {
           forwardTranslation = fixedSegments[segIdx++] || forwardTranslation;
@@ -94,20 +96,26 @@ export const redistributeMergedTranslations = (sourceJSON) => {
         
         if (forwardUtterances.length > 0 && forwardTranslation.trim()) {
           const translations = splitTranslationByWordRatio(forwardTranslation, forwardUtterances, targetLang);
-          forwardUtterances.forEach((utt, i) => utt.elementTranslation = translations[i] || '');
-          console.log(`   ✅ ${forwardUtterances.length} forward utterances`);
+          forwardUtterances.forEach((utt, i) => {
+            utt.elementTranslation = translations[i] || '';
+          });
+          console.log(`   ✅ ${forwardUtterances.length} forward utterances redistributed`);
         }
         
         if (matchedUtterances.length > 0 && matchedTranslation.trim()) {
           const translations = splitTranslationByWordRatio(matchedTranslation, matchedUtterances, targetLang);
-          matchedUtterances.forEach((utt, i) => utt.elementTranslation = translations[i] || '');
-          console.log(`   ✅ ${matchedUtterances.length} matched utterances`);
+          matchedUtterances.forEach((utt, i) => {
+            utt.elementTranslation = translations[i] || '';
+          });
+          console.log(`   ✅ ${matchedUtterances.length} matched utterances redistributed`);
         }
         
         if (backwardUtterances.length > 0 && backwardTranslation.trim()) {
           const translations = splitTranslationByWordRatio(backwardTranslation, backwardUtterances, targetLang);
-          backwardUtterances.forEach((utt, i) => utt.elementTranslation = translations[i] || '');
-          console.log(`   ✅ ${backwardUtterances.length} backward utterances`);
+          backwardUtterances.forEach((utt, i) => {
+            utt.elementTranslation = translations[i] || '';
+          });
+          console.log(`   ✅ ${backwardUtterances.length} backward utterances redistributed`);
         }
         
         instance.utterances.forEach(utt => {
@@ -120,7 +128,7 @@ export const redistributeMergedTranslations = (sourceJSON) => {
         console.log(`   ✨ Done\n`);
         
       } catch (error) {
-        console.error(`❌ Error: ${instance.domainIndex}`, error);
+        console.error(`❌ Error redistributing ${instance.domainIndex}:`, error);
       }
     });
   });

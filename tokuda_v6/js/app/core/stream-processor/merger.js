@@ -3,6 +3,7 @@
  */
 
 import { getGroupInfo } from '../../ui/cards/index.js';
+import { getInstanceStats } from '../../utils/json-helpers.js';
 
 export const mergeOrphanForward = (processor, orphanInstance, targetInstance) => {
   orphanInstance.status = "MERGED";
@@ -14,17 +15,20 @@ export const mergeOrphanForward = (processor, orphanInstance, targetInstance) =>
     targetInstance.mergedOrphans = [];
   }
   
+  // ✅ Calculate stats on-demand
+  const orphanStats = getInstanceStats(orphanInstance);
+  
   targetInstance.mergedOrphans.unshift({
     domainIndex: orphanInstance.domainIndex,
     position: orphanInstance.position,
     content: orphanInstance.content,
     utterances: orphanInstance.utterances,
-    contentLength: orphanInstance.contentLength,
-    totalUtteranceWords: orphanInstance.totalUtteranceWords,
+    contentLength: orphanStats.contentLength,
+    totalUtteranceWords: orphanStats.totalUtteranceWords,
     mergeDirection: "FORWARD"
   });
   
-  if (orphanInstance.utteranceCount > 0) {
+  if (orphanInstance.utterances && orphanInstance.utterances.length > 0) {
     if (!targetInstance.utterances) {
       targetInstance.utterances = [];
     }
@@ -34,7 +38,6 @@ export const mergeOrphanForward = (processor, orphanInstance, targetInstance) =>
     });
     
     targetInstance.utterances.unshift(...orphanInstance.utterances);
-    targetInstance.utteranceCount = targetInstance.utterances.length;
   }
   
   if (processor.events.length < processor.maxEvents) {
@@ -90,17 +93,20 @@ export const mergeOrphanToPreceding = (processor, orphanInstance) => {
     processor.lastMatchedInstance.mergedOrphans = [];
   }
   
+  // ✅ Calculate stats on-demand
+  const orphanStats = getInstanceStats(orphanInstance);
+  
   processor.lastMatchedInstance.mergedOrphans.push({
     domainIndex: orphanInstance.domainIndex,
     position: orphanInstance.position,
     content: orphanInstance.content,
     utterances: orphanInstance.utterances,
-    contentLength: orphanInstance.contentLength,
-    totalUtteranceWords: orphanInstance.totalUtteranceWords,
+    contentLength: orphanStats.contentLength,
+    totalUtteranceWords: orphanStats.totalUtteranceWords,
     mergeDirection: "BACKWARD"
   });
   
-  if (orphanInstance.utteranceCount > 0) {
+  if (orphanInstance.utterances && orphanInstance.utterances.length > 0) {
     if (!processor.lastMatchedInstance.utterances) {
       processor.lastMatchedInstance.utterances = [];
     }
@@ -110,7 +116,6 @@ export const mergeOrphanToPreceding = (processor, orphanInstance) => {
     });
     
     processor.lastMatchedInstance.utterances.push(...orphanInstance.utterances);
-    processor.lastMatchedInstance.utteranceCount = processor.lastMatchedInstance.utterances.length;
   }
   
   if (processor.events.length < processor.maxEvents) {

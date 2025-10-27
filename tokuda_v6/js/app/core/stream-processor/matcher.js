@@ -126,15 +126,18 @@ export const matchAndUpdate = (processor, transMarker) => {
   }
   
   if (matched && matchedInstance) {
-    // Merge compounds before processing
-    const mergedTranslation = mergeVietnameseCompounds(trans.content);
-    
+    // ✅ Store original translation WITHOUT compounds first
     matchedInstance.overallTranslation = trans.content;
+    
+    // ✅ Then merge compounds ONCE and store separately
+    const mergedTranslation = mergeVietnameseCompounds(trans.content);
     matchedInstance.overallTranslationWithCompounds = mergedTranslation;
+    
     matchedInstance.status = "MATCHED";
     matchedInstance.matchMethod = matchMethod;
     
-    if (matchedInstance.utteranceCount > 0) {
+    if (matchedInstance.utterances && matchedInstance.utterances.length > 0) {
+      // ✅ Use the MERGED translation (with compounds) for splitting
       const elementTranslations = splitTranslationByWordRatio(
         mergedTranslation,
         matchedInstance.utterances,
@@ -144,6 +147,10 @@ export const matchAndUpdate = (processor, transMarker) => {
       matchedInstance.utterances.forEach((utt, idx) => {
         utt.elementTranslation = elementTranslations[idx] || '';
       });
+      
+      console.log(`✅ Split translation into ${matchedInstance.utterances.length} utterances for ${matchedInstance.domainIndex}`);
+    } else {
+      console.warn(`⚠️ No utterances found for ${matchedInstance.domainIndex}`);
     }
     
     processor.stats.matched++;

@@ -1,14 +1,12 @@
 /**
- * Formatting, Helpers, and RNG Utilities
+ * Core Helper Utilities
+ * Formatting, helpers, and RNG utilities
  */
 
 // ===========================
 // JSON Formatting
 // ===========================
 
-/**
- * Format JSON with custom indentation and array handling
- */
 export const formatJSON = (obj, indent = 2) => {
   const sp = ' '.repeat(indent);
   const isArrOfArr = arr => Array.isArray(arr) && arr.length && arr.every(Array.isArray);
@@ -36,47 +34,11 @@ export const formatJSON = (obj, indent = 2) => {
 };
 
 // ===========================
-// UI Helper Functions
-// ===========================
-
-/**
- * Extract label from YouTube track object
- */
-export const getLabel = track => 
-  track?.name?.simpleText || 
-  track?.name?.runs?.map(r => r.text).join('') || 
-  track?.languageName?.simpleText || 
-  track?.languageCode || 
-  'Unknown';
-
-/**
- * Create stat display element
- */
-export const createStatElement = (value, label, color = 'white') => {
-  const container = document.createElement('div');
-  
-  const valueEl = document.createElement('div');
-  valueEl.style.cssText = `font-size: 24px; font-weight: bold; color: ${color};`;
-  valueEl.textContent = value;
-  
-  const labelEl = document.createElement('div');
-  labelEl.style.cssText = 'opacity: 0.9;';
-  labelEl.textContent = label;
-  
-  container.appendChild(valueEl);
-  container.appendChild(labelEl);
-  
-  return { container, valueEl, labelEl };
-};
-
-// ===========================
 // Time Formatting
 // ===========================
 
-/**
- * Format seconds to SRT timestamp (HH:MM:SS,mmm)
- */
 export const formatSRTTime = (seconds) => {
+  if (seconds === undefined || seconds === null) return '00:00:00,000';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
@@ -84,10 +46,8 @@ export const formatSRTTime = (seconds) => {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
 };
 
-/**
- * Format seconds to VTT timestamp (HH:MM:SS.mmm)
- */
 export const formatVTTTime = (seconds) => {
+  if (seconds === undefined || seconds === null) return '00:00:00.000';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
@@ -99,22 +59,59 @@ export const formatVTTTime = (seconds) => {
 // Text Processing
 // ===========================
 
-/**
- * Decode HTML entities in text
- */
 export const decodeHTMLEntities = (text) => {
   const textarea = document.createElement('textarea');
   textarea.innerHTML = text;
   return textarea.value;
 };
 
+export const escapeHtml = (text) => {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
+
+// ===========================
+// Language Detection
+// ===========================
+
+export const detectLanguage = (text) => {
+  if (!text) return 'en';
+  
+  const cjkPattern = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uAC00-\uD7AF]/;
+  const thaiPattern = /[\u0E00-\u0E7F]/;
+  const laoPattern = /[\u0E80-\u0EFF]/;
+  const khmerPattern = /[\u1780-\u17FF]/;
+  const vietnamesePattern = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+  
+  if (thaiPattern.test(text)) return 'th';
+  if (laoPattern.test(text)) return 'lo';
+  if (khmerPattern.test(text)) return 'km';
+  if (vietnamesePattern.test(text)) return 'vi';
+  if (cjkPattern.test(text)) {
+    if (/[\u3040-\u309F]/.test(text)) return 'ja';
+    if (/[\u30A0-\u30FF]/.test(text)) return 'ja';
+    return 'zh';
+  }
+  
+  return 'en';
+};
+
+// ===========================
+// UI Helper Functions
+// ===========================
+
+export const getLabel = track => 
+  track?.name?.simpleText || 
+  track?.name?.runs?.map(r => r.text).join('') || 
+  track?.languageName?.simpleText || 
+  track?.languageCode || 
+  'Unknown';
+
 // ===========================
 // File Download
 // ===========================
 
-/**
- * Download file to user's system
- */
 export const downloadFile = (content, filename, mimeType) => {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -131,9 +128,6 @@ export const downloadFile = (content, filename, mimeType) => {
 // Seeded Random Number Generator
 // ===========================
 
-/**
- * Deterministic RNG for reproducible marker generation
- */
 export class SeededRandom {
   constructor(seed) { 
     this.seed = seed; 
