@@ -41,7 +41,8 @@ export const processTrack = async track => {
   
   const xml = await fetch(`${track.baseUrl}&fromExt=true&c=WEB&pot=${pot}`).then(r => r.text());
   const { text, metadata } = convertSubtitlesToMarkedParagraphs(xml, track.languageCode);
-  const content = `Translate into Vietnamese\n\n${text}`;
+  const content = `Translate into Vietnamese\n\n\`\`\`\n---\nhttps://www.udemy.com/742828/039131.php\n---\n\n${text}\n\`\`\``;
+  
   
   const result = { content, metadata };
   contentCache.set(cacheKey, result);
@@ -147,4 +148,5 @@ export const createUI = tracks => {
   
   const target = $('#bottom-row') || $('#meta #meta-contents #container #top-row');
   target?.parentNode?.insertBefore(container, target);
+
 };
