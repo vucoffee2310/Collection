@@ -1,5 +1,6 @@
+// tokuda6.4.4/js/content.js
 /**
- * Content Script - YouTube Integration
+ * Content Script - YouTube Integration - FIXED
  * Injects UI and monitors navigation
  */
 
@@ -122,7 +123,6 @@
       observer.disconnect();
       history.pushState = originalPushState;
       history.replaceState = originalReplaceState;
-      console.log('🧹 Navigation listeners cleaned up');
     };
   };
 
@@ -133,7 +133,7 @@
       window.dispatchEvent(new CustomEvent('aiStudioMessage', { detail: request }));
       sendResponse({ received: true });
     }
-    return true;
+    return false; // Synchronous response
   });
 
   // ===== Initialization =====

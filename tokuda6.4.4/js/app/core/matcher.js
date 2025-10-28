@@ -1,6 +1,5 @@
 /**
- * Marker Matcher + Orphan Merger
- * MERGED: matcher.js + merger.js
+ * Marker Matcher + Orphan Merger - OPTIMIZED
  */
 
 import { splitTranslationByWordRatio } from '../lib/text.js';
@@ -108,11 +107,12 @@ export const matchAndUpdate = (processor, transMarker) => {
     };
   }
 
-  const lookupKey = `${markerKey}_lookup`;
-  if (!processor[lookupKey]) {
-    processor[lookupKey] = buildPrevLookupMap(unmatchedInstances, processor.sourcePrevCache);
+  // OPTIMIZED: Use cached lookup map
+  let lookupMap = processor.getLookupCache(markerKey);
+  if (!lookupMap) {
+    lookupMap = buildPrevLookupMap(unmatchedInstances, processor.sourcePrevCache);
+    processor.setLookupCache(markerKey, lookupMap);
   }
-  const lookupMap = processor[lookupKey];
 
   const transPrevCache = {
     prev5: trans.prev5 ? JSON.stringify(trans.prev5) : null,
@@ -212,9 +212,6 @@ export const matchAndUpdate = (processor, transMarker) => {
       matchedInstance = bestCandidate;
       matchMethod = 'fallback_proximity';
       matched = true;
-      console.warn(
-        `⚠️ Context match failed for ${trans.marker} at trans pos #${trans.position}. Using FALLBACK match to source pos #${matchedInstance.position}. Re-synchronizing stream.`
-      );
     }
   }
 
@@ -251,10 +248,11 @@ export const matchAndUpdate = (processor, transMarker) => {
     const remaining = unmatchedInstances.filter((inst) => inst !== matchedInstance);
     if (remaining.length > 0) {
       processor.unmatchedMap.set(markerKey, remaining);
-      delete processor[lookupKey];
+      // OPTIMIZED: Clear lookup cache to rebuild with fewer instances
+      processor.clearLookupCache(markerKey);
     } else {
       processor.unmatchedMap.delete(markerKey);
-      delete processor[lookupKey];
+      processor.clearLookupCache(markerKey);
     }
 
     return {
@@ -267,14 +265,12 @@ export const matchAndUpdate = (processor, transMarker) => {
   return { matched: false, reason: 'no_context_match', sourcePosition: null };
 };
 
-// ===== Orphan Handling =====
+// ===== Orphan Handling (unchanged) =====
 export const checkForOrphans = (processor, beforePosition, currentMatchedInstance = null) => {
   const startPos = processor.lastMatchedPosition + 1;
   const endPos = beforePosition - 1;
 
   if (startPos > endPos) return;
-
-  console.log(`🔍 Checking #${startPos}-#${endPos} for orphans`);
 
   const orphans = [];
   for (let pos = startPos; pos <= endPos; pos++) {
@@ -306,8 +302,6 @@ const handleLeadingOrphans = (processor, orphans) => {
   leader.groupMembers = [];
   processor.stats.orphaned++;
 
-  console.log(`👑 Leading orphan group: ${leader.domainIndex} (#${leader.position})`);
-
   if (!leader.utterances) leader.utterances = [];
 
   for (let i = 1; i < orphans.length; i++) {
@@ -334,8 +328,6 @@ const handleLeadingOrphans = (processor, orphans) => {
       });
       leader.utterances.push(...orphan.utterances);
     }
-
-    console.log(`  ↳ Merged ${orphan.domainIndex} (#${orphan.position}) into orphan group`);
   }
 };
 
@@ -345,7 +337,6 @@ const handleGapOrphans = (processor, orphans, precedingMatch) => {
     return;
   }
 
-  console.log(`👑 Creating GAP orphan group with ${orphans.length} members.`);
   const leader = orphans[0];
   leader.status = 'ORPHAN_GROUP';
   leader.orphanGroupType = 'GAP';
@@ -390,8 +381,6 @@ const handleTrailingOrphans = (processor, orphans) => {
   leader.groupMembers = [];
   processor.stats.orphaned++;
 
-  console.log(`👑 Trailing orphan group: ${leader.domainIndex} (#${leader.position})`);
-
   if (!leader.utterances) leader.utterances = [];
 
   for (let i = 1; i < orphans.length; i++) {
@@ -418,8 +407,6 @@ const handleTrailingOrphans = (processor, orphans) => {
       });
       leader.utterances.push(...orphan.utterances);
     }
-
-    console.log(`  ↳ Merged ${orphan.domainIndex} (#${orphan.position}) into orphan group`);
   }
 };
 
@@ -429,8 +416,6 @@ export const mergeOrphanToPreceding = (processor, orphanInstance, precedingMatch
   if (!targetMatch) {
     orphanInstance.status = 'ORPHAN';
     processor.stats.orphaned++;
-
-    console.log(`⚠️ Orphan: ${orphanInstance.domainIndex} (#${orphanInstance.position})`);
     return;
   }
 
@@ -473,8 +458,4 @@ export const mergeOrphanToPreceding = (processor, orphanInstance, precedingMatch
   ) {
     targetMatch.overallLength += orphanInstance.overallLength;
   }
-
-  console.log(
-    `🔗 Backward: ${orphanInstance.domainIndex} (#${orphanInstance.position}) → ${targetMatch.domainIndex}`
-  );
 };

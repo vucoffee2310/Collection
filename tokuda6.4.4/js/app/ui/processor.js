@@ -1,5 +1,5 @@
 /**
- * Processor UI - Real-time position-ordered JSON viewer
+ * Processor UI - SMART AUTO-SCROLL
  */
 
 import { getVideoId, copyToClipboard, downloadFile, formatJSON } from '../lib/helpers.js';
@@ -13,7 +13,6 @@ import { getGlobalStats } from '../lib/json-utils.js';
 
 let lastClearedVideoId = null;
 
-// ===== Track Processing =====
 const processTrack = async (track) => {
   const videoId = getVideoId();
   const cacheKey = `${videoId}::${track.baseUrl}`;
@@ -21,8 +20,7 @@ const processTrack = async (track) => {
   const contentCache = getCache('content');
   if (contentCache.has(cacheKey)) return contentCache.get(cacheKey);
 
-  const response = await getPotWithRetry(videoId);
-  const pot = response?.pot;
+  const { pot } = await getPotWithRetry(videoId);
   if (!pot) throw new Error('Unable to obtain POT token');
 
   const xml = await fetch(`${track.baseUrl}&fromExt=true&c=WEB&pot=${pot}`).then((r) => r.text());
@@ -42,8 +40,6 @@ const getOrCreateJSON = async (track) => {
   if (jsonCache.has(cacheKey)) return jsonCache.get(cacheKey);
 
   const result = await processTrack(track);
-  if (!result) return null;
-
   const json = extractMarkersWithContext(result.content, result.metadata, result.language);
   json.sourceLanguage = result.language;
 
@@ -51,21 +47,28 @@ const getOrCreateJSON = async (track) => {
   return json;
 };
 
-// ===== Position Ordering =====
 const getPositionOrderedData = (json) => {
   const items = [];
-
-  Object.entries(json.markers || {}).forEach(([marker, instances]) => {
-    instances.forEach((inst) => {
-      items.push(inst);
-    });
+  Object.values(json.markers || {}).forEach((instances) => {
+    instances.forEach((inst) => items.push(inst));
   });
-
   items.sort((a, b) => a.position - b.position);
   return items;
 };
 
-// ===== UI Creation =====
+const throttle = (fn, delay) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+};
+
+const truncate = (str, len = 150) => {
+  if (!str || str.length <= len) return str;
+  return str.substring(0, len) + '...';
+};
+
 export const createProcessorUI = (track) => {
   const container = document.createElement('div');
   container.style.cssText =
@@ -106,38 +109,50 @@ export const createProcessorUI = (track) => {
 
   btnContainer.append(processBtn, downloadBtn, copyBtn, toggleBtn);
 
-  // Stats bar - PLAIN TEXT VERSION
   const statsBar = document.createElement('div');
   statsBar.style.cssText =
     'display: none; padding: 8px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; font-size: 11px; font-family: monospace; color: #333;';
 
-  // JSON Viewer
   const jsonViewer = document.createElement('div');
   jsonViewer.style.cssText = `
-    display: none;
-    max-height: 500px;
-    overflow-y: auto;
-    background: #1e1e1e;
-    border: 1px solid #000;
-    border-radius: 4px;
-    padding: 10px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 11px;
-    color: #d4d4d4;
-    line-height: 1.4;
+    display: none; max-height: 600px; overflow-y: auto; background: #1e1e1e;
+    border: 1px solid #000; border-radius: 4px; padding: 10px;
+    font-family: 'Consolas', 'Monaco', monospace; font-size: 10px; color: #d4d4d4; line-height: 1.5;
   `;
 
   let processedJSON = null;
   let positionCache = new Map();
+  let userScrolledUp = false; // Track manual scroll
+
+  // ===== SMART AUTO-SCROLL =====
+  const isNearBottom = (element) => {
+    const threshold = 100; // pixels from bottom
+    return element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
+  };
+
+  // Track when user manually scrolls up
+  jsonViewer.addEventListener('scroll', () => {
+    userScrolledUp = !isNearBottom(jsonViewer);
+  });
+
+  const smartScroll = () => {
+    // Only auto-scroll if user hasn't manually scrolled up
+    if (!userScrolledUp) {
+      jsonViewer.scrollTop = jsonViewer.scrollHeight;
+    }
+  };
 
   toggleBtn.onclick = () => {
     const hidden = jsonViewer.style.display === 'none';
     jsonViewer.style.display = hidden ? 'block' : 'none';
     toggleBtn.textContent = hidden ? 'Hide JSON ▲' : 'Show JSON ▼';
+    if (hidden) {
+      userScrolledUp = false; // Reset on toggle
+      smartScroll();
+    }
   };
 
-  // Update stats - PLAIN TEXT
-  const updateStats = (json) => {
+  const updateStats = throttle((json) => {
     const all = Object.values(json.markers || {}).flat();
     const matched = all.filter((s) => s.status === 'MATCHED').length;
     const merged = all.filter((s) => s.status === 'MERGED').length;
@@ -145,126 +160,83 @@ export const createProcessorUI = (track) => {
     const total = json.totalMarkers || all.length;
     const percent = total ? Math.round(((matched + merged) / total) * 100) : 0;
 
-    statsBar.textContent = `Stats: ✅ ${matched} matched | 🔗 ${merged} merged | ❌ ${orphaned} orphaned | 📊 ${total} total | 🎯 ${percent}% success`;
-  };
+    statsBar.textContent = `✅ ${matched} | 🔗 ${merged} | ❌ ${orphaned} | 📊 ${total} | 🎯 ${percent}%`;
+  }, 300);
 
-  // Render position entry - SHOW ALL FIELDS EXCEPT PREV* METHODS
-  // Render position entry - SHOW ALL FIELDS EXCEPT PREV* METHODS (NO TRUNCATION)
-  const renderPosition = (item, isNew = false) => {
-    const statusColors = {
-      MATCHED: '#4CAF50',
-      MERGED: '#FF9800',
-      ORPHAN: '#F44336',
-      ORPHAN_GROUP: '#9C27B0',
-      GAP: '#666'
+  const renderPosition = (item) => {
+    const colors = {
+      MATCHED: '#4CAF50', MERGED: '#FF9800', ORPHAN: '#F44336',
+      ORPHAN_GROUP: '#9C27B0', GAP: '#666'
+    };
+    const color = colors[item.status] || '#666';
+
+    const data = {
+      position: item.position,
+      domainIndex: item.domainIndex,
+      status: item.status,
+      content: truncate(item.content),
+      ...(item.overallTranslation && { translation: truncate(item.overallTranslation) }),
+      ...(item.matchMethod && { method: item.matchMethod }),
+      ...(item.utterances?.length && {
+        utterances: item.utterances.map(u => ({
+          text: truncate(u.utterance, 80),
+          trans: truncate(u.elementTranslation, 80),
+          start: u.start?.toFixed(2),
+          dur: u.duration?.toFixed(2),
+          words: u.wordLength
+        }))
+      })
     };
 
-    const color = statusColors[item.status] || '#666';
-
-    // Filter out prev* fields and build clean object
-    const jsonObj = {};
-    const excludeFields = ['_compoundsMerged']; // Internal fields to exclude
-    
-    Object.keys(item).forEach((key) => {
-      // Skip prev* fields (prev5, prev4, prev3, prev5Choose4, etc.)
-      if (key.startsWith('prev')) return;
-      
-      // Skip internal fields
-      if (excludeFields.includes(key)) return;
-      
-      const value = item[key];
-      
-      // Summarize utterances array
-      if (key === 'utterances' && Array.isArray(value)) {
-        jsonObj[key] = `[${value.length} utterances]`;
-        jsonObj.utterancesCount = value.length;
-      }
-      // Summarize groupMembers array
-      else if (key === 'groupMembers' && Array.isArray(value)) {
-        jsonObj[key] = `[${value.length} members]`;
-        jsonObj.groupMembersCount = value.length;
-      }
-      // Summarize mergedOrphans array
-      else if (key === 'mergedOrphans' && Array.isArray(value)) {
-        jsonObj[key] = `[${value.length} orphans]`;
-        jsonObj.mergedOrphansDetails = value.map(o => ({
-          domainIndex: o.domainIndex,
-          position: o.position,
-          mergeDirection: o.mergeDirection
-        }));
-      }
-      // Keep other values as-is (NO TRUNCATION)
-      else {
-        jsonObj[key] = value;
-      }
-    });
-
-    const jsonStr = JSON.stringify(jsonObj, null, 2)
-      .split('\n')
-      .map((line) => '  ' + line)
-      .join('\n');
+    const json = JSON.stringify(data, null, 2).split('\n').map(l => '  ' + l).join('\n');
 
     return `
-      <div id="pos-${item.position}" style="
-        margin-bottom: 10px;
-        padding: 8px;
-        background: #2d2d2d;
-        border-left: 4px solid ${color};
-        border-radius: 3px;
-        ${isNew ? 'animation: slideIn 0.3s;' : ''}
-      ">
-        <div style="color: ${color}; font-weight: bold; margin-bottom: 4px;">
-          Position ${item.position}: ${item.domainIndex} - ${item.status}
-        </div>
-        <pre style="margin: 0; color: #d4d4d4; font-size: 10px; white-space: pre-wrap;">${jsonStr}</pre>
+      <div id="pos-${item.position}" style="margin-bottom: 10px; padding: 8px; background: #2d2d2d; border-left: 4px solid ${color}; border-radius: 3px;">
+        <div style="color: ${color}; font-weight: bold; margin-bottom: 4px; font-size: 11px;">#${item.position}: ${item.domainIndex} - ${item.status}</div>
+        <pre style="margin: 0; color: #d4d4d4; font-size: 9px; white-space: pre-wrap; line-height: 1.4;">${json}</pre>
       </div>
     `;
   };
 
-  // Update JSON viewer incrementally
-  const updateJSONView = (json, fullRebuild = false) => {
+  const updateJSONView = throttle((json, changedPos = [], fullRebuild = false) => {
     const items = getPositionOrderedData(json);
 
     if (fullRebuild) {
-      jsonViewer.innerHTML = items.map((item) => renderPosition(item, false)).join('');
-      items.forEach((item) => positionCache.set(item.position, item.status));
-    } else {
-      items.forEach((item) => {
-        const cached = positionCache.get(item.position);
+      jsonViewer.innerHTML = items.map(item => renderPosition(item)).join('');
+      items.forEach(item => positionCache.set(item.position, item.status));
+      userScrolledUp = false; // Reset on full rebuild
+      smartScroll();
+    } else if (changedPos.length) {
+      changedPos.forEach(pos => {
+        const item = items.find(i => i.position === pos);
+        if (!item) return;
 
-        if (cached !== item.status) {
-          const existingDiv = jsonViewer.querySelector(`#pos-${item.position}`);
+        const existing = jsonViewer.querySelector(`#pos-${pos}`);
+        const temp = document.createElement('div');
+        temp.innerHTML = renderPosition(item);
 
-          if (existingDiv) {
-            const temp = document.createElement('div');
-            temp.innerHTML = renderPosition(item, true);
-            existingDiv.replaceWith(temp.firstElementChild);
-          } else {
-            const temp = document.createElement('div');
-            temp.innerHTML = renderPosition(item, true);
-            jsonViewer.appendChild(temp.firstElementChild);
-          }
-
-          positionCache.set(item.position, item.status);
+        if (existing) {
+          existing.replaceWith(temp.firstElementChild);
+        } else {
+          jsonViewer.appendChild(temp.firstElementChild);
         }
+        positionCache.set(pos, item.status);
       });
+      smartScroll(); // Only scroll if user is already at bottom
     }
-  };
+  }, 400);
 
-  // Main processing
   processBtn.onclick = async () => {
     processBtn.disabled = true;
     processBtn.textContent = 'Initializing...';
     status.textContent = 'Loading...';
-
     positionCache.clear();
+    userScrolledUp = false; // Reset scroll state
 
     try {
       await loadCompoundData();
       const result = await processTrack(track);
       const sourceJSON = await getOrCreateJSON(track);
-
-      if (!result || !sourceJSON) throw new Error('Failed to load data');
 
       const processor = new StreamingTranslationProcessor(JSON.parse(JSON.stringify(sourceJSON)));
 
@@ -274,7 +246,7 @@ export const createProcessorUI = (track) => {
       toggleBtn.textContent = 'Hide JSON ▲';
 
       updateStats(sourceJSON);
-      updateJSONView(sourceJSON, true);
+      updateJSONView(sourceJSON, [], true);
 
       status.textContent = 'Opening AI Studio...';
       processBtn.textContent = 'Processing...';
@@ -282,26 +254,22 @@ export const createProcessorUI = (track) => {
       let lastText = '';
       let cleanup;
 
-      const timeoutId = setTimeout(() => {
-        status.textContent = '⏱️ Timeout (5 min)';
-        status.style.color = '#ff9800';
-        processBtn.disabled = false;
-        processBtn.textContent = 'Process Translation';
-      }, 300000);
-
       const handler = (e) => {
         const msg = e.detail;
 
         if (msg.action === 'aiStudioUpdate') {
           const chunk = msg.currentText.substring(lastText.length);
           if (chunk) {
-            processor.processChunk(chunk);
+            const result = processor.processChunk(chunk);
             const currentJSON = processor.getUpdatedJSON();
 
             updateStats(currentJSON);
-            updateJSONView(currentJSON, false);
+            if (result.changedPositions?.length) {
+              updateJSONView(currentJSON, result.changedPositions, false);
+            }
 
             status.textContent = `Processing: ${processor.stats.matched} matched, ${processor.stats.merged} merged`;
+            processor.clearChangedPositions();
           }
           lastText = msg.currentText;
 
@@ -309,20 +277,15 @@ export const createProcessorUI = (track) => {
             processor.finalize();
             processedJSON = processor.getUpdatedJSON();
 
+            userScrolledUp = false; // Force scroll on completion
             updateStats(processedJSON);
-            updateJSONView(processedJSON, true);
-
+            updateJSONView(processedJSON, [], true);
             copyToClipboard(formatJSON(processedJSON));
 
             const stats = getGlobalStats(processedJSON);
-            const rate = sourceJSON.totalMarkers
-              ? (
-                  ((processor.stats.matched + processor.stats.merged) / sourceJSON.totalMarkers) *
-                  100
-                ).toFixed(1)
-              : 0;
+            const rate = ((processor.stats.matched + processor.stats.merged) / sourceJSON.totalMarkers * 100).toFixed(1);
 
-            status.innerHTML = `✅ Complete! ${rate}% success • ${stats.totalUtterances} utterances • JSON copied`;
+            status.innerHTML = `✅ Complete! ${rate}% • ${stats.totalUtterances} utterances • JSON copied`;
             status.style.color = '#27ae60';
 
             processBtn.textContent = 'Done ✓';
@@ -330,7 +293,6 @@ export const createProcessorUI = (track) => {
             downloadBtn.style.display = 'inline-block';
             copyBtn.style.display = 'inline-block';
 
-            clearTimeout(timeoutId);
             cleanup();
 
             setTimeout(() => {
@@ -342,8 +304,7 @@ export const createProcessorUI = (track) => {
         }
 
         if (msg.action === 'aiStudioError' || msg.action === 'aiStudioClosed') {
-          status.textContent =
-            msg.action === 'aiStudioError' ? `❌ ${msg.error}` : '⚠️ AI Studio closed';
+          status.textContent = msg.action === 'aiStudioError' ? `❌ ${msg.error}` : '⚠️ AI Studio closed';
           status.style.color = '#d32f2f';
           processBtn.disabled = false;
           processBtn.textContent = 'Process Translation';
@@ -355,29 +316,14 @@ export const createProcessorUI = (track) => {
         }
       };
 
-      cleanup = () => {
-        window.removeEventListener('aiStudioMessage', handler);
-        clearTimeout(timeoutId);
-      };
-
+      cleanup = () => window.removeEventListener('aiStudioMessage', handler);
       window.addEventListener('aiStudioMessage', handler);
 
-      chrome.runtime.sendMessage(
-        {
-          action: 'openAIStudio',
-          promptText: result.content,
-          cardName: `Translation: ${track.languageCode || 'Unknown'}`
-        },
-        (res) => {
-          if (chrome.runtime.lastError || !res?.success) {
-            status.textContent = '❌ Failed to open AI Studio';
-            status.style.color = '#d32f2f';
-            processBtn.disabled = false;
-            processBtn.textContent = 'Process Translation';
-            cleanup();
-          }
-        }
-      );
+      chrome.runtime.sendMessage({
+        action: 'openAIStudio',
+        promptText: result.content,
+        cardName: `Translation: ${track.languageCode || 'Unknown'}`
+      });
     } catch (err) {
       status.textContent = `❌ ${err.message}`;
       status.style.color = '#d32f2f';
@@ -401,12 +347,6 @@ export const createProcessorUI = (track) => {
       setTimeout(() => (copyBtn.textContent = 'Copy JSON'), 2000);
     }
   };
-
-  // Animation
-  const style = document.createElement('style');
-  style.textContent =
-    '@keyframes slideIn { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }';
-  document.head.appendChild(style);
 
   container.append(title, status, btnContainer, statsBar, jsonViewer);
   return container;

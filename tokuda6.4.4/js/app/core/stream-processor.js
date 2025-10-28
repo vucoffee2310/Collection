@@ -1,6 +1,5 @@
 /**
- * Streaming Translation Processor
- * MERGED: processor.js + cache-builder.js
+ * Streaming Translation Processor - OPTIMIZED
  */
 
 import { getPositionMap } from '../lib/json-utils.js';
@@ -72,8 +71,9 @@ export class StreamingTranslationProcessor {
       processed: 0
     };
 
+    // OPTIMIZED: Reduced event storage
     this.events = [];
-    this.maxEvents = 1000;
+    this.maxEvents = 100; // Reduced from 1000
 
     // Build lookup caches
     const caches = buildCaches(sourceJSON);
@@ -81,10 +81,13 @@ export class StreamingTranslationProcessor {
     this.sourcePrevCache = caches.sourcePrevCache;
     this.positionMap = caches.positionMap;
 
+    // OPTIMIZED: Per-marker lookup cache
+    this.lookupCacheMap = new Map();
+
     // Buffer management
     this.pendingBuffer = '';
-    this.maxBufferSize = 100000;
-    this.bufferKeepSize = 1000;
+    this.maxBufferSize = 50000; // Reduced from 100000
+    this.bufferKeepSize = 500; // Reduced from 1000
 
     // Tracking
     this.lastMatchedPosition = 0;
@@ -93,6 +96,10 @@ export class StreamingTranslationProcessor {
     // Patterns
     this.markerPattern = /\(([a-z])\)/g;
     this.nextMarkerPattern = /\(([a-z])\)/;
+
+    // OPTIMIZED: Track changed positions for incremental updates
+    this.changedPositions = new Set();
+    this.lastUpdateTime = 0;
   }
 
   processChunk(chunk) {
@@ -112,13 +119,19 @@ export class StreamingTranslationProcessor {
       this.completedMarkers.push(marker);
       const matchResult = matchAndUpdate(this, marker);
       this.logEvent(marker, matchResult);
+      
+      // Track changed position
+      if (matchResult.sourcePosition) {
+        this.changedPositions.add(matchResult.sourcePosition);
+      }
     });
 
     return {
       newMarkers,
       currentMarker: this.currentMarker,
       stats: this.stats,
-      bufferLength: this.buffer.length
+      bufferLength: this.buffer.length,
+      changedPositions: Array.from(this.changedPositions) // Return changed positions
     };
   }
 
@@ -185,14 +198,32 @@ export class StreamingTranslationProcessor {
     this.events.push({
       type: 'marker_completed',
       marker: marker.marker,
-      content: marker.content.substring(0, 50) + (marker.content.length > 50 ? '...' : ''),
       position: marker.position,
       matched: matchResult.matched,
       method: matchResult.method,
-      reason: matchResult.reason,
-      sourcePosition: matchResult.sourcePosition,
-      eventIndex: this.events.length
+      sourcePosition: matchResult.sourcePosition
     });
+  }
+
+  // OPTIMIZED: Get lookup cache (build once per marker)
+  getLookupCache(markerKey) {
+    if (this.lookupCacheMap.has(markerKey)) {
+      return this.lookupCacheMap.get(markerKey);
+    }
+    return null;
+  }
+
+  setLookupCache(markerKey, cache) {
+    this.lookupCacheMap.set(markerKey, cache);
+  }
+
+  clearLookupCache(markerKey) {
+    this.lookupCacheMap.delete(markerKey);
+  }
+
+  // OPTIMIZED: Clear changed positions after UI update
+  clearChangedPositions() {
+    this.changedPositions.clear();
   }
 
   finalize() {
@@ -209,6 +240,10 @@ export class StreamingTranslationProcessor {
     redistributeMergedTranslations(this.sourceJSON);
 
     this.printFinalStats();
+
+    // OPTIMIZED: Clear caches
+    this.lookupCacheMap.clear();
+    this.completedMarkers = []; // Clear to free memory
   }
 
   finalizeCurrentMarker() {

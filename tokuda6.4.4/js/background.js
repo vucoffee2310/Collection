@@ -1,6 +1,6 @@
+// tokuda6.4.4/js/background.js
 /**
- * Background Service Worker
- * Captures POT token + handles AI Studio tab automation
+ * Background Service Worker - LEAN BUT SAFE
  */
 
 let lastPot = null;
@@ -8,25 +8,44 @@ let lastVideoId = null;
 let aiStudioTabId = null;
 let youtubeTabId = null;
 
-// ===== POT Token Interception =====
+// Keep-alive
+let keepAlive;
+const startKeepAlive = () => {
+  if (keepAlive) clearInterval(keepAlive);
+  keepAlive = setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000);
+};
+startKeepAlive();
+chrome.runtime.onStartup.addListener(startKeepAlive);
+chrome.runtime.onInstalled.addListener(startKeepAlive);
+
+// POT interception
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
-    if (details.type === 'xmlhttprequest' || details.type === 'fetch') {
-      const url = new URL(details.url);
-      const pot = url.searchParams.get('pot');
-      const fromExt = url.searchParams.get('fromExt');
-      const videoId = url.searchParams.get('v');
-
-      if (!fromExt && pot) {
-        lastPot = pot;
-        lastVideoId = videoId;
-      }
+    const url = new URL(details.url);
+    const pot = url.searchParams.get('pot');
+    const fromExt = url.searchParams.get('fromExt');
+    const videoId = url.searchParams.get('v');
+    if (!fromExt && pot) {
+      lastPot = pot;
+      lastVideoId = videoId;
     }
   },
   { urls: ['https://www.youtube.com/api/timedtext?*'] }
 );
 
-// ===== Message Routing =====
+// Safe message sender
+const sendToYouTube = (message) => {
+  if (!youtubeTabId) return;
+  chrome.tabs.get(youtubeTabId, (tab) => {
+    if (chrome.runtime.lastError) {
+      youtubeTabId = null;
+    } else {
+      chrome.tabs.sendMessage(youtubeTabId, message).catch(() => {});
+    }
+  });
+};
+
+// Message routing
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getPot') {
     sendResponse({
@@ -34,111 +53,77 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       videoId: lastVideoId,
       valid: request.videoId === lastVideoId
     });
-    return true;
+    return false;
   }
 
   if (request.action === 'openAIStudio') {
-    handleOpenAIStudio(request, sender);
-    sendResponse({ success: true });
+    youtubeTabId = sender.tab?.id;
+    
+    chrome.tabs.create(
+      { url: 'https://aistudio.google.com/prompts/new_chat', active: true },
+      (tab) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+
+        aiStudioTabId = tab.id;
+        let injected = false;
+
+        // Timeout safeguard
+        const timeout = setTimeout(() => {
+          if (!injected) {
+            sendToYouTube({ action: 'aiStudioError', error: 'Page load timeout (30s)' });
+          }
+        }, 30000);
+
+        chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+          if (tabId === tab.id && info.status === 'complete') {
+            chrome.tabs.onUpdated.removeListener(listener);
+            clearTimeout(timeout);
+
+            chrome.scripting.executeScript({
+              target: { tabId },
+              files: ['js/app/automation.js']
+            }).then(() => {
+              setTimeout(() => {
+                chrome.tabs.sendMessage(tabId, {
+                  action: 'startAutomation',
+                  promptText: request.promptText,
+                  cardName: request.cardName || 'AI Studio'
+                }).then(() => {
+                  injected = true;
+                }).catch((err) => {
+                  sendToYouTube({ action: 'aiStudioError', error: 'Failed to start: ' + err.message });
+                });
+              }, 500);
+            }).catch((err) => {
+              sendToYouTube({ action: 'aiStudioError', error: 'Failed to inject: ' + err.message });
+            });
+          }
+        });
+
+        sendResponse({ success: true });
+      }
+    );
     return true;
   }
 
   if (['aiStudioUpdate', 'aiStudioError', 'aiStudioStarted'].includes(request.action)) {
-    relayToYouTube(request);
-    return true;
+    sendToYouTube(request);
+    return false;
   }
+
+  return false;
 });
 
-// ===== AI Studio Tab Management =====
-const handleOpenAIStudio = (request, sender) => {
-  youtubeTabId = sender.tab?.id;
-  console.log(`📋 Opening AI Studio from YouTube tab ${youtubeTabId}`);
-
-  chrome.tabs.create(
-    { url: 'https://aistudio.google.com/prompts/new_chat', active: true },
-    (tab) => {
-      aiStudioTabId = tab.id;
-      let injected = false;
-
-      const timeoutId = setTimeout(() => {
-        if (!injected) {
-          console.error('⏱️ AI Studio page load timeout');
-          notifyYouTube({ action: 'aiStudioError', error: 'Page load timeout (30s)' });
-        }
-      }, 30000);
-
-      chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-        if (tabId === tab.id && info.status === 'complete') {
-          chrome.tabs.onUpdated.removeListener(listener);
-          clearTimeout(timeoutId);
-          injectAutomationScript(tab.id, request);
-          injected = true;
-        }
-      });
-    }
-  );
-};
-
-const injectAutomationScript = (tabId, request) => {
-  console.log(`✅ AI Studio tab ${tabId} loaded, injecting script...`);
-
-  chrome.tabs.get(tabId, (tab) => {
-    if (chrome.runtime.lastError) {
-      console.error('❌ Tab was closed before injection');
-      return;
-    }
-
-    chrome.scripting
-      .executeScript({
-        target: { tabId: tab.id },
-        files: ['js/app/automation.js']
-      })
-      .then(() => {
-        console.log('✅ Automation script injected');
-        chrome.tabs
-          .sendMessage(tab.id, {
-            action: 'startAutomation',
-            promptText: request.promptText,
-            cardName: request.cardName || 'AI Studio Automation'
-          })
-          .catch((err) => {
-            console.error('❌ Failed to send start message:', err);
-            notifyYouTube({ action: 'aiStudioError', error: 'Failed to start automation: ' + err.message });
-          });
-      })
-      .catch((err) => {
-        console.error('❌ Script injection failed:', err);
-        notifyYouTube({ action: 'aiStudioError', error: 'Failed to inject script: ' + err.message });
-      });
-  });
-};
-
-const relayToYouTube = (message) => {
-  if (youtubeTabId) {
-    chrome.tabs.sendMessage(youtubeTabId, message).catch((err) => {
-      console.error('❌ Failed to relay to YouTube tab:', err);
-    });
-  }
-};
-
-const notifyYouTube = (message) => {
-  if (youtubeTabId) {
-    chrome.tabs.sendMessage(youtubeTabId, message).catch((err) => {
-      console.error('❌ Failed to notify YouTube tab:', err);
-    });
-  }
-};
-
-// ===== Tab Cleanup =====
+// Tab cleanup
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === aiStudioTabId) {
-    console.log('🚪 AI Studio tab closed');
     aiStudioTabId = null;
-    notifyYouTube({ action: 'aiStudioClosed' });
+    sendToYouTube({ action: 'aiStudioClosed' });
   }
-
   if (tabId === youtubeTabId) {
-    console.log('🚪 YouTube tab closed');
     youtubeTabId = null;
   }
 });
