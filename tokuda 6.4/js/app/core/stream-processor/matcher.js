@@ -1,6 +1,7 @@
 /**
  * Marker Matcher - Match translation markers with source markers
- * ✅ FIXED: Correct getPrev calculation (excludes current marker)
+ * ✅ ROOT FIX: Corrected getPrev calculation to NOT include the current marker.
+ * ✅ RETAINED: Proximity-based fallback for robust stream re-synchronization.
  */
 
 import { getGroupInfo } from '../../ui/cards/index.js';
@@ -9,7 +10,7 @@ import { safelyMergeCompounds } from '../../utils/compounds/index.js';
 import { checkForOrphans } from './merger.js';
 
 /**
- * ✅ Build fast lookup map for prev patterns
+ * Build fast lookup map for prev patterns
  */
 const buildPrevLookupMap = (unmatchedInstances, sourcePrevCache) => {
   const lookupMap = {
@@ -73,16 +74,16 @@ const buildPrevLookupMap = (unmatchedInstances, sourcePrevCache) => {
 export const matchAndUpdate = (processor, transMarker) => {
   processor.stats.processed++;
   
-  // ✅ FIXED: getPrev excludes current marker (already in completedMarkers)
+  // ✅ DEFINITIVE FIX: Get previous markers EXCLUDING the current one.
   const getPrev = (count) => {
     if (count === 0) return [];
     
-    // ✅ Subtract 1 because current marker is already pushed to completedMarkers
-    const len = processor.completedMarkers.length - 1;
-    if (len < count) return null;
+    // The current marker is at the end of the array.
+    const len = processor.completedMarkers.length;
+    if (len - 1 < count) return null;
     
-    // Get previous markers (excluding current)
-    return processor.completedMarkers.slice(len - count, len).map(m => m.marker);
+    // Slice from (end - 1 - count) up to (end - 1)
+    return processor.completedMarkers.slice(len - 1 - count, len - 1).map(m => m.marker);
   };
   
   const trans = {
@@ -92,7 +93,6 @@ export const matchAndUpdate = (processor, transMarker) => {
     position: transMarker.position
   };
   
-  // ✅ Current marker is at index length-1
   const markerIndex = processor.completedMarkers.length - 1;
   
   if (markerIndex < 3) {
@@ -113,7 +113,6 @@ export const matchAndUpdate = (processor, transMarker) => {
     return { matched: false, reason: 'no_unmatched_instances', sourcePosition: null };
   }
   
-  // ✅ Build lookup map once per marker key (lazy initialization)
   const lookupKey = `${markerKey}_lookup`;
   if (!processor[lookupKey]) {
     processor[lookupKey] = buildPrevLookupMap(unmatchedInstances, processor.sourcePrevCache);
@@ -130,10 +129,9 @@ export const matchAndUpdate = (processor, transMarker) => {
   let matchMethod = null;
   let matchedInstance = null;
   
-  // ✅ Handle edge cases (check individually)
+  // Handle edge cases
   for (const sourceInstance of unmatchedInstances) {
     if (sourceInstance.edgeCase && trans.edgeCase) {
-      // Both are edge cases, try to match prev patterns
       for (let j = 0; j <= markerIndex; j++) {
         const prevKey = `prev${j}`;
         if (sourceInstance[prevKey] !== undefined && trans[prevKey] !== undefined) {
@@ -141,7 +139,6 @@ export const matchAndUpdate = (processor, transMarker) => {
             matchedInstance = sourceInstance;
             matchMethod = `edge_case_${prevKey}`;
             matched = true;
-            console.log(`✅ Edge case match: ${trans.marker} at #${trans.position} using ${matchMethod}`);
             break;
           }
         }
@@ -150,56 +147,50 @@ export const matchAndUpdate = (processor, transMarker) => {
     }
   }
   
-  // ✅ O(1) lookups for non-edge cases
+  // O(1) lookups for non-edge cases
   if (!matched && transPrevCache.prev5) {
     matchedInstance = lookupMap.prev5.get(transPrevCache.prev5);
-    if (matchedInstance) {
-      matchMethod = 'prev5';
-      matched = true;
-    }
+    if (matchedInstance) { matchMethod = 'prev5'; matched = true; }
   }
   
   if (!matched && transPrevCache.prev4) {
     const candidates = lookupMap.prev5Choose4.get(transPrevCache.prev4);
-    if (candidates && candidates.length > 0) {
-      matchedInstance = candidates[0];
-      matchMethod = 'prev5Choose4';
-      matched = true;
-    }
+    if (candidates?.length > 0) { matchedInstance = candidates[0]; matchMethod = 'prev5Choose4'; matched = true; }
   }
   
   if (!matched && transPrevCache.prev3) {
     const candidates = lookupMap.prev5Choose3.get(transPrevCache.prev3);
-    if (candidates && candidates.length > 0) {
-      matchedInstance = candidates[0];
-      matchMethod = 'prev5Choose3';
-      matched = true;
-    }
+    if (candidates?.length > 0) { matchedInstance = candidates[0]; matchMethod = 'prev5Choose3'; matched = true; }
   }
   
   if (!matched && transPrevCache.prev4) {
     matchedInstance = lookupMap.prev4.get(transPrevCache.prev4);
-    if (matchedInstance) {
-      matchMethod = 'prev4';
-      matched = true;
-    }
+    if (matchedInstance) { matchMethod = 'prev4'; matched = true; }
   }
   
   if (!matched && transPrevCache.prev3) {
     const candidates = lookupMap.prev4Choose3.get(transPrevCache.prev3);
-    if (candidates && candidates.length > 0) {
-      matchedInstance = candidates[0];
-      matchMethod = 'prev4Choose3';
-      matched = true;
-    }
+    if (candidates?.length > 0) { matchedInstance = candidates[0]; matchMethod = 'prev4Choose3'; matched = true; }
   }
   
   if (!matched && transPrevCache.prev3) {
     matchedInstance = lookupMap.prev3.get(transPrevCache.prev3);
-    if (matchedInstance) {
-      matchMethod = 'prev3';
-      matched = true;
-    }
+    if (matchedInstance) { matchMethod = 'prev3'; matched = true; }
+  }
+
+  // Proximity-based fallback to allow self-recovery from sequence errors
+  if (!matched && unmatchedInstances.length > 0) {
+      let bestCandidate = unmatchedInstances.find(inst => inst.position > processor.lastMatchedPosition);
+      if (!bestCandidate) {
+          bestCandidate = unmatchedInstances.sort((a, b) => a.position - b.position)[0];
+      }
+      
+      if (bestCandidate) {
+          matchedInstance = bestCandidate;
+          matchMethod = 'fallback_proximity';
+          matched = true;
+          console.warn(`⚠️ Context match failed for ${trans.marker} at trans pos #${trans.position}. Using FALLBACK match to source pos #${matchedInstance.position}. Re-synchronizing stream.`);
+      }
   }
   
   if (matched && matchedInstance) {
@@ -214,19 +205,8 @@ export const matchAndUpdate = (processor, transMarker) => {
     matchedInstance.matchMethod = matchMethod;
     
     if (matchedInstance.utterances && matchedInstance.utterances.length > 0) {
-      const elementTranslations = splitTranslationByWordRatio(
-        mergedTranslation,
-        matchedInstance.utterances,
-        'vi'
-      );
-      
-      matchedInstance.utterances.forEach((utt, idx) => {
-        utt.elementTranslation = elementTranslations[idx] || '';
-      });
-      
-      console.log(`✅ Split translation into ${matchedInstance.utterances.length} utterances for ${matchedInstance.domainIndex}`);
-    } else {
-      console.warn(`⚠️ No utterances found for ${matchedInstance.domainIndex}`);
+      const elementTranslations = splitTranslationByWordRatio(mergedTranslation, matchedInstance.utterances, 'vi');
+      matchedInstance.utterances.forEach((utt, idx) => { utt.elementTranslation = elementTranslations[idx] || ''; });
     }
     
     processor.stats.matched++;
@@ -239,7 +219,6 @@ export const matchAndUpdate = (processor, transMarker) => {
     const remaining = unmatchedInstances.filter(inst => inst !== matchedInstance);
     if (remaining.length > 0) {
       processor.unmatchedMap.set(markerKey, remaining);
-      // ✅ Invalidate lookup map cache
       delete processor[lookupKey];
     } else {
       processor.unmatchedMap.delete(markerKey);

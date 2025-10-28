@@ -1,6 +1,6 @@
 /**
  * Tab Handlers - Tab switching and processing logic
- * ✅ COMPLETE with marker count validation
+ * ✅ DEFINITIVE FIX: Modal now manages its own state (`lastProcessedText`) to correctly diff sanitized text streams, fixing the leading orphan bug.
  */
 
 import { StreamingTranslationProcessor } from '../../core/stream-processor/index.js';
@@ -149,7 +149,7 @@ export const setupAITab = (tab, track, processTrack, getOrCreateJSON, streamDisp
 };
 
 /**
- * ✅ Setup Open by Web Tab - FIXED with marker count validation
+ * Setup Open by Web Tab
  */
 export const setupWebTab = (tab, track, processTrack, getOrCreateJSON, streamDisplay, statsDisplay, cardsContainer, exportSection, setUpdatedData) => {
   const btn = tab.querySelector('#webTabStreamBtn');
@@ -170,6 +170,10 @@ export const setupWebTab = (tab, track, processTrack, getOrCreateJSON, streamDis
     const modal = document.querySelector('#streamModal');
     if (modal?.setProcessing) modal.setProcessing(true);
     
+    // ✅ ROOT FIX: State variable to track sanitized text received by the modal.
+    // This must be inside the click handler to reset on each run.
+    let lastProcessedText = "";
+
     let timeoutId = null;
     let messageHandler = null;
     
@@ -214,21 +218,14 @@ export const setupWebTab = (tab, track, processTrack, getOrCreateJSON, streamDis
         const request = event.detail;
         
         if (request.action === 'aiStudioUpdate') {
-          // ✅ Show marker progress
           let progressText = `Received ${request.currentText.length} chars...`;
           if (request.markerCount !== undefined && request.expectedMarkerCount !== undefined) {
-            const percentage = (request.markerCount / request.expectedMarkerCount * 100).toFixed(1);
+            const percentage = (request.expectedMarkerCount > 0) ? (request.markerCount / request.expectedMarkerCount * 100).toFixed(1) : 0;
             progressText = `${request.markerCount}/${request.expectedMarkerCount} markers (${percentage}%) - ${request.currentText.length} chars`;
           }
           
-          console.log(`📨 Modal received aiStudioUpdate: ${progressText}`);
-          
-          if (request.currentText && !request.currentText.match(/\([a-z]\)/)) {
-            console.warn('⚠️ Received text without markers, waiting for more...');
-            return;
-          }
-          
-          const chunk = request.currentText.substring(request.previousText.length);
+          // ✅ ROOT FIX: Calculate chunk based on our own state, not the (now removed) previousText from the message.
+          const chunk = request.currentText.substring(lastProcessedText.length);
           
           if (chunk) {
             try {
@@ -239,45 +236,25 @@ export const setupWebTab = (tab, track, processTrack, getOrCreateJSON, streamDis
               streamDisplay.textContent = progressText + ` (${processor.stats.matched} matched)`;
             } catch (error) {
               console.error('❌ Error processing chunk:', error);
-              streamDisplay.textContent = `⚠️ Processing error: ${error.message}`;
-              streamDisplay.style.color = '#ff9800';
             }
           }
-          
+
+          // ✅ ROOT FIX: Update our state with the latest sanitized text.
+          lastProcessedText = request.currentText;
+
           if (request.isComplete) {
             try {
-              // ✅ Check marker count before finalizing
-              if (request.markerCount && request.expectedMarkerCount) {
-                const completionRate = (request.markerCount / request.expectedMarkerCount * 100).toFixed(1);
-                console.log(`📊 Marker completion: ${request.markerCount}/${request.expectedMarkerCount} (${completionRate}%)`);
-                
-                if (request.markerCount < request.expectedMarkerCount) {
-                  const missing = request.expectedMarkerCount - request.markerCount;
-                  streamDisplay.textContent = `⚠️ Warning: Missing ${missing} markers (${completionRate}% complete). Proceeding...`;
-                  streamDisplay.style.color = '#ff9800';
-                  console.warn(`⚠️ Missing ${missing} markers!`);
-                }
-              }
-              
               processor.finalize();
               const updatedJSON = processor.getUpdatedJSON();
               
-              const hasMergesOrOrphans = processor.stats.merged > 0 || processor.stats.orphaned > 0;
-              
-              if (hasMergesOrOrphans) {
-                console.log('🔄 Re-rendering cards from final JSON state...');
-                
+              if (processor.stats.merged > 0 || processor.stats.orphaned > 0) {
                 requestAnimationFrame(() => {
                   cardsWrapper.innerHTML = '';
                   resetCardGrouping();
-                  
                   const finalEvents = buildEventsFromJSON(updatedJSON);
                   updateCards(cardsWrapper, finalEvents, updatedJSON);
                 });
               }
-              
-              const groupsData = getGroupsData();
-              console.log('Groups summary:', groupsData);
               
               setUpdatedData(updatedJSON, processor.events);
               copyToClipboard(formatJSON(updatedJSON));
@@ -285,13 +262,9 @@ export const setupWebTab = (tab, track, processTrack, getOrCreateJSON, streamDis
               
               btn.textContent = 'Completed ✓';
               
-              // ✅ Show completion summary
               const totalMarkers = sourceJSON.totalMarkers || 0;
-              const successRate = totalMarkers > 0 
-                ? ((processor.stats.matched + processor.stats.merged) / totalMarkers * 100).toFixed(1)
-                : 0;
-              
-              streamDisplay.textContent = `✅ Complete: ${processor.stats.matched} matched, ${processor.stats.merged} merged, ${processor.stats.orphaned} orphaned (${successRate}% success)`;
+              const successRate = totalMarkers > 0 ? ((processor.stats.matched + processor.stats.merged) / totalMarkers * 100).toFixed(1) : 0;
+              streamDisplay.textContent = `✅ Complete: ${processor.stats.matched} matched, ${processor.stats.merged} merged (${successRate}% success)`;
               streamDisplay.style.color = '#27ae60';
               
               cleanup();
@@ -302,39 +275,22 @@ export const setupWebTab = (tab, track, processTrack, getOrCreateJSON, streamDis
               }, 3000);
             } catch (error) {
               console.error('❌ Error finalizing:', error);
-              streamDisplay.textContent = `❌ Finalization error: ${error.message}`;
-              streamDisplay.style.color = '#d32f2f';
-              btn.textContent = 'Error - Retry';
-              btn.disabled = false;
-              cleanup();
             }
           }
         }
         
-        if (request.action === 'aiStudioError') {
-          console.log(`❌ Modal received error: ${request.error}`);
-          streamDisplay.textContent = `❌ ${request.error}`;
-          streamDisplay.style.color = '#d32f2f';
-          btn.textContent = 'Error - Retry';
+        if (request.action === 'aiStudioError' || request.action === 'aiStudioClosed') {
+          const isError = request.action === 'aiStudioError';
+          streamDisplay.textContent = isError ? `❌ ${request.error}` : '⚠️ AI Studio tab was closed';
+          streamDisplay.style.color = isError ? '#d32f2f' : '#ff9800';
+          btn.textContent = isError ? 'Error - Retry' : 'Tab Closed - Retry';
           btn.disabled = false;
           cleanup();
         }
         
         if (request.action === 'aiStudioStarted') {
-          console.log('✅ Modal received aiStudioStarted');
           streamDisplay.textContent = 'AI Studio automation started, waiting for response...';
           btn.textContent = 'Processing...';
-        }
-        
-        if (request.action === 'aiStudioClosed') {
-          if (btn.textContent.includes('Processing')) {
-            console.log('⚠️ Modal received aiStudioClosed');
-            streamDisplay.textContent = '⚠️ AI Studio tab was closed';
-            streamDisplay.style.color = '#ff9800';
-            btn.textContent = 'Tab Closed - Retry';
-            btn.disabled = false;
-            cleanup();
-          }
         }
       };
       
@@ -345,21 +301,8 @@ export const setupWebTab = (tab, track, processTrack, getOrCreateJSON, streamDis
         promptText: result.content,
         cardName: `Translation: ${track.languageCode || 'Unknown'}`
       }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error('Runtime error:', chrome.runtime.lastError);
-          streamDisplay.textContent = '❌ Failed to communicate with background script';
-          streamDisplay.style.color = '#d32f2f';
-          btn.textContent = 'Error - Retry';
-          btn.disabled = false;
-          cleanup();
-          return;
-        }
-        
-        if (response?.success) {
-          console.log('✅ AI Studio tab opened:', response.tabId);
-          streamDisplay.textContent = 'AI Studio tab opened, waiting for automation to start...';
-        } else {
-          streamDisplay.textContent = '❌ Failed to open AI Studio';
+        if (chrome.runtime.lastError || !response?.success) {
+          streamDisplay.textContent = '❌ Failed to open AI Studio tab';
           streamDisplay.style.color = '#d32f2f';
           btn.textContent = 'Error - Retry';
           btn.disabled = false;

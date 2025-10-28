@@ -118,13 +118,69 @@ const handleLeadingOrphans = (processor, orphans) => {
 };
 
 /**
- * Handle gap orphans - merge backward into preceding match
+ * Handle gap orphans - merge single orphans backward, group multiple orphans
  */
 const handleGapOrphans = (processor, orphans, precedingMatch) => {
-  orphans.forEach(orphan => {
-    mergeOrphanToPreceding(processor, orphan, precedingMatch);
-  });
+  // If only one orphan is in the gap, merge it backward.
+  if (orphans.length === 1) {
+    mergeOrphanToPreceding(processor, orphans[0], precedingMatch);
+    return;
+  }
+
+  // If there are multiple orphans, group them together for clarity.
+  console.log(`👑 Creating GAP orphan group with ${orphans.length} members.`);
+  const leader = orphans[0];
+  leader.status = "ORPHAN_GROUP";
+  leader.orphanGroupType = "GAP";
+  leader.groupMembers = [];
+  processor.stats.orphaned++;
+
+  if (!leader.utterances) leader.utterances = [];
+
+  for (let i = 1; i < orphans.length; i++) {
+    const orphan = orphans[i];
+
+    orphan.status = "MERGED";
+    orphan.mergedInto = leader.domainIndex;
+    orphan.mergeDirection = "ORPHAN_GROUP";
+    processor.stats.merged++;
+
+    const orphanStats = getInstanceStats(orphan);
+    leader.groupMembers.push({
+      domainIndex: orphan.domainIndex,
+      position: orphan.position,
+      content: orphan.content,
+      utterances: orphan.utterances || [],
+      contentLength: orphanStats.contentLength,
+      totalUtteranceWords: orphanStats.totalUtteranceWords
+    });
+
+    if (orphan.utterances && orphan.utterances.length > 0) {
+      orphan.utterances.forEach(utt => {
+        utt._mergedFrom = orphan.domainIndex;
+      });
+      leader.utterances.push(...orphan.utterances);
+    }
+  }
+
+  if (processor.events.length < processor.maxEvents) {
+    const eventIndex = processor.events.length;
+    const groupInfo = getGroupInfo(eventIndex);
+
+    processor.events.push({
+      type: 'orphan_group_created',
+      marker: leader.domainIndex,
+      position: leader.position,
+      orphanGroupType: 'GAP',
+      memberCount: orphans.length - 1,
+      reason: 'multiple_markers_skipped_in_translation',
+      detectedBetween: `Gap orphan group with ${orphans.length} members`,
+      group: groupInfo.groupNumber,
+      eventIndex: eventIndex
+    });
+  }
 };
+
 
 /**
  * Handle trailing orphans - create self-contained group
@@ -235,7 +291,7 @@ export const mergeOrphanToPreceding = (processor, orphanInstance, precedingMatch
     utterances: orphanInstance.utterances,
     contentLength: orphanStats.contentLength,
     totalUtteranceWords: orphanStats.totalUtteranceWords,
-    overallLength: orphanInstance.overallLength,  // ✅ Include overallLength
+    overallLength: orphanInstance.overallLength,
     mergeDirection: "BACKWARD"
   });
   
@@ -251,7 +307,6 @@ export const mergeOrphanToPreceding = (processor, orphanInstance, precedingMatch
     targetMatch.utterances.push(...orphanInstance.utterances);
   }
   
-  // ✅ Update target's overallLength
   if (targetMatch.overallLength !== undefined && orphanInstance.overallLength !== undefined) {
     targetMatch.overallLength += orphanInstance.overallLength;
   }
@@ -295,7 +350,7 @@ export const mergeOrphanForward = (processor, orphanInstance, targetInstance) =>
     utterances: orphanInstance.utterances,
     contentLength: orphanStats.contentLength,
     totalUtteranceWords: orphanStats.totalUtteranceWords,
-    overallLength: orphanInstance.overallLength,  // ✅ Include overallLength
+    overallLength: orphanInstance.overallLength,
     mergeDirection: "FORWARD"
   });
   
@@ -311,7 +366,6 @@ export const mergeOrphanForward = (processor, orphanInstance, targetInstance) =>
     targetInstance.utterances.unshift(...orphanInstance.utterances);
   }
   
-  // ✅ Update target's overallLength
   if (targetInstance.overallLength !== undefined && orphanInstance.overallLength !== undefined) {
     targetInstance.overallLength += orphanInstance.overallLength;
   }
