@@ -1,5 +1,5 @@
 /**
- * Processor UI - SMART AUTO-SCROLL
+ * Processor UI - ALL FIELDS (except prev*)
  */
 
 import { getVideoId, copyToClipboard, downloadFile, formatJSON } from '../lib/helpers.js';
@@ -64,7 +64,7 @@ const throttle = (fn, delay) => {
   };
 };
 
-const truncate = (str, len = 150) => {
+const truncate = (str, len = 200) => {
   if (!str || str.length <= len) return str;
   return str.substring(0, len) + '...';
 };
@@ -122,21 +122,18 @@ export const createProcessorUI = (track) => {
 
   let processedJSON = null;
   let positionCache = new Map();
-  let userScrolledUp = false; // Track manual scroll
+  let userScrolledUp = false;
 
-  // ===== SMART AUTO-SCROLL =====
   const isNearBottom = (element) => {
-    const threshold = 100; // pixels from bottom
+    const threshold = 100;
     return element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
   };
 
-  // Track when user manually scrolls up
   jsonViewer.addEventListener('scroll', () => {
     userScrolledUp = !isNearBottom(jsonViewer);
   });
 
   const smartScroll = () => {
-    // Only auto-scroll if user hasn't manually scrolled up
     if (!userScrolledUp) {
       jsonViewer.scrollTop = jsonViewer.scrollHeight;
     }
@@ -147,7 +144,7 @@ export const createProcessorUI = (track) => {
     jsonViewer.style.display = hidden ? 'block' : 'none';
     toggleBtn.textContent = hidden ? 'Hide JSON ▲' : 'Show JSON ▼';
     if (hidden) {
-      userScrolledUp = false; // Reset on toggle
+      userScrolledUp = false;
       smartScroll();
     }
   };
@@ -163,6 +160,7 @@ export const createProcessorUI = (track) => {
     statsBar.textContent = `✅ ${matched} | 🔗 ${merged} | ❌ ${orphaned} | 📊 ${total} | 🎯 ${percent}%`;
   }, 300);
 
+  // ===== RENDER ALL FIELDS EXCEPT prev* =====
   const renderPosition = (item) => {
     const colors = {
       MATCHED: '#4CAF50', MERGED: '#FF9800', ORPHAN: '#F44336',
@@ -170,23 +168,70 @@ export const createProcessorUI = (track) => {
     };
     const color = colors[item.status] || '#666';
 
-    const data = {
-      position: item.position,
-      domainIndex: item.domainIndex,
-      status: item.status,
-      content: truncate(item.content),
-      ...(item.overallTranslation && { translation: truncate(item.overallTranslation) }),
-      ...(item.matchMethod && { method: item.matchMethod }),
-      ...(item.utterances?.length && {
-        utterances: item.utterances.map(u => ({
-          text: truncate(u.utterance, 80),
-          trans: truncate(u.elementTranslation, 80),
+    // Fields to exclude (prev* context methods and internal fields)
+    const excludeFields = [
+      'prev5', 'prev4', 'prev3',
+      'prev5Choose4', 'prev5Choose3', 'prev4Choose3',
+      'edgeCase',
+      '_compoundsMerged'
+    ];
+
+    // Build clean display object with ALL other fields
+    const data = {};
+
+    Object.keys(item).forEach(key => {
+      // Skip excluded fields
+      if (excludeFields.includes(key)) return;
+
+      const value = item[key];
+
+      // Handle utterances array - show full details
+      if (key === 'utterances' && Array.isArray(value)) {
+        data.utterances = value.map(u => ({
+          utterance: truncate(u.utterance, 100),
+          elementTranslation: truncate(u.elementTranslation, 100),
           start: u.start?.toFixed(2),
-          dur: u.duration?.toFixed(2),
-          words: u.wordLength
-        }))
-      })
-    };
+          end: u.end?.toFixed(2),
+          duration: u.duration?.toFixed(2),
+          index: u.index,
+          wordLength: u.wordLength,
+          ...(u.markerDomainIndex && { markerDomainIndex: u.markerDomainIndex }),
+          ...(u.mergedSource && { mergedSource: u.mergedSource }),
+          ...(u._mergedFrom && { _mergedFrom: u._mergedFrom })
+        }));
+      }
+      // Handle groupMembers array
+      else if (key === 'groupMembers' && Array.isArray(value)) {
+        data.groupMembers = value.map(m => ({
+          domainIndex: m.domainIndex,
+          position: m.position,
+          content: truncate(m.content, 100),
+          contentLength: m.contentLength,
+          utterancesCount: m.utterances?.length || 0,
+          totalUtteranceWords: m.totalUtteranceWords
+        }));
+      }
+      // Handle mergedOrphans array
+      else if (key === 'mergedOrphans' && Array.isArray(value)) {
+        data.mergedOrphans = value.map(o => ({
+          domainIndex: o.domainIndex,
+          position: o.position,
+          content: truncate(o.content, 100),
+          mergeDirection: o.mergeDirection,
+          contentLength: o.contentLength,
+          utterancesCount: o.utterances?.length || 0,
+          overallLength: o.overallLength
+        }));
+      }
+      // Truncate long text fields
+      else if (typeof value === 'string' && value.length > 200) {
+        data[key] = truncate(value, 200);
+      }
+      // Keep everything else as-is
+      else {
+        data[key] = value;
+      }
+    });
 
     const json = JSON.stringify(data, null, 2).split('\n').map(l => '  ' + l).join('\n');
 
@@ -204,7 +249,7 @@ export const createProcessorUI = (track) => {
     if (fullRebuild) {
       jsonViewer.innerHTML = items.map(item => renderPosition(item)).join('');
       items.forEach(item => positionCache.set(item.position, item.status));
-      userScrolledUp = false; // Reset on full rebuild
+      userScrolledUp = false;
       smartScroll();
     } else if (changedPos.length) {
       changedPos.forEach(pos => {
@@ -222,7 +267,7 @@ export const createProcessorUI = (track) => {
         }
         positionCache.set(pos, item.status);
       });
-      smartScroll(); // Only scroll if user is already at bottom
+      smartScroll();
     }
   }, 400);
 
@@ -231,7 +276,7 @@ export const createProcessorUI = (track) => {
     processBtn.textContent = 'Initializing...';
     status.textContent = 'Loading...';
     positionCache.clear();
-    userScrolledUp = false; // Reset scroll state
+    userScrolledUp = false;
 
     try {
       await loadCompoundData();
@@ -277,7 +322,7 @@ export const createProcessorUI = (track) => {
             processor.finalize();
             processedJSON = processor.getUpdatedJSON();
 
-            userScrolledUp = false; // Force scroll on completion
+            userScrolledUp = false;
             updateStats(processedJSON);
             updateJSONView(processedJSON, [], true);
             copyToClipboard(formatJSON(processedJSON));
