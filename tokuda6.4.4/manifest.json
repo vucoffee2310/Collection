@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Youtube Subtitle Downloader",
+  "version": "4.0.0",
+  "description": "Download subtitle (Closed Caption) from YouTube with AI translation processing",
+  "icons": {
+    "48": "images/download-64.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "youtube-subtitle-downloader@mozilla.org"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "all_frames": false,
+      "js": ["js/content.js"]
+    }
+  ],
+  "permissions": ["webRequest", "scripting", "tabs"],
+  "host_permissions": [
+    "https://www.youtube.com/api/timedtext?*",
+    "https://aistudio.google.com/*"
+  ],
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["js/app/**/*.js", "data.json"],
+      "matches": ["*://*.youtube.com/*"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
