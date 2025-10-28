@@ -1,12 +1,13 @@
 // tokuda6.4.4/js/background.js
 /**
- * Background Service Worker - LEAN BUT SAFE
+ * Background Service Worker - With Audio Injector
  */
 
 let lastPot = null;
 let lastVideoId = null;
 let aiStudioTabId = null;
 let youtubeTabId = null;
+let tabGroupId = null;
 
 // Keep-alive
 let keepAlive;
@@ -59,53 +60,97 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'openAIStudio') {
     youtubeTabId = sender.tab?.id;
     
-    chrome.tabs.create(
-      { url: 'https://aistudio.google.com/prompts/new_chat', active: true },
-      (tab) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({ success: false, error: chrome.runtime.lastError.message });
-          return;
-        }
-
-        aiStudioTabId = tab.id;
-        let injected = false;
-
-        // Timeout safeguard
-        const timeout = setTimeout(() => {
-          if (!injected) {
-            sendToYouTube({ action: 'aiStudioError', error: 'Page load timeout (30s)' });
-          }
-        }, 30000);
-
-        chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-          if (tabId === tab.id && info.status === 'complete') {
-            chrome.tabs.onUpdated.removeListener(listener);
-            clearTimeout(timeout);
-
-            chrome.scripting.executeScript({
-              target: { tabId },
-              files: ['js/app/automation.js']
-            }).then(() => {
-              setTimeout(() => {
-                chrome.tabs.sendMessage(tabId, {
-                  action: 'startAutomation',
-                  promptText: request.promptText,
-                  cardName: request.cardName || 'AI Studio'
-                }).then(() => {
-                  injected = true;
-                }).catch((err) => {
-                  sendToYouTube({ action: 'aiStudioError', error: 'Failed to start: ' + err.message });
-                });
-              }, 500);
-            }).catch((err) => {
-              sendToYouTube({ action: 'aiStudioError', error: 'Failed to inject: ' + err.message });
-            });
-          }
-        });
-
-        sendResponse({ success: true });
+    chrome.tabs.get(youtubeTabId, (youtubeTab) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ success: false, error: 'YouTube tab not found' });
+        return;
       }
-    );
+
+      chrome.tabs.create(
+        {
+          url: 'https://aistudio.google.com/prompts/new_chat',
+          active: false,
+          index: youtubeTab.index + 1
+        },
+        async (aiStudioTab) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ success: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+
+          aiStudioTabId = aiStudioTab.id;
+
+          // Create tab group
+          try {
+            if (youtubeTab.groupId && youtubeTab.groupId !== -1) {
+              await chrome.tabs.group({
+                tabIds: [aiStudioTabId],
+                groupId: youtubeTab.groupId
+              });
+              tabGroupId = youtubeTab.groupId;
+            } else {
+              tabGroupId = await chrome.tabs.group({
+                tabIds: [youtubeTabId, aiStudioTabId]
+              });
+              
+              await chrome.tabGroups.update(tabGroupId, {
+                title: 'Translation Workspace',
+                color: 'blue'
+              });
+            }
+          } catch (err) {
+            console.warn('Tab grouping failed:', err);
+          }
+
+          let injected = false;
+          const timeout = setTimeout(() => {
+            if (!injected) {
+              sendToYouTube({ action: 'aiStudioError', error: 'Page load timeout (30s)' });
+            }
+          }, 30000);
+
+          chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+            if (tabId === aiStudioTab.id && info.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(listener);
+              clearTimeout(timeout);
+
+              // ===== INJECT BOTH SCRIPTS =====
+              chrome.scripting.executeScript({
+                target: { tabId },
+                files: [
+                  'js/app/audio-injector.js',  // ← Inject audio first
+                  'js/app/automation.js'        // ← Then automation
+                ]
+              }).then(() => {
+                // Wait for scripts to initialize
+                setTimeout(() => {
+                  // Start audio (already auto-starts, but ensure it)
+                  chrome.tabs.sendMessage(tabId, { action: 'startAudio' }).catch(() => {});
+                  
+                  // Then start automation
+                  setTimeout(() => {
+                    chrome.tabs.sendMessage(tabId, {
+                      action: 'startAutomation',
+                      promptText: request.promptText,
+                      cardName: request.cardName || 'AI Studio'
+                    }).then(() => {
+                      injected = true;
+                    }).catch((err) => {
+                      sendToYouTube({ action: 'aiStudioError', error: 'Failed to start: ' + err.message });
+                    });
+                  }, 200);
+                }, 500);
+              }).catch((err) => {
+                sendToYouTube({ action: 'aiStudioError', error: 'Failed to inject: ' + err.message });
+              });
+            }
+          });
+
+          sendResponse({ success: true });
+        }
+      );
+    });
+    
     return true;
   }
 

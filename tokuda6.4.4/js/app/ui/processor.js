@@ -135,7 +135,7 @@ export const createProcessorUI = (track) => {
 
   const smartScroll = () => {
     if (!userScrolledUp) {
-      jsonViewer.scrollTop = jsonViewer.scrollHeight;
+      jsonViewer.scrollTop = 0;
     }
   };
 

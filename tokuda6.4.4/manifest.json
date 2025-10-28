@@ -18,7 +18,7 @@
       "js": ["js/content.js"]
     }
   ],
-  "permissions": ["webRequest", "scripting", "tabs"],
+  "permissions": ["webRequest", "scripting", "tabs", "tabGroups"],
   "host_permissions": [
     "https://www.youtube.com/api/timedtext?*",
     "https://aistudio.google.com/*"
@@ -29,7 +29,7 @@
   "web_accessible_resources": [
     {
       "resources": ["js/app/**/*.js", "data.json"],
-      "matches": ["*://*.youtube.com/*"]
+      "matches": ["*://*.youtube.com/*", "*://*.aistudio.google.com/*"]
     }
   ],
   "content_security_policy": {
