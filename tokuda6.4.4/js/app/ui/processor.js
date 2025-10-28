@@ -1,5 +1,5 @@
 /**
- * Processor UI - ALL FIELDS (except prev*)
+ * Processor UI - Show ALL Real Fields (except prev*)
  */
 
 import { getVideoId, copyToClipboard, downloadFile, formatJSON } from '../lib/helpers.js';
@@ -160,7 +160,7 @@ export const createProcessorUI = (track) => {
     statsBar.textContent = `✅ ${matched} | 🔗 ${merged} | ❌ ${orphaned} | 📊 ${total} | 🎯 ${percent}%`;
   }, 300);
 
-  // ===== RENDER ALL FIELDS EXCEPT prev* =====
+  // ===== SHOW ALL FIELDS (just exclude prev* methods) =====
   const renderPosition = (item) => {
     const colors = {
       MATCHED: '#4CAF50', MERGED: '#FF9800', ORPHAN: '#F44336',
@@ -168,66 +168,20 @@ export const createProcessorUI = (track) => {
     };
     const color = colors[item.status] || '#666';
 
-    // Fields to exclude (prev* context methods and internal fields)
-    const excludeFields = [
-      'prev5', 'prev4', 'prev3',
-      'prev5Choose4', 'prev5Choose3', 'prev4Choose3',
-      'edgeCase',
-      '_compoundsMerged'
-    ];
-
-    // Build clean display object with ALL other fields
+    // Clone and process the item
     const data = {};
 
     Object.keys(item).forEach(key => {
-      // Skip excluded fields
-      if (excludeFields.includes(key)) return;
+      // Only exclude prev* context methods
+      if (key.startsWith('prev')) return;
 
       const value = item[key];
 
-      // Handle utterances array - show full details
-      if (key === 'utterances' && Array.isArray(value)) {
-        data.utterances = value.map(u => ({
-          utterance: truncate(u.utterance, 100),
-          elementTranslation: truncate(u.elementTranslation, 100),
-          start: u.start?.toFixed(2),
-          end: u.end?.toFixed(2),
-          duration: u.duration?.toFixed(2),
-          index: u.index,
-          wordLength: u.wordLength,
-          ...(u.markerDomainIndex && { markerDomainIndex: u.markerDomainIndex }),
-          ...(u.mergedSource && { mergedSource: u.mergedSource }),
-          ...(u._mergedFrom && { _mergedFrom: u._mergedFrom })
-        }));
-      }
-      // Handle groupMembers array
-      else if (key === 'groupMembers' && Array.isArray(value)) {
-        data.groupMembers = value.map(m => ({
-          domainIndex: m.domainIndex,
-          position: m.position,
-          content: truncate(m.content, 100),
-          contentLength: m.contentLength,
-          utterancesCount: m.utterances?.length || 0,
-          totalUtteranceWords: m.totalUtteranceWords
-        }));
-      }
-      // Handle mergedOrphans array
-      else if (key === 'mergedOrphans' && Array.isArray(value)) {
-        data.mergedOrphans = value.map(o => ({
-          domainIndex: o.domainIndex,
-          position: o.position,
-          content: truncate(o.content, 100),
-          mergeDirection: o.mergeDirection,
-          contentLength: o.contentLength,
-          utterancesCount: o.utterances?.length || 0,
-          overallLength: o.overallLength
-        }));
-      }
-      // Truncate long text fields
-      else if (typeof value === 'string' && value.length > 200) {
+      // Truncate long strings
+      if (typeof value === 'string' && value.length > 200) {
         data[key] = truncate(value, 200);
       }
-      // Keep everything else as-is
+      // Copy everything else as-is (including arrays, objects, etc)
       else {
         data[key] = value;
       }
