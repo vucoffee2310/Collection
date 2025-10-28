@@ -2,15 +2,7 @@
  * UI Main Entry Point - JSON-Only Version
  */
 
-import { getVideoId } from '../utils/helpers.js';
 import { createProcessorUI, clearCache } from './processor.js';
-
-const getLabel = (track) => 
-  track?.name?.simpleText || 
-  track?.name?.runs?.map(r => r.text).join('') || 
-  track?.languageName?.simpleText || 
-  track?.languageCode || 
-  'Unknown';
 
 export const createUI = (tracks) => {
   const existing = document.querySelector('#captionDownloadContainer');
@@ -36,7 +28,13 @@ export const createUI = (tracks) => {
     if (tracks.length > 1) {
       const info = document.createElement('div');
       info.style.cssText = 'font-size: 11px; color: #666; margin-top: 8px;';
-      info.textContent = `Available languages: ${tracks.map(t => getLabel(t)).join(', ')}`;
+      const getTrackLabel = (track) => 
+        track?.name?.simpleText || 
+        track?.name?.runs?.map(r => r.text).join('') || 
+        track?.languageName?.simpleText || 
+        track?.languageCode || 
+        'Unknown';
+      info.textContent = `Available languages: ${tracks.map(t => getTrackLabel(t)).join(', ')}`;
       container.appendChild(info);
     }
   }

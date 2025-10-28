@@ -2,7 +2,7 @@
  * Orphan Merger - Handle skipped/orphaned markers
  */
 
-import { findInstanceByDomainIndex } from '../../utils/json-helpers.js';
+// ❌ REMOVED: import { findInstanceByDomainIndex } from '../../utils/json-helpers.js';
 
 export const checkForOrphans = (processor, beforePosition, currentMatchedInstance = null) => {
   const startPos = processor.lastMatchedPosition + 1;

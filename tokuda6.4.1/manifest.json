@@ -36,11 +36,7 @@
     },
     "web_accessible_resources": [{
         "resources": [
-            "js/app/ui/main.js",
-            "js/app/ui/processor.js",
-            "js/app/core/**/*.js",
-            "js/app/export/**/*.js",
-            "js/app/utils/**/*.js",
+            "js/app/**/*.js",
             "data.json"
         ],
         "matches": ["*://*.youtube.com/*"]
