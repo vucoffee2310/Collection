@@ -1,6 +1,13 @@
 (function () {
   "use strict";
 
+  // ⭐ FIX: Add a singleton guard to prevent re-execution.
+  if (window.__XHR_INTERCEPTOR_LOADED__) {
+    console.warn('⚠️ XHR Interceptor script already loaded. Aborting.');
+    return;
+  }
+  window.__XHR_INTERCEPTOR_LOADED__ = true;
+
   const originalXHR = window.XMLHttpRequest;
   const TARGET_URL = "https://alkalimakersuite-pa.clients6.google.com";
   const TARGET_ENDPOINT = "GenerateContent";

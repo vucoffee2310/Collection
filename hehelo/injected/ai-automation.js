@@ -1,5 +1,11 @@
 (function() {
   'use strict';
+  
+  // ⭐ FIX: Add a singleton guard to prevent re-execution.
+  if (window.aiStudioAutomation) {
+    console.warn('⚠️ AI Automation script already loaded. Aborting.');
+    return;
+  }
 
   // Helper: Wait for element
   const waitForElement = (selector, timeout = 10000) => {
@@ -163,7 +169,7 @@
       console.log('✅ Temperature: 1.5');
 
       // Thinking budget
-      postMsg('action', { action: 'setting-thinking-budget', value: 500 });
+      postMsg('action', { action: 'setting-thinking-budget', value: 300 });
       const manualBudgetToggle = await waitForElement('[data-test-toggle="manual-budget"]');
       await setToggle(manualBudgetToggle.closest('mat-slide-toggle'), true);
       const budgetInput = await waitForElement(() => {

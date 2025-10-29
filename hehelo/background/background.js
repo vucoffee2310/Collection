@@ -49,6 +49,8 @@ class InjectionManager {
   async injectAll(tabId) {
     if (this.injectedTabs.has(tabId)) return false;
 
+    // ⭐ FIX: Add the tabId immediately to prevent race conditions from duplicate onUpdated events.
+    this.injectedTabs.add(tabId);
     console.log(`🚀 Parallel injection for tab ${tabId}...`);
     const startTime = Date.now();
 
@@ -61,6 +63,8 @@ class InjectionManager {
 
     if (!xhrSuccess || !automationSuccess) {
       console.error('❌ Critical injection failed');
+      // If a critical script fails, remove the tabId to allow for a potential retry on reload.
+      this.injectedTabs.delete(tabId);
       return false;
     }
 
@@ -72,7 +76,6 @@ class InjectionManager {
     ]);
 
     console.log(`✅ All ready in ${Date.now() - startTime}ms`);
-    this.injectedTabs.add(tabId);
     return true;
   }
 
