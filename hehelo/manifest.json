@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "AI Studio Monitor",
+  "version": "1.0",
+  "description": "Monitor Google AI Studio requests and responses",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://aistudio.google.com/*"
+  ],
+  "action": {
+    "default_title": "Open AI Studio Monitor"
+  },
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://aistudio.google.com/*"],
+      "js": ["content/content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected/xhr-interceptor.js",
+        "injected/ai-automation.js",
+        "injected/audio-injector.js"
+      ],
+      "matches": ["https://aistudio.google.com/*"]
+    }
+  ]
+}
