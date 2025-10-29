@@ -100,33 +100,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-const runAutomationBtn = document.getElementById('runAutomationBtn');
-
-runAutomationBtn.addEventListener('click', async () => {
-  runAutomationBtn.disabled = true;
-  runAutomationBtn.textContent = '⏳ Running...';
-  
-  try {
-    chrome.runtime.sendMessage({ 
-      action: 'runAutomation',
-      message: 'Hello! Please test these automation settings.'
-    });
-    
-    addLog('🤖 Triggering automation...', 'info');
-    setStatus('Running automation...', 'active');
-    
-    setTimeout(() => {
-      runAutomationBtn.disabled = false;
-      runAutomationBtn.textContent = '🤖 Run Automation';
-    }, 3000);
-  } catch (error) {
-    addLog(`Error: ${error.message}`, 'error');
-    setStatus('Error running automation', 'error');
-    runAutomationBtn.disabled = false;
-    runAutomationBtn.textContent = '🤖 Run Automation';
-  }
-});
-
 openBtn.addEventListener('click', async () => {
   openBtn.disabled = true;
   openBtn.textContent = '⏳ Opening...';
@@ -145,61 +118,6 @@ openBtn.addEventListener('click', async () => {
     setStatus('Error opening tab', 'error');
     openBtn.disabled = false;
     openBtn.textContent = '🚀 Open AI Studio';
-  }
-});
-
-const startAudioBtn = document.getElementById('startAudioBtn');
-const stopAudioBtn = document.getElementById('stopAudioBtn');
-
-// Start audio
-startAudioBtn.addEventListener('click', async () => {
-  try {
-    const tabs = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
-    
-    if (tabs.length === 0) {
-      addLog('❌ No AI Studio tab found', 'error');
-      return;
-    }
-    
-    await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      world: 'MAIN',
-      func: function() {
-        if (window.audioInjector) {
-          window.audioInjector.start();
-        }
-      }
-    });
-    
-    addLog('🔊 Audio start requested', 'info');
-  } catch (error) {
-    addLog(`Error: ${error.message}`, 'error');
-  }
-});
-
-// Stop audio
-stopAudioBtn.addEventListener('click', async () => {
-  try {
-    const tabs = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
-    
-    if (tabs.length === 0) {
-      addLog('❌ No AI Studio tab found', 'error');
-      return;
-    }
-    
-    await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      world: 'MAIN',
-      func: function() {
-        if (window.audioInjector) {
-          window.audioInjector.stop();
-        }
-      }
-    });
-    
-    addLog('⏹️ Audio stop requested', 'info');
-  } catch (error) {
-    addLog(`Error: ${error.message}`, 'error');
   }
 });
 
@@ -243,4 +161,3 @@ exportBtn.addEventListener('click', () => {
 addLog('Monitor initialized and ready', 'info');
 setConnectionStatus(true);
 chrome.runtime.sendMessage({ action: 'monitorReady' });
-

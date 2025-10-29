@@ -1,232 +1,159 @@
-// Request injection (backup, though background handles it automatically)
-chrome.runtime.sendMessage({ action: 'contentScriptReady' }).catch(() => {});
-
-// Message forwarding functions
-function sendLog(message, logType = 'info', content = null) {
-  chrome.runtime.sendMessage({
-    type: 'log',
-    message: message,
-    logType: logType,
-    content: content
-  }).catch(() => {});
-}
-
-function sendStatus(message, statusType = 'active') {
-  chrome.runtime.sendMessage({
-    type: 'status',
-    message: message,
-    statusType: statusType
-  }).catch(() => {});
-}
-
-// Safe substring helper
-function safeSubstring(str, start, end) {
-  if (!str) return 'N/A';
-  const text = String(str);
-  return text.length > end ? text.substring(start, end) + '...' : text;
-}
-
-// Safe value getter
-function safeValue(value, defaultValue = 'N/A') {
-  return value !== undefined && value !== null ? value : defaultValue;
-}
-
-// Listen for messages from injected scripts
-window.addEventListener('message', (event) => {
-  if (event.source !== window) return;
+// ⭐ SINGLETON: Ensure only ONE content script instance is active
+(function() {
+  const INSTANCE_ID = 'content-script-' + Date.now();
   
-  const data = event.data;
+  // Check if another instance is already running
+  if (window.__CONTENT_SCRIPT_INSTANCE__) {
+    console.warn('⚠️ Content script already running, this instance will exit');
+    return;
+  }
   
-  // XHR Interceptor messages
-  if (data.source === 'xhr-interceptor') {
-    switch(data.type) {
-      case 'interceptor-ready':
-        console.log('✅ XHR Interceptor is active and monitoring');
-        sendLog('✅ XHR Interceptor activated - monitoring GenerateContent API', 'info');
+  // Mark this window as having an active content script
+  window.__CONTENT_SCRIPT_INSTANCE__ = INSTANCE_ID;
+  
+  // Cleanup on unload
+  window.addEventListener('unload', () => {
+    if (window.__CONTENT_SCRIPT_INSTANCE__ === INSTANCE_ID) {
+      delete window.__CONTENT_SCRIPT_INSTANCE__;
+    }
+  });
+
+  console.log('✅ Content script instance started:', INSTANCE_ID);
+
+  // === ACTUAL CONTENT SCRIPT CODE STARTS HERE ===
+
+  chrome.runtime.sendMessage({ action: 'contentScriptReady' }).catch(() => {});
+
+  // Helpers
+  const sendLog = (message, logType = 'info', content = null) => {
+    chrome.runtime.sendMessage({ type: 'log', message, logType, content }).catch(() => {});
+  };
+
+  const sendStatus = (message, statusType = 'active') => {
+    chrome.runtime.sendMessage({ type: 'status', message, statusType }).catch(() => {});
+  };
+
+  const safe = (value, defaultValue = 'N/A') => {
+    return value !== undefined && value !== null ? value : defaultValue;
+  };
+
+  const safeStr = (str, start, end) => {
+    if (!str) return 'N/A';
+    const text = String(str);
+    return text.length > end ? text.substring(start, end) + '...' : text;
+  };
+
+  // Message handlers by source
+  const handlers = {
+    'xhr-interceptor': {
+      'ready': () => {
+        sendLog('✅ XHR Interceptor activated', 'info');
         sendStatus('✅ Interceptor active', 'active');
-        break;
-        
-      case 'request-detected':
-        sendLog(
-          `🎯 GenerateContent URL detected: ${safeValue(data.method)} ${safeSubstring(data.url, 0, 80)}`,
-          'request'
-        );
+      },
+      'request-detected': (data) => {
+        sendLog(`🎯 ${safe(data.method)} ${safeStr(data.url, 0, 80)}`, 'request');
         sendStatus('🔍 Request intercepted', 'active');
-        break;
-        
-      case 'request':
-        const requestInfo = [
-          `Prompt: ${safeSubstring(data.prompt, 0, 100)}`,
-          data.model ? `Model: ${data.model}` : '',
-          data.temperature !== undefined ? `Temperature: ${data.temperature}` : '',
-          data.topP !== undefined ? `Top P: ${data.topP}` : '',
-          data.topK !== undefined ? `Top K: ${data.topK}` : '',
-          data.maxOutputTokens !== undefined ? `Max Tokens: ${data.maxOutputTokens}` : ''
+      },
+      'request': (data) => {
+        const info = [
+          `Prompt: ${safeStr(data.prompt, 0, 100)}`,
+          data.model && `Model: ${data.model}`,
+          data.temperature !== undefined && `Temperature: ${data.temperature}`,
+          data.topP !== undefined && `Top P: ${data.topP}`,
+          data.topK !== undefined && `Top K: ${data.topK}`,
+          data.maxOutputTokens !== undefined && `Max Tokens: ${data.maxOutputTokens}`
         ].filter(Boolean).join('\n');
-        
-        sendLog('📤 Request sent to GenerateContent', 'request', requestInfo);
-        sendStatus('📤 Sending request...', 'active');
-        break;
-        
-      case 'thinking-update':
+        sendLog('📤 Request sent', 'request', info);
+        sendStatus('📤 Sending...', 'active');
+      },
+      'thinking-update': (data) => {
         sendLog(
-          `💭 Thinking chunk ${safeValue(data.count, 0)} (+${safeValue(data.chunkLength, 0)} chars, total: ${safeValue(data.totalLength, 0)})`, 
-          'thinking', 
-          safeValue(data.content, '')
+          `💭 Thinking chunk ${safe(data.count)} (+${safe(data.chunkLength)} chars, total: ${safe(data.totalLength)})`,
+          'thinking',
+          safe(data.content, '')
         );
-        break;
-        
-      case 'streaming-update':
+      },
+      'streaming-update': (data) => {
         sendLog(
-          `💬 Output chunk ${safeValue(data.count, 0)} (+${safeValue(data.chunkLength, 0)} chars, total: ${safeValue(data.totalLength, 0)})`, 
-          'answer', 
-          safeValue(data.content, '')
+          `💬 Output chunk ${safe(data.count)} (+${safe(data.chunkLength)} chars, total: ${safe(data.totalLength)})`,
+          'answer',
+          safe(data.content, '')
         );
-        break;
-        
-      case 'complete':
-        const thinkingText = safeValue(data.thinking, '');
-        const streamingText = safeValue(data.streaming, '');
-        const thinkingCount = safeValue(data.thinkingCount, 0);
-        const streamingCount = safeValue(data.streamingCount, 0);
-        const duration = safeValue(data.duration, 0);
-        
-        const summary = `Duration: ${duration}ms\n` +
-                       `Total chunks - Thinking: ${thinkingCount}, Output: ${streamingCount}\n` +
-                       `Total length - Thinking: ${thinkingText.length} chars, Output: ${streamingText.length} chars\n\n` +
-                       `--- THINKING ---\n${thinkingText}\n\n` +
-                       `--- OUTPUT ---\n${streamingText}`;
-        
-        sendLog(
-          `✅ XHR Complete (${duration}ms) - Thinking: ${thinkingCount} chunks, Output: ${streamingCount} chunks`, 
-          'complete', 
-          summary
-        );
-        sendStatus('✅ Request complete', 'active');
-        break;
-        
-      case 'error':
-        sendLog(`❌ XHR Error: ${safeValue(data.message, 'Unknown error')}`, 'error');
-        sendStatus('❌ XHR error', 'error');
-        break;
-        
-      default:
-        console.log('Unknown XHR interceptor message:', data.type, data);
-        break;
-    }
-  }
-  
-  // AI Automation messages
-  if (data.source === 'ai-automation') {
-    switch(data.type) {
-      case 'ready':
-        console.log('✅ AI Automation is ready - waiting for XHR interceptor...');
-        sendLog('✅ AI Automation ready - waiting for XHR interceptor signal', 'info');
-        break;
-        
-      case 'start':
-        sendLog('🤖 AUTO-RUNNING: Starting configuration...', 'info');
-        sendStatus('🤖 Auto-configuring...', 'active');
-        break;
-        
-      case 'action':
-        const action = safeValue(data.action, 'unknown');
-        const value = data.value;
-        const message = data.message;
-        
-        const actionMessages = {
-          'setting-temperature': `⚙️ Setting Temperature: ${value}`,
-          'setting-thinking-budget': `⚙️ Setting Thinking Budget: ${value}`,
-          'setting-google-search': `⚙️ Setting Google Search: ${value ? 'ON' : 'OFF'}`,
-          'setting-top-p': `⚙️ Setting Top P: ${value}`,
-          'sending-message': `📝 Preparing message: ${safeSubstring(message, 0, 50)}`,
-          'message-sent': `✅ Message sent - XHR interceptor will capture response`
+      },
+      'complete': (data) => {
+        const summary = `Duration: ${safe(data.duration)}ms\n` +
+                       `Chunks - Thinking: ${safe(data.thinkingCount)}, Output: ${safe(data.streamingCount)}\n` +
+                       `Length - Thinking: ${safe(data.thinking, '').length}, Output: ${safe(data.streaming, '').length}\n\n` +
+                       `--- THINKING ---\n${safe(data.thinking, '')}\n\n` +
+                       `--- OUTPUT ---\n${safe(data.streaming, '')}`;
+        sendLog(`✅ Complete (${safe(data.duration)}ms)`, 'complete', summary);
+        sendStatus('✅ Complete', 'active');
+      },
+      'error': (data) => {
+        sendLog(`❌ XHR Error: ${safe(data.message)}`, 'error');
+        sendStatus('❌ Error', 'error');
+      }
+    },
+    
+    'ai-automation': {
+      'ready': () => sendLog('✅ Automation ready', 'info'),
+      'start': () => {
+        sendLog('🤖 Starting configuration...', 'info');
+        sendStatus('🤖 Configuring...', 'active');
+      },
+      'action': (data) => {
+        const messages = {
+          'setting-temperature': `⚙️ Temperature: ${data.value}`,
+          'setting-thinking-budget': `⚙️ Thinking Budget: ${data.value}`,
+          'setting-google-search': `⚙️ Google Search: ${data.value ? 'ON' : 'OFF'}`,
+          'setting-top-p': `⚙️ Top P: ${data.value}`,
+          'sending-message': `📝 Message: ${safeStr(data.message, 0, 50)}`,
+          'message-sent': `✅ Message sent`
         };
-        
-        if (actionMessages[action]) {
-          sendLog(actionMessages[action], 'info');
-        } else {
-          console.log('Unknown automation action:', action, data);
-        }
-        break;
-        
-      case 'complete':
-        sendLog('✅ AUTO-RUN COMPLETE! Watch for XHR streaming response...', 'complete');
-        sendStatus('✅ Auto-run complete', 'active');
-        break;
-        
-      case 'error':
-        sendLog(`❌ Automation error: ${safeValue(data.message, 'Unknown error')}`, 'error');
-        sendStatus('❌ Automation failed', 'error');
-        break;
-        
-      default:
-        console.log('Unknown automation message:', data.type, data);
-        break;
+        if (messages[data.action]) sendLog(messages[data.action], 'info');
+      },
+      'complete': () => {
+        sendLog('✅ Auto-run complete!', 'complete');
+        sendStatus('✅ Complete', 'active');
+      },
+      'error': (data) => {
+        sendLog(`❌ Automation error: ${safe(data.message)}`, 'error');
+        sendStatus('❌ Failed', 'error');
+      }
+    },
+    
+    'audio-injector': {
+      'ready': () => sendLog('🔊 Audio ready - autoplay bypassed', 'info'),
+      'started': () => sendLog('▶️ Audio started', 'info'),
+      'stopped': () => sendLog('⏹️ Audio stopped', 'info'),
+      'error': (data) => sendLog(`❌ Audio: ${safe(data.message)}`, 'error')
     }
-  }
-});
+  };
 
-// Listen for messages from injected scripts
-window.addEventListener('message', (event) => {
-  if (event.source !== window) return;
-  
-  const data = event.data;
-  
-  // Safety check
-  if (!data || typeof data !== 'object') {
-    return;
-  }
-  
-  if (!data.source) {
-    return;
-  }
-  
-  // XHR Interceptor messages
-  if (data.source === 'xhr-interceptor') {
-    // ... existing XHR handler code ...
-  }
-  
-  // AI Automation messages
-  if (data.source === 'ai-automation') {
-    // ... existing automation handler code ...
-  }
-  
-  // ⭐ NEW: Audio Injector messages
-  if (data.source === 'audio-injector') {
-    switch(data.type) {
-      case 'ready':
-        console.log('✅ Audio Injector is ready');
-        sendLog('🔊 Audio Injector ready - autoplay policy bypassed', 'info');
-        break;
-        
-      case 'started':
-        console.log('🔊 Audio started');
-        sendLog('▶️ Audio started (minimal volume)', 'info');
-        break;
-        
-      case 'stopped':
-        console.log('⏹️ Audio stopped');
-        sendLog('⏹️ Audio stopped', 'info');
-        break;
-        
-      case 'status':
-        console.log('📊 Audio status:', data);
-        sendLog(`📊 Audio: ${data.audioContextState}, oscillator: ${data.oscillatorActive ? 'active' : 'inactive'}`, 'info');
-        break;
-        
-      case 'error':
-        console.error('❌ Audio error:', data.message);
-        sendLog(`❌ Audio error: ${data.message}`, 'error');
-        break;
-        
-      default:
-        console.log('Unknown audio injector message:', data.type, data);
-        break;
+  // Main message listener
+  window.addEventListener('message', (event) => {
+    // ⭐ Double-check this instance is still active
+    if (window.__CONTENT_SCRIPT_INSTANCE__ !== INSTANCE_ID) {
+      console.warn('⚠️ This content script instance is no longer active, ignoring message');
+      return;
     }
-  }
-});
 
-// Initial message
-sendLog('✅ Content script loaded', 'info');
-console.log('🔌 Content script ready - listening for events');
+    if (event.source !== window) return;
+    
+    const { source, type } = event.data || {};
+    if (!source || !type) return;
+
+    // Forward ready signals
+    if (type === 'ready') {
+      chrome.runtime.sendMessage({ action: 'scriptReady', scriptName: source }).catch(() => {});
+    }
+
+    // Handle messages
+    const handler = handlers[source]?.[type];
+    if (handler) handler(event.data);
+  });
+
+  sendLog('✅ Content script loaded', 'info');
+  console.log('🔌 Content script ready - instance:', INSTANCE_ID);
+
+})();
