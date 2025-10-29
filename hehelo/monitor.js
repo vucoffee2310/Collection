@@ -1,0 +1,158 @@
+const openBtn = document.getElementById('openBtn');
+const clearBtn = document.getElementById('clearBtn');
+const exportBtn = document.getElementById('exportBtn');
+const monitor = document.getElementById('monitor');
+const status = document.getElementById('status');
+const connectionDot = document.getElementById('connectionDot');
+const connectionText = document.getElementById('connectionText');
+
+const totalLogsEl = document.getElementById('totalLogs');
+const requestCountEl = document.getElementById('requestCount');
+const thinkingCountEl = document.getElementById('thinkingCount');
+const answerCountEl = document.getElementById('answerCount');
+
+let logCount = 0;
+let requestCount = 0;
+let thinkingCount = 0;
+let answerCount = 0;
+let allLogs = [];
+
+function updateStats() {
+  totalLogsEl.textContent = logCount;
+  requestCountEl.textContent = requestCount;
+  thinkingCountEl.textContent = thinkingCount;
+  answerCountEl.textContent = answerCount;
+}
+
+function addLog(message, type = 'info', content = null) {
+  const emptyState = monitor.querySelector('.empty-state');
+  if (emptyState) {
+    emptyState.remove();
+  }
+  
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  
+  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const typeLabels = {
+    info: 'INFO',
+    thinking: 'THINKING',
+    answer: 'ANSWER',
+    error: 'ERROR',
+    request: 'REQUEST',
+    complete: 'COMPLETE'
+  };
+  
+  entry.innerHTML = `
+    <div class="log-header">
+      <span class="log-type">${typeLabels[type] || 'INFO'}</span>
+      <span class="log-time">${time}</span>
+    </div>
+    <div class="log-message">${escapeHtml(message)}</div>
+    ${content ? `<div class="log-content">${escapeHtml(content)}</div>` : ''}
+  `;
+  
+  monitor.appendChild(entry);
+  monitor.scrollTop = monitor.scrollHeight;
+  
+  logCount++;
+  if (type === 'request') requestCount++;
+  if (type === 'thinking') thinkingCount++;
+  if (type === 'answer') answerCount++;
+  updateStats();
+  
+  allLogs.push({ time, type, message, content });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function setStatus(message, type = 'active') {
+  status.textContent = message;
+  status.className = type;
+}
+
+function setConnectionStatus(connected) {
+  if (connected) {
+    connectionDot.classList.remove('disconnected');
+    connectionText.textContent = 'Connected';
+  } else {
+    connectionDot.classList.add('disconnected');
+    connectionText.textContent = 'Disconnected';
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'log') {
+    addLog(message.message, message.logType || 'info', message.content || null);
+  } else if (message.type === 'status') {
+    setStatus(message.message, message.statusType || 'active');
+  } else if (message.type === 'connection') {
+    setConnectionStatus(message.connected);
+  }
+});
+
+openBtn.addEventListener('click', async () => {
+  openBtn.disabled = true;
+  openBtn.textContent = '⏳ Opening...';
+  
+  try {
+    chrome.runtime.sendMessage({ action: 'openAIStudio' });
+    setStatus('AI Studio tab opened. Waiting for page to load...', 'active');
+    addLog('Opening AI Studio in new tab...', 'info');
+    
+    setTimeout(() => {
+      openBtn.disabled = false;
+      openBtn.textContent = '🚀 Open AI Studio';
+    }, 2000);
+  } catch (error) {
+    addLog(`Error: ${error.message}`, 'error');
+    setStatus('Error opening tab', 'error');
+    openBtn.disabled = false;
+    openBtn.textContent = '🚀 Open AI Studio';
+  }
+});
+
+clearBtn.addEventListener('click', () => {
+  monitor.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-icon">📊</div>
+      <div class="empty-state-text">No logs yet</div>
+      <div class="empty-state-subtext">Click "Open AI Studio" to start monitoring</div>
+    </div>
+  `;
+  logCount = 0;
+  requestCount = 0;
+  thinkingCount = 0;
+  answerCount = 0;
+  allLogs = [];
+  updateStats();
+  setStatus('Log cleared', 'active');
+  setTimeout(() => { status.className = ''; }, 2000);
+});
+
+exportBtn.addEventListener('click', () => {
+  const exportData = {
+    exportTime: new Date().toISOString(),
+    stats: { total: logCount, requests: requestCount, thinking: thinkingCount, answers: answerCount },
+    logs: allLogs
+  };
+  
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ai-studio-monitor-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  setStatus('Log exported successfully', 'active');
+  setTimeout(() => { status.className = ''; }, 2000);
+});
+
+addLog('Monitor initialized and ready', 'info');
+setConnectionStatus(true);
+chrome.runtime.sendMessage({ action: 'monitorReady' });
